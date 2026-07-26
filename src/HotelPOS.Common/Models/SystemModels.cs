@@ -48,6 +48,9 @@ public class SystemSettingsDto
     public decimal VatRate { get; set; } = 7.00m;
     public bool EnableVat { get; set; } = false;
 
+    public string ReceiptDocPrefix { get; set; } = "RC";
+    public int ReceiptDocRunningNumber { get; set; } = 0;
+
     public string? LogoImagePath { get; set; }
     public string? QrCodeImagePath { get; set; }
 }

@@ -35,6 +35,11 @@ public class SystemSettingsControl : UserControl
     private NumericUpDown _numVatRate = null!;
     private CheckBox _chkEnableVat = null!;
 
+    // Section 4: Document Prefix & Sequences
+    private TextBox _txtDocPrefix = null!;
+    private NumericUpDown _numDocRunning = null!;
+    private Button _btnResetSequences = null!;
+
     private Button _btnSave = null!;
     private Button _btnReload = null!;
 
@@ -94,6 +99,11 @@ public class SystemSettingsControl : UserControl
         BuildOpsFields(grpOps);
         currentY += 245;
 
+        // Group 4: Document Prefix & Reset
+        var grpDocSeq = CreateGroupPanel("4. ตั้งค่าเลขที่เอกสารและการรีเซ็ตคีย์หลัก (Document Prefix & Reset)", currentY, 160);
+        BuildDocSeqFields(grpDocSeq);
+        currentY += 175;
+
         // Bottom Action Bar
         var pnlActions = new Panel
         {
@@ -133,7 +143,7 @@ public class SystemSettingsControl : UserControl
 
         mainScrollPanel.Controls.AddRange(new Control[]
         {
-            titleLabel, subtitleLabel, grpShop, grpPrinter, grpOps, pnlActions
+            titleLabel, subtitleLabel, grpShop, grpPrinter, grpOps, grpDocSeq, pnlActions
         });
 
         Controls.Add(mainScrollPanel);
@@ -393,6 +403,64 @@ public class SystemSettingsControl : UserControl
         });
     }
 
+    private void BuildDocSeqFields(Panel pnl)
+    {
+        var lblPrefix = new Label { Text = "คำนำหน้าเลขที่บิล (Prefix):", Location = new Point(20, 58), AutoSize = true, Font = new Font("Segoe UI", 10F, FontStyle.Bold) };
+        _txtDocPrefix = new TextBox { Location = new Point(200, 54), Width = 110, Font = new Font("Segoe UI", 10F) };
+
+        var lblRunning = new Label { Text = "เลขรันบิลล่าสุด (Running No.):", Location = new Point(340, 58), AutoSize = true, Font = new Font("Segoe UI", 10F, FontStyle.Bold) };
+        _numDocRunning = new NumericUpDown { Location = new Point(540, 54), Width = 110, Maximum = 999999, Minimum = 0, Font = new Font("Segoe UI", 10F) };
+
+        _btnResetSequences = new Button
+        {
+            Text = "🔄 รีเซ็ตลำดับคีย์และเลขรันทั้งหมด (Reset Sequences)",
+            BackColor = Color.FromArgb(239, 68, 68),
+            ForeColor = Color.White,
+            FlatStyle = FlatStyle.Flat,
+            Font = new Font("Segoe UI", 9.5F, FontStyle.Bold),
+            Location = new Point(20, 105),
+            Size = new Size(320, 36),
+            Cursor = Cursors.Hand
+        };
+        _btnResetSequences.Click += BtnResetSequences_Click;
+
+        var lblInfoSeq = new Label
+        {
+            Text = "* ปุ่มรีเซ็ตจะตั้งค่า Auto-increment ในระบบทั้งหมดให้ต่อจาก ID ล่าสุดที่มีอยู่ เพื่อลบล้างช่องว่างที่ลบไป และตั้งค่าเลขบิลเริ่มใหม่",
+            Location = new Point(350, 112),
+            AutoSize = true,
+            Font = new Font("Segoe UI", 9F, FontStyle.Italic),
+            ForeColor = Color.DimGray
+        };
+
+        pnl.Controls.AddRange(new Control[]
+        {
+            lblPrefix, _txtDocPrefix, lblRunning, _numDocRunning, _btnResetSequences, lblInfoSeq
+        });
+    }
+
+    private async Task ResetDatabaseSequencesAsync()
+    {
+        if (MessageBox.Show("ยืนยันการรีเซ็ตคีย์หลักในฐานข้อมูลและเลขรันบิลทั้งหมด?\nการดำเนินการนี้จะปรับค่า Auto-increment ID ของทุกตารางให้รันต่อจากข้อมูลล่าสุดที่มีอยู่ และตั้งค่าเลขรันบิลกลับไปเป็น 0", "ยืนยันการรีเซ็ต", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) == DialogResult.Yes)
+        {
+            try
+            {
+                await _settingsService.ResetDatabaseSequencesAsync();
+                MessageBox.Show("รีเซ็ตลำดับคีย์หลักและเลขรันบิลเรียบร้อยแล้ว", "สำเร็จ", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                await LoadSettingsAsync();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"รีเซ็ตไม่สำเร็จ: {ex.Message}", "ข้อผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+    }
+
+    private async void BtnResetSequences_Click(object? sender, EventArgs e)
+    {
+        await ResetDatabaseSequencesAsync();
+    }
+
     private async Task LoadSettingsAsync()
     {
         try
@@ -442,6 +510,9 @@ public class SystemSettingsControl : UserControl
             _numDeposit.Value = Math.Min(_numDeposit.Maximum, Math.Max(0, dto.DefaultSecurityDeposit));
             _numVatRate.Value = Math.Min(_numVatRate.Maximum, Math.Max(0, dto.VatRate));
             _chkEnableVat.Checked = dto.EnableVat;
+
+            _txtDocPrefix.Text = dto.ReceiptDocPrefix;
+            _numDocRunning.Value = Math.Min(_numDocRunning.Maximum, Math.Max(0, dto.ReceiptDocRunningNumber));
         }
         catch (Exception ex)
         {
@@ -475,7 +546,10 @@ public class SystemSettingsControl : UserControl
                 DefaultCheckOutTime = _txtCheckOutTime.Text.Trim(),
                 DefaultSecurityDeposit = _numDeposit.Value,
                 VatRate = _numVatRate.Value,
-                EnableVat = _chkEnableVat.Checked
+                EnableVat = _chkEnableVat.Checked,
+
+                ReceiptDocPrefix = _txtDocPrefix.Text.Trim(),
+                ReceiptDocRunningNumber = (int)_numDocRunning.Value
             };
 
             await _settingsService.SaveAllSettingsAsync(dto);

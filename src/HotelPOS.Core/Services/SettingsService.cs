@@ -87,6 +87,9 @@ public class SettingsService : ISettingsService
         dto.LogoImagePath = await GetAsync("logo_image_path");
         dto.QrCodeImagePath = await GetAsync("qrcode_image_path");
 
+        dto.ReceiptDocPrefix = await GetAsync("receipt_doc_prefix") ?? dto.ReceiptDocPrefix;
+        dto.ReceiptDocRunningNumber = int.TryParse(await GetAsync("receipt_doc_running_number"), out var rn) ? rn : dto.ReceiptDocRunningNumber;
+
         return dto;
     }
 
@@ -116,11 +119,30 @@ public class SettingsService : ISettingsService
             await SetAsync("logo_image_path", settings.LogoImagePath);
             await SetAsync("qrcode_image_path", settings.QrCodeImagePath);
 
+            await SetAsync("receipt_doc_prefix", settings.ReceiptDocPrefix);
+            await SetAsync("receipt_doc_running_number", settings.ReceiptDocRunningNumber.ToString());
+
             _logger.Info(LogCategory.System, "บันทึกการตั้งค่าระบบเรียบร้อยแล้ว", correlationId);
         }
         catch (Exception ex)
         {
             _logger.Error(LogCategory.System, "บันทึกการตั้งค่าระบบไม่สำเร็จ", ex, correlationId);
+            throw;
+        }
+    }
+
+    public async Task ResetDatabaseSequencesAsync()
+    {
+        var correlationId = _logger.NewCorrelationId();
+        try
+        {
+            await _repository.ResetDatabaseSequencesAsync();
+            await SetAsync("receipt_doc_running_number", "0");
+            _logger.Info(LogCategory.System, "รีเซ็ตคีย์หลักในฐานข้อมูลและตั้งเลขรันบิลเริ่มต้นใหม่สำเร็จ", correlationId);
+        }
+        catch (Exception ex)
+        {
+            _logger.Error(LogCategory.System, "รีเซ็ตคีย์หลักในฐานข้อมูลและเลขรันบิลไม่สำเร็จ", ex, correlationId);
             throw;
         }
     }

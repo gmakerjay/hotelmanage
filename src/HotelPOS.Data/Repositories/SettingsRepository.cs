@@ -73,4 +73,39 @@ public class SettingsRepository : ISettingsRepository
             throw;
         }
     }
+
+    public async Task ResetDatabaseSequencesAsync()
+    {
+        var correlationId = _logger.NewCorrelationId();
+        try
+        {
+            using var connection = _connectionFactory.CreateConnection();
+            connection.Open();
+            using var transaction = connection.BeginTransaction();
+
+            var tables = new[]
+            {
+                "rooms", "bookings", "room_types", "customers", 
+                "products", "product_categories", "sales", "sale_items", 
+                "payments", "invoice_documents", "folios", "audit_logs", 
+                "users", "roles"
+            };
+
+            foreach (var table in tables)
+            {
+                var sql = $@"
+                    INSERT OR REPLACE INTO sqlite_sequence (name, seq)
+                    VALUES ('{table}', (SELECT COALESCE(MAX(id), 0) FROM {table}));";
+                await connection.ExecuteAsync(sql, transaction: transaction);
+            }
+
+            transaction.Commit();
+            _logger.Info(LogCategory.Database, "รีเซ็ตค่าลำดับคีย์หลัก (Auto-increment Sequences) ของทุกตารางเรียบร้อยแล้ว", correlationId);
+        }
+        catch (Exception ex)
+        {
+            _logger.Error(LogCategory.Database, "รีเซ็ตค่าลำดับคีย์หลักไม่สำเร็จ", ex, correlationId);
+            throw;
+        }
+    }
 }
