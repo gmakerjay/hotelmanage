@@ -1,0 +1,27 @@
+# Build and Output directories
+[Bb]in/
+[Oo]bj/
+output/
+
+# IDE / Visual Studio files
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+.idea/
+.vscode/
+
+# OS metadata
+.DS_Store
+Thumbs.db
+
+# Dynamic / Cache files
+._cache_*
+*.cache
+*.log
+*.tmp
+*.db
+*.db-journal
+*.db-shm
+*.db-wal

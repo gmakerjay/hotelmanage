@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <UseWindowsForms>true</UseWindowsForms>
+    <RootNamespace>HotelPOS.LicenseAdminTool</RootNamespace>
+    <ApplicationIcon>app.ico</ApplicationIcon>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!--
+      สำคัญ: โปรเจคนี้จะเป็นที่เดียวที่เก็บ RSA Private Key (ใช้เซ็น license ให้ลูกค้า)
+      ห้าม reference โปรเจคนี้จาก HotelPOS.UI หรือโปรเจคใดๆ ที่จะแจกให้ลูกค้าเด็ดขาด (ดู SKILL.md ข้อ 5)
+    -->
+    <ProjectReference Include="..\HotelPOS.Common\HotelPOS.Common.csproj" />
+    <ProjectReference Include="..\HotelPOS.Logging\HotelPOS.Logging.csproj" />
+    <ProjectReference Include="..\HotelPOS.Licensing\HotelPOS.Licensing.csproj" />
+  </ItemGroup>
+
+</Project>

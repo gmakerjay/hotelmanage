@@ -1,0 +1,60 @@
+# บันทึกการเปลี่ยนแปลง (Changelogs) - HotelPOS TH
+
+เอกสารนี้ใช้สำหรับติดตามประวัติการเปลี่ยนแปลงและปรับปรุงโค้ดของระบบ HotelPOS TH แยกตามรุ่นและวันที่พัฒนาอย่างเป็นระเบียบ
+
+---
+
+## [v1.0.0] - ระบบบริหารจัดการห้องพัก และระบบลิขสิทธิ์ความปลอดภัย (Phase 1 & Phase 2)
+**วันที่:** 2026-07-26 | **เวลา:** 13:15 น.
+**ผู้รับผิดชอบ:** Antigravity AI Coding Assistant
+
+### 🚀 ฟีเจอร์ใหม่ (New Features)
+- **ระบบความปลอดภัยในการลบห้องพัก (Safe Room & RoomType Deletion):**
+  - อนุญาตให้ลบห้องพักและประเภทห้องพักได้อย่างอิสระ
+  - เพิ่มระบบตรวจสอบความปลอดภัย: ป้องกันการลบห้องพักที่มีสถานะ `Occupied (มีคนพักอยู่)` หรือ `Reserved (จองล่วงหน้า)` พร้อมแจ้งเตือนด้วยป๊อปอัปชัดเจน
+  - ป้องกันการลบประเภทห้องพักที่มีห้องพักใช้งานผูกกับประเภทนั้นอยู่ในระบบ
+- **ระบบบันทึกประวัติการทำงาน (Audit Log):**
+  - พัฒนา `AuditRepository`, `AuditService` บันทึกทุกกิจกรรม (การลบห้องพัก, เช็คอิน, เช็คเอาท์, การสำรอง/คืนค่า DB, นำเข้าส่งออก CSV) ลงตาราง `audit_logs`
+  - หน้าต่าง `AuditLogControl`: ค้นหากิจกรรมและกรองตามช่วงวันที่ เพื่อไว้ออดิตย้อนหลังในอนาคต
+- **ระบบสำรองและคืนค่าฐานข้อมูล (Database Backup & Restore):**
+  - พัฒนา `BackupService` สำรองไฟล์ SQLite ฐานข้อมูลทันทีโดยใช้ SQLite Backup API เคลียร์ connection lock ปลอดภัย
+  - ฟังก์ชัน คืนค่าฐานข้อมูล (Restore DB) พร้อมระบบ Safety rollback หากเกิดข้อผิดพลาด
+- **ระบบนำเข้าและส่งออกข้อมูล (CSV Import & Export):**
+  - พัฒนา `ExportImportService` ส่งออกและนำเข้าข้อมูลห้องพักและลูกค้าด้วยไฟล์ CSV
+- **หน้าต่างแท็บใหม่ใน UI (`MainForm`):**
+  - เพิ่มแท็บ **"📜 Audit Log"** ดูประวัติการทำงานย้อนหลัง
+  - เพิ่มแท็บ **"💾 สำรอง/นำเข้า"** จัดการสำรองฐานข้อมูลและนำเข้า/ส่งออก CSV
+- **ผังห้องพักการ์ดสี (RoomGridControl):** หน้าจอ Interactive Grid แสดงสีห้อง 5 สถานะ (เขียว=ว่าง, แดง=มีคนพัก, เหลือง=รอทำความสะอาด, ฟ้า=จองไว้, เทา=ปิดซ่อม) พร้อมตัวกรองชั้น/ประเภทห้อง และเมนูคลิกด่วน
+- **ระบบการจอง เช็คอิน และเช็คเอาท์ (Booking & Folio):**
+  - **Walk-in Check-in:** หน้าต่าง `CheckInForm` ลงทะเบียนเข้าพักทันที เลือกราคา Daily/Hourly/Monthly Rate
+  - **Check-out:** หน้าต่าง `CheckOutForm` คำนวณระยะเวลาพักจริง มินิบาร์/บริการเสริม ส่วนลด สรุปยอดสุทธิ ปิด Folio และเปลี่ยนสถานะห้องเป็น 'รอทำความสะอาด'
+  - **Advance Reservation:** หน้าต่าง `BookingForm` ลงทะเบียนจองห้องพักล่วงหน้า
+- **หน้าจัดการประเภทห้อง & เลขห้อง (RoomManagementControl):** หน้าจอแอดมินสำหรับ CRUD ประเภทห้องพัก กำหนดราคา Daily/Hourly/Monthly Rate และจัดการเลขห้อง/ชั้น
+- **หน้าจัดการข้อมูลลูกค้า (CustomerManagementControl):** หน้าจอค้นหาและแก้ไขข้อมูลลูกค้า
+- **หน้าตารางรายการจอง (BookingListControl):** หน้าจอแสดงประวัติและรายการจองทั้งหมด พร้อมปุ่มเช็คอิน/เช็คเอาท์/ยกเลิก
+- **ระบบลิขสิทธิ์ความปลอดภัย (Core License):** ถอดรหัส Hardware ID, ลายเซ็นดิจิทัล RSA 2048 บิต, Trial 30 วัน ป้องกันการแก้ไขเวลา, License Activation Form, และ License Admin Tool สำหรับผู้ขายออกคีย์
+- **ระบบ Unit Tests:** เพิ่มเคสทดสอบความปลอดภัยการลบห้องพัก รวมเป็น 18 เคสทดสอบอัตโนมัติ (ผ่าน 100%)
+
+### 🔧 การปรับปรุงและแก้ไข (Bug Fixes & Improvements)
+- **ปรับปรุงแถบไซด์บาร์ด้านขวา (Responsive Sidebar Fix):**
+  - แก้ไข `SplitContainer` ใน `RoomManagementControl` และ `CustomerManagementControl` โดยกำหนด `FixedPanel = Panel2` ความกว้างขั้นต่ำ 420px
+  - คำนวณปรับขนาด Splitter Distance อัตโนมัติตามการย่อ/ขยายหน้าจอ ไม่ต้องเลื่อน Scrollbar เอง
+- **ปรับปรุงขนาดฟอนต์ & ปุ่มกด UI (Front-End UX Enhancement):**
+  - ขยายขนาดการ์ดห้องพักจาก 160x130 เป็น 200x150px
+  - ขยายฟอนต์เลขห้อง (15.5pt Bold), สถานะ (11.5pt Bold), ราคา (10pt Bold)
+  - ขยายฟอนต์และปุ่มกดหลักในทุกหน้าต่าง Dialog เป็น 11.5pt Bold (160x42px)
+- **ปรับปรุง CreatedBy เป็น Nullable:** แก้ไข Foreign Key constraint เรื่อง `created_by` ในตาราง `bookings` และเพิ่ม seed user เริ่มต้น ID=1 ใน `schema.sql`
+- **ปรับเปลี่ยน Dynamic SQL Query:** เปลี่ยนไปใช้ Dapper `DynamicParameters` เพื่อความเสถียรและประสิทธิภาพสูงสุด
+- **แก้ไข Error CS5001 & File Locking:** สร้าง Stub `Program.cs` ให้กับ `LicenseAdminTool` และปรับปรุง `ClearAllPools()` ใน Unit Tests
+
+---
+
+## [v0.1.0] - เตรียมโครงสร้างระบบ (Setup Solution - Phase 0)
+**วันที่:** 2026-07-26 | **เวลา:** 05:40 น.
+**ผู้รับผิดชอบ:** Claude AI Coding Assistant
+
+### 🚀 ฟีเจอร์ใหม่ (New Features)
+- **โครงสร้าง Solution:** แยกสถาปัตยกรรมออกเป็น 7 โปรเจคย่อย (UI, Core, Data, Licensing, Printing, Logging, Common) ตามสไตล์ Layered Architecture
+- **ฐานข้อมูล SQLite Schema:** จัดทำสคริปต์ `schema.sql` พร้อมตารางสำคัญและ Seed ข้อมูลพนักงานและตั้งค่าระบบเริ่มต้น
+- **โครงสร้าง Logging (Serilog):** ระบบ rolling log ไฟล์รายวันแบบ JSON เก็บไว้ในโฟลเดอร์ AppData พร้อมกับ global unhandled exceptions handler
+- **โมเดลหน้าแรก UI Mockup:** เชื่อมโยงดึงข้อมูลชื่อโรงแรมจากฐานข้อมูล SQLite จริงผ่านมายัง Service และชั้น UI MainForm

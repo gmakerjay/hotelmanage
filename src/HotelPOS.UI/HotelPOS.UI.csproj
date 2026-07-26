@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <UseWindowsForms>true</UseWindowsForms>
+    <RootNamespace>HotelPOS.UI</RootNamespace>
+    <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
+    <ApplicationIcon>app.ico</ApplicationIcon>
+    <!-- self-contained เพื่อรันบนเครื่องที่ไม่มี .NET runtime ติดตั้งไว้ (คอมเก่า/ไม่คุ้นเคยการติดตั้ง runtime) -->
+    <SelfContained>false</SelfContained>
+    <RuntimeIdentifier>win-x86</RuntimeIdentifier>
+    <!-- win-x86 เพื่อความเข้ากันได้สูงสุดกับเครื่องเก่า/Windows 7 32-bit -->
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\HotelPOS.Common\HotelPOS.Common.csproj" />
+    <ProjectReference Include="..\HotelPOS.Core\HotelPOS.Core.csproj" />
+    <ProjectReference Include="..\HotelPOS.Data\HotelPOS.Data.csproj" />
+    <ProjectReference Include="..\HotelPOS.Logging\HotelPOS.Logging.csproj" />
+    <ProjectReference Include="..\HotelPOS.Licensing\HotelPOS.Licensing.csproj" />
+    <ProjectReference Include="..\HotelPOS.Printing\HotelPOS.Printing.csproj" />
+  </ItemGroup>
+
+</Project>
