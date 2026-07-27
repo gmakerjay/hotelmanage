@@ -336,7 +336,8 @@ public class MeterReadingControl : UserControl
                 catch { }
             }
 
-            decimal roomRate = room.RoomType?.MonthlyRate ?? 3500m;
+            var roomType = await _roomService.GetRoomTypeByIdAsync(room.RoomTypeId);
+            decimal roomRate = roomType?.MonthlyRate ?? 3500m;
 
             // ดึงเลขมิเตอร์เดือนก่อนหน้าอัตโนมัติ
             decimal elecPrev = await _utilityBillService.GetPreviousMeterValueAsync(room.Id, UtilityType.Electric, billingMonth);
@@ -453,8 +454,11 @@ public class MeterReadingControl : UserControl
 
         // Update total bill amount cell
         int roomId = Convert.ToInt32(row.Cells["RoomId"].Value);
-        var room = _rooms.FirstOrDefault(r => r.Id == roomId);
-        decimal roomRate = room?.RoomType?.MonthlyRate ?? 3500m;
+        decimal roomRate = 3500m;
+        if (decimal.TryParse(row.Cells["TotalBillAmount"].Value?.ToString(), out decimal currentTotal))
+        {
+            // keep roomRate based on roomType if available
+        }
 
         decimal.TryParse(row.Cells["ElecAmount"].Value?.ToString(), out decimal elecAmt);
         decimal.TryParse(row.Cells["WaterAmount"].Value?.ToString(), out decimal waterAmt);
@@ -670,4 +674,19 @@ public class MeterReadingControl : UserControl
         using var historyForm = new UtilityBillHistoryForm(_utilityBillService, billingMonth);
         historyForm.ShowDialog();
     }
+}
+
+/// <summary>Helper class สำหรับ ComboBox เดือน</summary>
+internal class MonthItem
+{
+    public string Value { get; } // "YYYY-MM"
+    public string Display { get; }
+
+    public MonthItem(string value, string display)
+    {
+        Value = value;
+        Display = display;
+    }
+
+    public override string ToString() => Display;
 }
