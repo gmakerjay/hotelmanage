@@ -121,8 +121,8 @@ public class CheckInForm : Form
             Size = new Size(110, 42)
         };
 
-        // ToolTips Onboarding Guide
-        var tt = new ToolTip();
+        // ToolTips Onboarding Guide (Large readable font & clipping safety)
+        var tt = new AppToolTip();
         tt.SetToolTip(_txtFullName, "กรอกชื่อ-นามสกุลของผู้เข้าพัก (จำเป็นต้องกรอก)");
         tt.SetToolTip(_txtPhone, "กรอกเบอร์โทรศัพท์ลูกค้า (ระบบจะค้นหาประวัติลูกค้าเก่าให้อัตโนมัติ)");
         tt.SetToolTip(_txtIdCard, "กรอกเลขบัตรประชาชน หรือ เลขพาสปอร์ตของลูกค้า");

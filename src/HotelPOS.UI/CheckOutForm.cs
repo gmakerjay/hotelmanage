@@ -181,8 +181,8 @@ public class CheckOutForm : Form
             Size = new Size(90, 42)
         };
 
-        // ToolTips Onboarding Guide
-        var tt = new ToolTip();
+        // ToolTips Onboarding Guide (Large readable font & clipping safety)
+        var tt = new AppToolTip();
         tt.SetToolTip(_numRoomCharges, "ค่าห้องพักที่คำนวณตามระยะเวลาเข้าพักจริง (สามารถปรับเปลี่ยนได้หากมีส่วนลดพิเศษ)");
         tt.SetToolTip(_numExtraCharges, "ระบุค่าบริการเพิ่มเติม มินิบาร์ หรือค่าเสียหายย่อย (บาท)");
         tt.SetToolTip(_numDiscount, "ระบุจำนวนเงินส่วนลดสำหรับบิลนี้ (บาท)");

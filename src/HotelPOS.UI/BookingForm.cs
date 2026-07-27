@@ -140,8 +140,8 @@ public class BookingForm : Form
             Size = new Size(110, 42)
         };
 
-        // ToolTips Onboarding Guide
-        var tt = new ToolTip();
+        // ToolTips Onboarding Guide (Large readable font & clipping safety)
+        var tt = new AppToolTip();
         tt.SetToolTip(_cboRooms, "เลือกห้องพักที่ต้องการจองล่วงหน้า");
         tt.SetToolTip(_txtFullName, "ชื่อ-นามสกุลของผู้จองห้องพัก");
         tt.SetToolTip(_txtPhone, "เบอร์โทรศัพท์ติดต่อของผู้จอง");

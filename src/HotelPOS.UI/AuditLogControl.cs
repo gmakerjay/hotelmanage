@@ -44,8 +44,8 @@ public class AuditLogControl : UserControl
         _btnSearch = new Button { Text = "🔍 ค้นหา", Location = new Point(960, 13), Size = new Size(100, 36), Font = new Font("Segoe UI", 10.5F, FontStyle.Bold) };
         _btnSearch.Click += async (s, e) => await LoadLogsAsync();
 
-        // ToolTips Guide
-        var tt = new ToolTip();
+        // ToolTips Guide (Large readable font & clipping safety)
+        var tt = new AppToolTip();
         tt.SetToolTip(_txtSearch, "พิมพ์ค้นหาชื่อกิจกรรม หรือรายละเอียดใน Audit Log");
         tt.SetToolTip(_dtpStart, "เลือกวันที่เริ่มต้นในการค้นหาประวัติกิจกรรม");
         tt.SetToolTip(_dtpEnd, "เลือกวันที่สิ้นสุดในการค้นหาประวัติกิจกรรม");

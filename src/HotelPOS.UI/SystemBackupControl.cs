@@ -136,8 +136,8 @@ public class SystemBackupControl : UserControl
 
         grpCsv.Controls.AddRange(new Control[] { _btnExportRooms, _btnImportRooms, _btnExportCustomers, _btnImportCustomers });
 
-        // ToolTips Guide
-        var tt = new ToolTip();
+        // ToolTips Guide (Large readable font & clipping safety)
+        var tt = new AppToolTip();
         tt.SetToolTip(_btnBackup, "คัดลอกสำรองไฟล์ฐานข้อมูล SQLite ทั้งหมดเก็บไว้เพื่อความปลอดภัย");
         tt.SetToolTip(_btnRestore, "เลือกไฟล์ .db สำรองเพื่อนำกลับมาใช้งานแทนที่ฐานข้อมูลปัจจุบัน");
         tt.SetToolTip(_btnExportRooms, "ส่งออกรายชื่อห้องพักและประเภทห้องเป็นไฟล์ CSV สำหรับเปิดบน Excel");

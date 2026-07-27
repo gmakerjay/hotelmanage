@@ -30,22 +30,26 @@ internal static class Program
         _logger = new AppLogger(logFolder, retentionDays: 90);
         LogContext.MachineId = Environment.MachineName;
 
-        // ---------- 2) ดัก Exception ทุกจุดของโปรแกรม (SKILL.md ข้อ 7.6) ----------
+        // ---------- 2) ดัก Exception ทุกจุดของโปรแกรมทุกซอกทุกมุม (UI, AppDomain, Async Tasks) ----------
         Application.ThreadException += (sender, args) =>
         {
             _logger.Fatal(LogCategory.System, "เกิดข้อผิดพลาดที่ไม่ได้ดักไว้ (UI Thread)", args.Exception);
-            ShowFriendlyErrorAndContinue(args.Exception);
+            ShowDetailedErrorPopup(args.Exception, "เกิดข้อผิดพลาดในการทำงานของระบบ (UI Thread Exception)", logFolder);
         };
         Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
 
         AppDomain.CurrentDomain.UnhandledException += (sender, args) =>
         {
-            var ex = args.ExceptionObject as Exception;
-            _logger.Fatal(LogCategory.System, "เกิดข้อผิดพลาดร้ายแรงที่ไม่ได้ดักไว้ (AppDomain)", ex);
-            MessageBox.Show(
-                "โปรแกรมพบข้อผิดพลาดร้ายแรงและต้องปิดตัวลง กรุณาส่งไฟล์ log ให้ทีมซัพพอร์ต",
-                "HotelPOS - ข้อผิดพลาดร้ายแรง",
-                MessageBoxButtons.OK, MessageBoxIcon.Error);
+            var ex = args.ExceptionObject as Exception ?? new Exception("AppDomain Unhandled Exception");
+            _logger.Fatal(LogCategory.System, "เกิดข้อผิดพลาดร้ายแรงที่ไม่ได้ดักไว้ (AppDomain Unhandled)", ex);
+            ShowDetailedErrorPopup(ex, "เกิดข้อผิดพลาดร้ายแรงในระดับแอปพลิเคชัน (AppDomain Unhandled Exception)", logFolder);
+        };
+
+        TaskScheduler.UnobservedTaskException += (sender, args) =>
+        {
+            _logger.Fatal(LogCategory.System, "เกิดข้อผิดพลาดใน Task ที่ไม่ได้สังเกต (Unobserved Task Exception)", args.Exception);
+            args.SetObserved();
+            ShowDetailedErrorPopup(args.Exception, "เกิดข้อผิดพลาดในขบวนการทำงานเบื้องหลัง (Background Task Exception)", logFolder);
         };
 
         try
@@ -55,8 +59,7 @@ internal static class Program
             var migrationRunner = new MigrationRunner(connectionFactory, _logger);
             migrationRunner.EnsureDatabaseIsReady();
 
-            // ---------- 4) Composition Root แบบง่าย (ยังไม่ใช้ DI container เต็มรูปแบบ) ----------
-            // เมื่อโปรเจคใหญ่ขึ้นในเฟสถัดไป ให้พิจารณาเปลี่ยนมาใช้ Microsoft.Extensions.DependencyInjection
+            // ---------- 4) Composition Root แบบง่าย ----------
             ISettingsRepository settingsRepository = new SettingsRepository(connectionFactory, _logger);
             ISettingsService settingsService = new SettingsService(settingsRepository, _logger);
 
@@ -80,7 +83,6 @@ internal static class Program
                     using var activationForm = new LicenseActivationForm(currentStatusText);
                     if (activationForm.ShowDialog() == DialogResult.OK)
                     {
-                        // ตรวจสอบใหม่อีกครั้งหลังจากเปิดใช้งานสำเร็จ
                         licenseResult = LicenseManager.CheckLicense();
                     }
                 }
@@ -108,19 +110,17 @@ internal static class Program
         catch (Exception ex)
         {
             _logger.Fatal(LogCategory.System, "โปรแกรมเปิดไม่สำเร็จตั้งแต่เริ่มต้น (startup failure)", ex);
-            MessageBox.Show(
-                $"โปรแกรมไม่สามารถเปิดได้ กรุณาตรวจสอบไฟล์ log ที่ {logFolder}\n\nรายละเอียด: {ex.Message}",
-                "HotelPOS - เปิดโปรแกรมไม่สำเร็จ",
-                MessageBoxButtons.OK, MessageBoxIcon.Error);
+            ShowDetailedErrorPopup(ex, "โปรแกรมไม่สามารถเปิดได้ตั้งแต่เริ่มต้น (Application Startup Failure)", logFolder);
         }
     }
 
-    private static void ShowFriendlyErrorAndContinue(Exception ex)
+    public static void ShowDetailedErrorPopup(Exception ex, string userMessage, string? customLogFolder = null)
     {
-        MessageBox.Show(
-            $"เกิดข้อผิดพลาดขึ้น แต่โปรแกรมยังทำงานต่อได้\n\nรายละเอียด: {ex.Message}\n\n" +
-            "หากเกิดซ้ำ กรุณากด \"ส่งออก Log\" ในเมนูช่วยเหลือ แล้วส่งให้ทีมซัพพอร์ต",
-            "HotelPOS - แจ้งเตือน",
-            MessageBoxButtons.OK, MessageBoxIcon.Warning);
+        var logFolder = customLogFolder ?? Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+            "HotelPOS", "logs");
+
+        using var errorDlg = new DetailedErrorDialog(ex, userMessage, logFolder);
+        errorDlg.ShowDialog();
     }
 }
