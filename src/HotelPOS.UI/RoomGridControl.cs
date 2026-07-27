@@ -4,6 +4,9 @@ using HotelPOS.Core.Services;
 
 namespace HotelPOS.UI;
 
+/// <summary>
+/// ผังห้องพักแสดงผลระดับพรีเมียม แบ่งสีประเภทราคา (รายเดือน / รายวัน / รายชั่วโมง) ชัดเจน ใช้ง่าย แข็งแกร่ง สะดวก
+/// </summary>
 public class RoomGridControl : UserControl
 {
     private readonly IRoomService _roomService;
@@ -13,6 +16,7 @@ public class RoomGridControl : UserControl
     private Panel _headerPanel = null!;
     private ComboBox _cboFloorFilter = null!;
     private ComboBox _cboTypeFilter = null!;
+    private TextBox _txtSearch = null!;
     private Button _btnRefresh = null!;
     private Button _btnNewBooking = null!;
 
@@ -29,7 +33,7 @@ public class RoomGridControl : UserControl
     private List<Room> _allRooms = new();
     private List<RoomType> _allRoomTypes = new();
 
-    private string? _selectedStatusFilter = null; // null = ทั้งหมด
+    private string? _selectedFilterMode = null; // null = ทั้งหมด, "Available", "Occupied", "Monthly", "Daily", "Hourly", "Cleaning", "Reserved", "Maintenance"
     private System.Windows.Forms.Timer _autoRefreshTimer = null!;
 
     public RoomGridControl(
@@ -49,7 +53,7 @@ public class RoomGridControl : UserControl
 
     private void InitializeTimer()
     {
-        _autoRefreshTimer = new System.Windows.Forms.Timer { Interval = 30000 }; // Auto refresh check-out status every 30s
+        _autoRefreshTimer = new System.Windows.Forms.Timer { Interval = 30000 };
         _autoRefreshTimer.Tick += async (s, e) =>
         {
             if (IsHandleCreated && !IsDisposed && Visible)
@@ -64,19 +68,20 @@ public class RoomGridControl : UserControl
     {
         Dock = DockStyle.Fill;
         Font = new Font("Segoe UI", 11F, FontStyle.Regular);
+        BackColor = Color.FromArgb(241, 245, 249);
 
         // Header Panel
         _headerPanel = new Panel
         {
             Dock = DockStyle.Top,
-            Height = 130,
+            Height = 135,
             BackColor = Color.White,
             Padding = new Padding(15, 10, 15, 10)
         };
 
         var titleLabel = new Label
         {
-            Text = "ผังห้องพัก",
+            Text = "ผังห้องพักและสถานะปัจจุบัน (Room Floor Plan)",
             Font = new Font("Segoe UI", 15F, FontStyle.Bold),
             ForeColor = Color.FromArgb(30, 41, 59),
             Location = new Point(15, 8),
@@ -84,49 +89,64 @@ public class RoomGridControl : UserControl
         };
 
         // Summary Badges
-        _lblAvailableCount = CreateBadgeLabel("ว่าง: 0", Color.Honeydew, Color.ForestGreen, 15, 42);
-        _lblOccupiedCount = CreateBadgeLabel("มีคนพัก: 0", Color.MistyRose, Color.Crimson, 115, 42);
-        _lblCleaningCount = CreateBadgeLabel("รอทำความสะอาด: 0", Color.LightYellow, Color.DarkGoldenrod, 225, 42);
-        _lblReservedCount = CreateBadgeLabel("จองล่วงหน้า: 0", Color.LightCyan, Color.DarkBlue, 380, 42);
+        _lblAvailableCount = CreateBadgeLabel("ว่าง: 0", Color.FromArgb(236, 253, 245), Color.FromArgb(6, 95, 70), 15, 42);
+        _lblOccupiedCount = CreateBadgeLabel("มีคนพัก: 0", Color.FromArgb(254, 226, 226), Color.FromArgb(153, 27, 27), 115, 42);
+        _lblCleaningCount = CreateBadgeLabel("รอทำความสะอาด: 0", Color.FromArgb(254, 243, 199), Color.FromArgb(146, 64, 14), 225, 42);
+        _lblReservedCount = CreateBadgeLabel("จองล่วงหน้า: 0", Color.FromArgb(239, 246, 255), Color.FromArgb(30, 58, 138), 380, 42);
         _lblNearCheckoutCount = CreateBadgeLabel("ใกล้ครบกำหนด: 0", Color.FromArgb(254, 243, 199), Color.DarkOrange, 520, 42);
         _lblOverdueCount = CreateBadgeLabel("เลยกำหนด: 0", Color.FromArgb(254, 226, 226), Color.DarkRed, 675, 42);
 
-        // Filter Controls
-        var lblFloor = new Label { Text = "ชั้น:", Location = new Point(810, 12), Font = new Font("Segoe UI", 10.5F, FontStyle.Bold), AutoSize = true };
-        _cboFloorFilter = new ComboBox { Location = new Point(850, 8), Width = 90, Font = new Font("Segoe UI", 10.5F), DropDownStyle = ComboBoxStyle.DropDownList };
+        // Instant Search Box
+        var lblSearch = new Label { Text = "ค้นหา:", Location = new Point(810, 12), Font = new Font("Segoe UI", 10F, FontStyle.Bold), AutoSize = true };
+        _txtSearch = new TextBox
+        {
+            Location = new Point(860, 8),
+            Width = 160,
+            Font = new Font("Segoe UI", 10.5F),
+            PlaceholderText = "เลขห้อง / ผู้พัก / เบอร์โทร..."
+        };
+        _txtSearch.TextChanged += async (s, e) => await ApplyFilterAsync();
+
+        // Floor Filter
+        var lblFloor = new Label { Text = "ชั้น:", Location = new Point(1030, 12), Font = new Font("Segoe UI", 10F, FontStyle.Bold), AutoSize = true };
+        _cboFloorFilter = new ComboBox { Location = new Point(1065, 8), Width = 85, Font = new Font("Segoe UI", 10F), DropDownStyle = ComboBoxStyle.DropDownList };
         _cboFloorFilter.SelectedIndexChanged += async (s, e) => await ApplyFilterAsync();
 
-        var lblType = new Label { Text = "ประเภท:", Location = new Point(950, 12), Font = new Font("Segoe UI", 10.5F, FontStyle.Bold), AutoSize = true };
-        _cboTypeFilter = new ComboBox { Location = new Point(1015, 8), Width = 110, Font = new Font("Segoe UI", 10.5F), DropDownStyle = ComboBoxStyle.DropDownList };
+        // Type Filter
+        var lblType = new Label { Text = "ประเภท:", Location = new Point(1160, 12), Font = new Font("Segoe UI", 10F, FontStyle.Bold), AutoSize = true };
+        _cboTypeFilter = new ComboBox { Location = new Point(1220, 8), Width = 110, Font = new Font("Segoe UI", 10F), DropDownStyle = ComboBoxStyle.DropDownList };
         _cboTypeFilter.SelectedIndexChanged += async (s, e) => await ApplyFilterAsync();
 
         _btnRefresh = new Button
         {
             Text = "รีเฟรช",
-            Location = new Point(1135, 6),
-            Size = new Size(85, 36),
+            Location = new Point(1340, 6),
+            Size = new Size(80, 36),
             Font = new Font("Segoe UI", 10F, FontStyle.Bold),
-            FlatStyle = FlatStyle.Flat
+            FlatStyle = FlatStyle.Flat,
+            Cursor = Cursors.Hand
         };
         _btnRefresh.Click += async (s, e) => await RefreshGridAsync();
 
         _btnNewBooking = new Button
         {
             Text = "+ จองล่วงหน้า",
-            Location = new Point(1135, 44),
+            Location = new Point(1340, 44),
             Size = new Size(115, 36),
             BackColor = Color.FromArgb(37, 99, 235),
             ForeColor = Color.White,
             FlatStyle = FlatStyle.Flat,
-            Font = new Font("Segoe UI", 10F, FontStyle.Bold)
+            Font = new Font("Segoe UI", 10F, FontStyle.Bold),
+            Cursor = Cursors.Hand
         };
+        _btnNewBooking.FlatAppearance.BorderSize = 0;
         _btnNewBooking.Click += BtnNewBooking_Click;
 
-        // Quick Status Filter Tabs Panel (Floor Plan Filter Buttons)
+        // Quick Filter Pills Panel
         _statusFilterPanel = new FlowLayoutPanel
         {
             Location = new Point(15, 84),
-            Size = new Size(1100, 38),
+            Size = new Size(1300, 42),
             BackColor = Color.Transparent,
             WrapContents = false
         };
@@ -138,7 +158,7 @@ public class RoomGridControl : UserControl
             titleLabel,
             _lblAvailableCount, _lblOccupiedCount, _lblCleaningCount, _lblReservedCount,
             _lblNearCheckoutCount, _lblOverdueCount,
-            lblFloor, _cboFloorFilter, lblType, _cboTypeFilter,
+            lblSearch, _txtSearch, lblFloor, _cboFloorFilter, lblType, _cboTypeFilter,
             _btnRefresh, _btnNewBooking, _statusFilterPanel
         });
 
@@ -158,14 +178,17 @@ public class RoomGridControl : UserControl
     private void BuildStatusFilterButtons()
     {
         _statusFilterPanel.Controls.Clear();
-        var filters = new (string label, string? statusValue)[]
+        var filters = new (string label, string? modeValue, Color colorTag)[]
         {
-            ("ทั้งหมด", null),
-            ("ห้องว่าง", "Available"),
-            ("มีผู้เข้าพัก", "Occupied"),
-            ("รอทำความสะอาด", "Cleaning"),
-            ("จองล่วงหน้า", "Reserved"),
-            ("ปิดซ่อม", "Maintenance")
+            ("ทั้งหมด", null, Color.FromArgb(30, 41, 59)),
+            ("ห้องว่าง", "Available", Color.FromArgb(6, 95, 70)),
+            ("มีผู้เข้าพัก", "Occupied", Color.FromArgb(153, 27, 27)),
+            ("📅 รายเดือน", "Monthly", Color.FromArgb(107, 33, 168)),
+            ("🌞 รายวัน", "Daily", Color.FromArgb(37, 99, 235)),
+            ("⏱️ รายชั่วโมง", "Hourly", Color.FromArgb(146, 64, 14)),
+            ("รอทำความสะอาด", "Cleaning", Color.FromArgb(180, 83, 9)),
+            ("จองล่วงหน้า", "Reserved", Color.FromArgb(30, 58, 138)),
+            ("ปิดซ่อม", "Maintenance", Color.FromArgb(71, 85, 105))
         };
 
         foreach (var item in filters)
@@ -174,20 +197,31 @@ public class RoomGridControl : UserControl
             {
                 Text = item.label,
                 AutoSize = true,
-                Height = 32,
+                Height = 34,
                 Font = new Font("Segoe UI", 9.5F, FontStyle.Bold),
                 Margin = new Padding(0, 0, 8, 0),
                 FlatStyle = FlatStyle.Flat,
                 Cursor = Cursors.Hand
             };
+            btn.FlatAppearance.BorderSize = 1;
 
-            bool isSelected = _selectedStatusFilter == item.statusValue;
-            btn.BackColor = isSelected ? Color.FromArgb(30, 41, 59) : Color.White;
-            btn.ForeColor = isSelected ? Color.White : Color.FromArgb(60, 60, 60);
+            bool isSelected = _selectedFilterMode == item.modeValue;
+            if (isSelected)
+            {
+                btn.BackColor = item.colorTag;
+                btn.ForeColor = Color.White;
+                btn.FlatAppearance.BorderColor = item.colorTag;
+            }
+            else
+            {
+                btn.BackColor = Color.White;
+                btn.ForeColor = item.colorTag;
+                btn.FlatAppearance.BorderColor = Color.FromArgb(203, 213, 225);
+            }
 
             btn.Click += async (s, e) =>
             {
-                _selectedStatusFilter = item.statusValue;
+                _selectedFilterMode = item.modeValue;
                 BuildStatusFilterButtons();
                 await ApplyFilterAsync();
             };
@@ -218,7 +252,6 @@ public class RoomGridControl : UserControl
             _allRooms = (await _roomService.GetRoomsAsync()).ToList();
             _allRoomTypes = (await _roomService.GetRoomTypesAsync(true)).ToList();
 
-            // Populate Floor Combobox
             var currentFloor = _cboFloorFilter.SelectedItem?.ToString();
             var floors = await _roomService.GetFloorsAsync();
             _cboFloorFilter.Items.Clear();
@@ -229,7 +262,6 @@ public class RoomGridControl : UserControl
             }
             _cboFloorFilter.SelectedIndex = 0;
 
-            // Populate Room Type Combobox
             _cboTypeFilter.Items.Clear();
             _cboTypeFilter.Items.Add("ทุกประเภท");
             foreach (var t in _allRoomTypes)
@@ -251,6 +283,8 @@ public class RoomGridControl : UserControl
         _cardsContainer.SuspendLayout();
         _cardsContainer.Controls.Clear();
 
+        string query = _txtSearch.Text.Trim();
+
         string? selectedFloor = _cboFloorFilter.SelectedIndex > 0
             ? _cboFloorFilter.SelectedItem?.ToString()?.Replace("ชั้น ", "")
             : null;
@@ -261,12 +295,6 @@ public class RoomGridControl : UserControl
             selectedTypeId = _allRoomTypes[_cboTypeFilter.SelectedIndex - 1].Id;
         }
 
-        var filteredRooms = _allRooms.Where(r =>
-            (selectedFloor == null || r.Floor == selectedFloor) &&
-            (selectedTypeId == null || r.RoomTypeId == selectedTypeId) &&
-            (_selectedStatusFilter == null || r.Status.ToString() == _selectedStatusFilter)
-        ).ToList();
-
         int avail = _allRooms.Count(r => r.Status == RoomStatus.Available);
         int occ = _allRooms.Count(r => r.Status == RoomStatus.Occupied);
         int clean = _allRooms.Count(r => r.Status == RoomStatus.Cleaning);
@@ -276,7 +304,7 @@ public class RoomGridControl : UserControl
 
         var now = DateTime.Now;
 
-        foreach (var room in filteredRooms)
+        foreach (var room in _allRooms)
         {
             var roomType = _allRoomTypes.FirstOrDefault(t => t.Id == room.RoomTypeId);
             Booking? booking = null;
@@ -293,15 +321,36 @@ public class RoomGridControl : UserControl
                 if (room.Status == RoomStatus.Occupied && booking?.CheckOutPlanned.HasValue == true)
                 {
                     var span = booking.CheckOutPlanned.Value - now;
-                    if (span.TotalMinutes <= 0)
-                    {
-                        overdueCount++;
-                    }
-                    else if (span.TotalMinutes <= 30)
-                    {
-                        nearCheckoutCount++;
-                    }
+                    if (span.TotalMinutes <= 0) overdueCount++;
+                    else if (span.TotalMinutes <= 30) nearCheckoutCount++;
                 }
+            }
+
+            // Filter Checking
+            if (selectedFloor != null && room.Floor != selectedFloor) continue;
+            if (selectedTypeId != null && room.RoomTypeId != selectedTypeId) continue;
+
+            if (_selectedFilterMode != null)
+            {
+                if (_selectedFilterMode == "Available" && room.Status != RoomStatus.Available) continue;
+                if (_selectedFilterMode == "Occupied" && room.Status != RoomStatus.Occupied) continue;
+                if (_selectedFilterMode == "Cleaning" && room.Status != RoomStatus.Cleaning) continue;
+                if (_selectedFilterMode == "Reserved" && room.Status != RoomStatus.Reserved) continue;
+                if (_selectedFilterMode == "Maintenance" && room.Status != RoomStatus.Maintenance) continue;
+
+                if (_selectedFilterMode == "Monthly" && (roomType == null || roomType.MonthlyRate == 0)) continue;
+                if (_selectedFilterMode == "Hourly" && (roomType == null || roomType.HourlyRate == 0)) continue;
+                if (_selectedFilterMode == "Daily" && (roomType == null || (roomType.DailyRate == 0 && roomType.MonthlyRate == 0 && roomType.HourlyRate == 0))) continue;
+            }
+
+            // Search query check
+            if (!string.IsNullOrWhiteSpace(query))
+            {
+                bool matchRoom = room.RoomNumber.Contains(query, StringComparison.OrdinalIgnoreCase);
+                bool matchCust = customer != null && (customer.FullName.Contains(query, StringComparison.OrdinalIgnoreCase) || (!string.IsNullOrEmpty(customer.Phone) && customer.Phone.Contains(query, StringComparison.OrdinalIgnoreCase)));
+                bool matchType = roomType != null && roomType.Name.Contains(query, StringComparison.OrdinalIgnoreCase);
+
+                if (!matchRoom && !matchCust && !matchType) continue;
             }
 
             var card = CreateRoomTileCard(room, roomType, booking, customer, now);
@@ -322,10 +371,11 @@ public class RoomGridControl : UserControl
     {
         var card = new Panel
         {
-            Size = new Size(245, 195),
+            Size = new Size(255, 205),
             Margin = new Padding(8),
             BorderStyle = BorderStyle.FixedSingle,
-            Padding = new Padding(0)
+            Padding = new Padding(0),
+            Cursor = Cursors.Hand
         };
 
         Color headerColor;
@@ -341,62 +391,56 @@ public class RoomGridControl : UserControl
         {
             var span = booking.CheckOutPlanned.Value - now;
             minutesDiff = span.TotalMinutes;
-            if (minutesDiff <= 0)
-            {
-                isOverdue = true;
-            }
-            else if (minutesDiff <= 30)
-            {
-                isNearCheckout = true;
-            }
+            if (minutesDiff <= 0) isOverdue = true;
+            else if (minutesDiff <= 30) isNearCheckout = true;
         }
 
         switch (room.Status)
         {
             case RoomStatus.Available:
-                headerColor = Color.ForestGreen;
+                headerColor = Color.FromArgb(16, 185, 129); // Emerald
                 backColor = Color.FromArgb(242, 251, 245);
-                textColor = Color.DarkGreen;
+                textColor = Color.FromArgb(6, 95, 70);
                 statusText = "ว่าง";
                 break;
             case RoomStatus.Occupied:
                 if (isOverdue)
                 {
-                    headerColor = Color.FromArgb(185, 28, 28); // Bright Crimson Red
-                    backColor = Color.FromArgb(254, 226, 226); // Light Red Alert
+                    headerColor = Color.FromArgb(185, 28, 28);
+                    backColor = Color.FromArgb(254, 226, 226);
                     textColor = Color.DarkRed;
                     statusText = "🚨 เลยกำหนด!";
                 }
                 else if (isNearCheckout)
                 {
-                    headerColor = Color.FromArgb(217, 119, 6); // Amber Warning
-                    backColor = Color.FromArgb(254, 243, 199); // Soft Amber Tint
+                    headerColor = Color.FromArgb(217, 119, 6);
+                    backColor = Color.FromArgb(254, 243, 199);
                     textColor = Color.DarkGoldenrod;
                     statusText = "⚠️ ใกล้ครบกำหนด";
                 }
                 else
                 {
-                    headerColor = Color.Crimson;
-                    backColor = Color.FromArgb(255, 240, 240);
-                    textColor = Color.DarkRed;
+                    headerColor = Color.FromArgb(225, 29, 72); // Rose Red
+                    backColor = Color.FromArgb(255, 241, 242);
+                    textColor = Color.FromArgb(159, 18, 57);
                     statusText = "มีผู้เข้าพัก";
                 }
                 break;
             case RoomStatus.Cleaning:
-                headerColor = Color.DarkGoldenrod;
+                headerColor = Color.FromArgb(217, 119, 6);
                 backColor = Color.FromArgb(255, 253, 230);
                 textColor = Color.SaddleBrown;
                 statusText = "รอทำความสะอาด";
                 break;
             case RoomStatus.Reserved:
-                headerColor = Color.RoyalBlue;
-                backColor = Color.FromArgb(240, 244, 255);
-                textColor = Color.DarkBlue;
+                headerColor = Color.FromArgb(37, 99, 235);
+                backColor = Color.FromArgb(239, 246, 255);
+                textColor = Color.FromArgb(30, 58, 138);
                 statusText = "จองล่วงหน้า";
                 break;
             case RoomStatus.Maintenance:
             default:
-                headerColor = Color.Gray;
+                headerColor = Color.FromArgb(100, 116, 139);
                 backColor = Color.FromArgb(245, 245, 245);
                 textColor = Color.DimGray;
                 statusText = "ปิดซ่อม";
@@ -409,32 +453,77 @@ public class RoomGridControl : UserControl
         var topHeader = new Panel
         {
             Dock = DockStyle.Top,
-            Height = 32,
+            Height = 36,
             BackColor = headerColor,
-            Padding = new Padding(8, 4, 8, 4)
+            Padding = new Padding(10, 4, 10, 4)
         };
 
         var lblRoomNumHeader = new Label
         {
-            Text = $"ห้อง {room.RoomNumber} (ชั้น {room.Floor ?? "1"}) - {statusText}",
-            Font = new Font("Segoe UI", 10.5F, FontStyle.Bold),
+            Text = $"ห้อง {room.RoomNumber}  (ชั้น {room.Floor ?? "1"})",
+            Font = new Font("Segoe UI", 12F, FontStyle.Bold),
             ForeColor = Color.White,
-            Dock = DockStyle.Fill,
+            Dock = DockStyle.Left,
+            AutoSize = true,
             TextAlign = ContentAlignment.MiddleLeft
         };
-        topHeader.Controls.Add(lblRoomNumHeader);
 
-        // Line 1: Type & Price
-        var lblTypeName = new Label
+        var lblStatusPill = new Label
         {
-            Text = $"{roomType?.Name ?? "ทั่วไป"} (฿{(roomType != null ? roomType.DailyRate.ToString("N0") : "0")}/วัน)",
+            Text = statusText,
             Font = new Font("Segoe UI", 9.5F, FontStyle.Bold),
-            ForeColor = Color.FromArgb(50, 50, 50),
-            Location = new Point(10, 38),
-            AutoSize = true
+            ForeColor = Color.White,
+            Dock = DockStyle.Right,
+            AutoSize = true,
+            TextAlign = ContentAlignment.MiddleRight
         };
 
-        // Line 2: Guest Details (Full Details)
+        topHeader.Controls.Add(lblRoomNumHeader);
+        topHeader.Controls.Add(lblStatusPill);
+
+        // Rate Plan Color Badge
+        string rateBadgeText;
+        Color rateBadgeBg;
+        Color rateBadgeFg;
+
+        if (roomType != null && roomType.MonthlyRate > 0 && roomType.DailyRate == 0)
+        {
+            rateBadgeText = $"📅 รายเดือน  ฿{roomType.MonthlyRate:N0}/เดือน";
+            rateBadgeBg = Color.FromArgb(243, 232, 255); // Purple
+            rateBadgeFg = Color.FromArgb(107, 33, 168);
+        }
+        else if (roomType != null && roomType.HourlyRate > 0 && roomType.DailyRate == 0)
+        {
+            rateBadgeText = $"⏱️ รายชั่วโมง  ฿{roomType.HourlyRate:N0}/ชม.";
+            rateBadgeBg = Color.FromArgb(254, 243, 199); // Amber
+            rateBadgeFg = Color.FromArgb(146, 64, 14);
+        }
+        else if (roomType != null && roomType.MonthlyRate > 0 && roomType.DailyRate > 0)
+        {
+            rateBadgeText = $"📅 รายเดือน ฿{roomType.MonthlyRate:N0} / 🌞 รายวัน ฿{roomType.DailyRate:N0}";
+            rateBadgeBg = Color.FromArgb(238, 242, 255); // Indigo
+            rateBadgeFg = Color.FromArgb(55, 48, 163);
+        }
+        else
+        {
+            rateBadgeText = $"🌞 รายวัน  ฿{(roomType != null ? roomType.DailyRate.ToString("N0") : "0")}/วัน";
+            rateBadgeBg = Color.FromArgb(236, 253, 245); // Emerald
+            rateBadgeFg = Color.FromArgb(6, 95, 70);
+        }
+
+        var lblRateBadge = new Label
+        {
+            Text = rateBadgeText,
+            Font = new Font("Segoe UI", 9F, FontStyle.Bold),
+            BackColor = rateBadgeBg,
+            ForeColor = rateBadgeFg,
+            Location = new Point(10, 42),
+            AutoSize = true,
+            Padding = new Padding(6, 2, 6, 2),
+            BorderStyle = BorderStyle.FixedSingle
+        };
+
+        // Guest Info
         string guestDetailText;
         if (room.Status == RoomStatus.Occupied && customer != null)
         {
@@ -446,11 +535,11 @@ public class RoomGridControl : UserControl
         }
         else if (room.Status == RoomStatus.Cleaning)
         {
-            guestDetailText = "สถานะ: รอแม่บ้านทำความสะอาด";
+            guestDetailText = "สถานะ: รอแม่บ้านทำความสะอาดห้อง";
         }
         else if (room.Status == RoomStatus.Available)
         {
-            guestDetailText = "สถานะ: ห้องว่าง พร้อมลงทะเบียนเข้าพัก";
+            guestDetailText = "สถานะ: ห้องว่าง พร้อมเข้าพัก";
         }
         else
         {
@@ -462,12 +551,12 @@ public class RoomGridControl : UserControl
             Text = guestDetailText,
             Font = new Font("Segoe UI", 9F, FontStyle.Regular),
             ForeColor = textColor,
-            Location = new Point(10, 60),
-            Size = new Size(225, 20),
+            Location = new Point(10, 72),
+            Size = new Size(235, 20),
             AutoEllipsis = true
         };
 
-        // Line 3: Time Remaining / Overdue Warning Alert
+        // Time Alert
         string timeAlertText = "";
         Color alertColor = textColor;
 
@@ -475,7 +564,7 @@ public class RoomGridControl : UserControl
         {
             if (isOverdue)
             {
-                timeAlertText = $"🚨 เลยกำหนดแล้ว {Math.Abs((int)minutesDiff)} นาที (ออก: {booking.CheckOutPlanned.Value:HH:mm} น.)";
+                timeAlertText = $"🚨 เลยกำหนด {Math.Abs((int)minutesDiff)} นาที (ออก: {booking.CheckOutPlanned.Value:HH:mm} น.)";
                 alertColor = Color.DarkRed;
             }
             else if (isNearCheckout)
@@ -498,16 +587,16 @@ public class RoomGridControl : UserControl
             Text = timeAlertText,
             Font = new Font("Segoe UI", 9F, (isOverdue || isNearCheckout) ? FontStyle.Bold : FontStyle.Regular),
             ForeColor = alertColor,
-            Location = new Point(10, 82),
-            Size = new Size(225, 20),
+            Location = new Point(10, 94),
+            Size = new Size(235, 20),
             AutoEllipsis = true
         };
 
-        // Panel Action Buttons (Direct Interactive Buttons on Card)
+        // Action Buttons Panel
         var actionPanel = new Panel
         {
-            Location = new Point(8, 108),
-            Size = new Size(225, 78),
+            Location = new Point(8, 118),
+            Size = new Size(235, 78),
             BackColor = Color.Transparent
         };
 
@@ -571,26 +660,28 @@ public class RoomGridControl : UserControl
                 {
                     Text = "เช็คอิน",
                     Location = new Point(4, 10),
-                    Size = new Size(105, 44),
-                    BackColor = Color.ForestGreen,
+                    Size = new Size(110, 44),
+                    BackColor = Color.FromArgb(16, 185, 129),
                     ForeColor = Color.White,
                     Font = new Font("Segoe UI", 10F, FontStyle.Bold),
                     FlatStyle = FlatStyle.Flat,
                     Cursor = Cursors.Hand
                 };
+                btnCheckIn.FlatAppearance.BorderSize = 0;
                 btnCheckIn.Click += async (s, e) => await OpenCheckInDialogAsync(room, roomType);
 
                 var btnReserve = new Button
                 {
                     Text = "จอง",
-                    Location = new Point(114, 10),
-                    Size = new Size(105, 44),
+                    Location = new Point(120, 10),
+                    Size = new Size(110, 44),
                     BackColor = Color.FromArgb(37, 99, 235),
                     ForeColor = Color.White,
                     Font = new Font("Segoe UI", 10F, FontStyle.Bold),
                     FlatStyle = FlatStyle.Flat,
                     Cursor = Cursors.Hand
                 };
+                btnReserve.FlatAppearance.BorderSize = 0;
                 btnReserve.Click += async (s, e) => await OpenBookingDialogAsync(room);
 
                 actionPanel.Controls.Add(btnCheckIn);
@@ -602,13 +693,14 @@ public class RoomGridControl : UserControl
                 {
                     Text = isOverdue ? "เช็คเอาท์ (เลยกำหนด!)" : "คืนห้อง / เช็คเอาท์",
                     Location = new Point(4, 10),
-                    Size = new Size(215, 44),
-                    BackColor = isOverdue ? Color.FromArgb(185, 28, 28) : Color.Crimson,
+                    Size = new Size(226, 44),
+                    BackColor = isOverdue ? Color.FromArgb(185, 28, 28) : Color.FromArgb(225, 29, 72),
                     ForeColor = Color.White,
                     Font = new Font("Segoe UI", 10F, FontStyle.Bold),
                     FlatStyle = FlatStyle.Flat,
                     Cursor = Cursors.Hand
                 };
+                btnCheckOut.FlatAppearance.BorderSize = 0;
                 btnCheckOut.Click += async (s, e) => await OpenCheckOutDialogAsync(room);
                 actionPanel.Controls.Add(btnCheckOut);
                 break;
@@ -618,13 +710,14 @@ public class RoomGridControl : UserControl
                 {
                     Text = "ทำความสะอาดเสร็จ",
                     Location = new Point(4, 10),
-                    Size = new Size(215, 44),
-                    BackColor = Color.DarkGoldenrod,
+                    Size = new Size(226, 44),
+                    BackColor = Color.FromArgb(217, 119, 6),
                     ForeColor = Color.White,
                     Font = new Font("Segoe UI", 10F, FontStyle.Bold),
                     FlatStyle = FlatStyle.Flat,
                     Cursor = Cursors.Hand
                 };
+                btnCleanDone.FlatAppearance.BorderSize = 0;
                 btnCleanDone.Click += async (s, e) =>
                 {
                     await _roomService.UpdateRoomStatusAsync(room.Id, RoomStatus.Available);
@@ -638,13 +731,14 @@ public class RoomGridControl : UserControl
                 {
                     Text = "เช็คอินการจอง",
                     Location = new Point(4, 10),
-                    Size = new Size(215, 44),
+                    Size = new Size(226, 44),
                     BackColor = Color.FromArgb(37, 99, 235),
                     ForeColor = Color.White,
                     Font = new Font("Segoe UI", 10F, FontStyle.Bold),
                     FlatStyle = FlatStyle.Flat,
                     Cursor = Cursors.Hand
                 };
+                btnCheckInReserved.FlatAppearance.BorderSize = 0;
                 btnCheckInReserved.Click += async (s, e) => await CheckInReservedBookingAsync(room);
                 actionPanel.Controls.Add(btnCheckInReserved);
                 break;
@@ -655,13 +749,14 @@ public class RoomGridControl : UserControl
                 {
                     Text = "เปิดใช้งานห้องพัก",
                     Location = new Point(4, 10),
-                    Size = new Size(215, 44),
-                    BackColor = Color.SteelBlue,
+                    Size = new Size(226, 44),
+                    BackColor = Color.FromArgb(100, 116, 139),
                     ForeColor = Color.White,
                     Font = new Font("Segoe UI", 10F, FontStyle.Bold),
                     FlatStyle = FlatStyle.Flat,
                     Cursor = Cursors.Hand
                 };
+                btnEnable.FlatAppearance.BorderSize = 0;
                 btnEnable.Click += async (s, e) =>
                 {
                     await _roomService.UpdateRoomStatusAsync(room.Id, RoomStatus.Available);
@@ -672,10 +767,13 @@ public class RoomGridControl : UserControl
         }
 
         card.Controls.Add(topHeader);
-        card.Controls.Add(lblTypeName);
+        card.Controls.Add(lblRateBadge);
         card.Controls.Add(lblGuest);
         card.Controls.Add(lblTimeAlert);
         card.Controls.Add(actionPanel);
+
+        // ToolTip Guide for Room Card
+        AppToolTip.Attach(card, $"ห้อง {room.RoomNumber} - คลิกขวาเพื่อเปิดเมนูด่วน");
 
         return card;
     }

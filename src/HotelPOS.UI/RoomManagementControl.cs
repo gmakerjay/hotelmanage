@@ -377,14 +377,16 @@ public class RoomManagementControl : UserControl
         {
             t.Id,
             ชื่อประเภท = t.Name,
-            รายวัน = t.DailyRate,
-            รายชั่วโมง = t.HourlyRate,
-            รายเดือน = t.MonthlyRate,
+            ประเภทราคาหลัก = GetRateTypeTag(t),
+            ราคาต่อวัน = t.DailyRate > 0 ? $"฿{t.DailyRate:N0}" : "-",
+            ราคาต่อชั่วโมง = t.HourlyRate > 0 ? $"฿{t.HourlyRate:N0}" : "-",
+            ราคาต่อเดือน = t.MonthlyRate > 0 ? $"฿{t.MonthlyRate:N0}" : "-",
             รายละเอียด = t.Description,
             สถานะ = t.IsActive ? "ใช้งาน" : "ปิดใช้งาน"
         }).ToList();
 
         AddGridActionColumns(_dgvRoomTypes);
+        ApplyGridRowColors(_dgvRoomTypes);
     }
 
     private void FilterRooms()
@@ -393,24 +395,73 @@ public class RoomManagementControl : UserControl
         var filtered = _allRoomsList.Where(r =>
         {
             if (string.IsNullOrWhiteSpace(query)) return true;
-            var typeName = _roomTypesList.FirstOrDefault(t => t.Id == r.RoomTypeId)?.Name ?? "";
+            var type = _roomTypesList.FirstOrDefault(t => t.Id == r.RoomTypeId);
+            var typeName = type?.Name ?? "";
             return r.RoomNumber.Contains(query, StringComparison.OrdinalIgnoreCase) ||
                    (!string.IsNullOrEmpty(r.Floor) && r.Floor.Contains(query, StringComparison.OrdinalIgnoreCase)) ||
                    typeName.Contains(query, StringComparison.OrdinalIgnoreCase);
         }).ToList();
 
         _dgvRooms.Columns.Clear();
-        _dgvRooms.DataSource = filtered.Select(r => new
+        _dgvRooms.DataSource = filtered.Select(r =>
         {
-            r.Id,
-            เลขห้อง = r.RoomNumber,
-            ชั้น = r.Floor ?? "-",
-            ประเภทห้อง = _roomTypesList.FirstOrDefault(t => t.Id == r.RoomTypeId)?.Name ?? "-",
-            ราคาต่อวัน = _roomTypesList.FirstOrDefault(t => t.Id == r.RoomTypeId)?.DailyRate.ToString("N0") ?? "-",
-            สถานะ = GetStatusName(r.Status)
+            var type = _roomTypesList.FirstOrDefault(t => t.Id == r.RoomTypeId);
+            return new
+            {
+                r.Id,
+                เลขห้อง = r.RoomNumber,
+                ชั้น = r.Floor ?? "-",
+                ประเภทห้อง = type?.Name ?? "-",
+                รูปแบบราคา = GetRateTypeTag(type),
+                ราคามาตรฐาน = GetPrimaryRateText(type),
+                สถานะ = GetStatusName(r.Status)
+            };
         }).ToList();
 
         AddGridActionColumns(_dgvRooms);
+        ApplyGridRowColors(_dgvRooms);
+    }
+
+    private static string GetRateTypeTag(RoomType? type)
+    {
+        if (type == null) return "-";
+        if (type.MonthlyRate > 0 && type.DailyRate == 0) return "📅 รายเดือน";
+        if (type.HourlyRate > 0 && type.DailyRate == 0) return "⏱️ รายชั่วโมง";
+        if (type.MonthlyRate > 0 && type.DailyRate > 0) return "📅 รายเดือน / 🌞 รายวัน";
+        return "🌞 รายวัน";
+    }
+
+    private static string GetPrimaryRateText(RoomType? type)
+    {
+        if (type == null) return "-";
+        if (type.MonthlyRate > 0) return $"฿{type.MonthlyRate:N0}/เดือน";
+        if (type.DailyRate > 0) return $"฿{type.DailyRate:N0}/วัน";
+        if (type.HourlyRate > 0) return $"฿{type.HourlyRate:N0}/ชม.";
+        return "-";
+    }
+
+    private static void ApplyGridRowColors(DataGridView dgv)
+    {
+        foreach (DataGridViewRow row in dgv.Rows)
+        {
+            if (row.IsNewRow) continue;
+            string rateTag = (row.Cells["รูปแบบราคา"]?.Value ?? row.Cells["ประเภทราคาหลัก"]?.Value)?.ToString() ?? "";
+            if (rateTag.Contains("รายเดือน"))
+            {
+                row.DefaultCellStyle.BackColor = Color.FromArgb(243, 232, 255); // Soft Purple
+                row.DefaultCellStyle.ForeColor = Color.FromArgb(107, 33, 168);  // Deep Purple
+            }
+            else if (rateTag.Contains("รายชั่วโมง"))
+            {
+                row.DefaultCellStyle.BackColor = Color.FromArgb(254, 243, 199); // Soft Amber
+                row.DefaultCellStyle.ForeColor = Color.FromArgb(146, 64, 14);   // Deep Amber
+            }
+            else if (rateTag.Contains("รายวัน"))
+            {
+                row.DefaultCellStyle.BackColor = Color.FromArgb(236, 253, 245); // Soft Emerald
+                row.DefaultCellStyle.ForeColor = Color.FromArgb(6, 95, 70);     // Deep Emerald
+            }
+        }
     }
 
     private static void AddGridActionColumns(DataGridView dgv)
