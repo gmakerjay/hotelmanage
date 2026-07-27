@@ -108,4 +108,63 @@ public class SettingsRepository : ISettingsRepository
             throw;
         }
     }
+
+    public async Task ZetZeroDatabaseAsync()
+    {
+        var correlationId = _logger.NewCorrelationId();
+        try
+        {
+            using var connection = _connectionFactory.CreateConnection();
+            connection.Open();
+
+            // ปิดการตรวจสอบ Foreign Key ชั่วคราวเพื่อทำการล้างข้อมูลธุรกรรมทั้งหมด
+            await connection.ExecuteAsync("PRAGMA foreign_keys = OFF;");
+
+            using var transaction = connection.BeginTransaction();
+
+            // ลบตารางธุรกรรมและประวัติในฐานข้อมูล (เก็บข้อมูลประเภทห้อง ห้องพัก สินค้า หมวดหมู่สินค้า และผู้ใช้/ตั้งค่าไว้)
+            var tablesToClean = new[]
+            {
+                "invoice_documents", "payments", "sale_items", "sales",
+                "folios", "bookings", "customers", 
+                "meter_readings", "utility_bills",
+                "audit_logs", "backup_history"
+            };
+
+            foreach (var table in tablesToClean)
+            {
+                await connection.ExecuteAsync($"DELETE FROM {table};", transaction: transaction);
+            }
+
+            // รีเซ็ตสถานะห้องพักทั้งหมดเป็นว่าง (Available = 0)
+            await connection.ExecuteAsync("UPDATE rooms SET status = 0;", transaction: transaction);
+
+            // รีเซ็ตจำนวนสินค้าในคลังสินค้าทั้งหมดเป็น 0
+            await connection.ExecuteAsync("UPDATE products SET stock_qty = 0;", transaction: transaction);
+
+            // รีเซ็ต sequences สำหรับตารางที่ถูกล้างข้อมูลทั้งหมดให้เริ่มนับใหม่จาก 0
+            var allTables = new[]
+            {
+                "bookings", "customers", "sales", "sale_items", 
+                "payments", "invoice_documents", "folios", "audit_logs"
+            };
+
+            foreach (var table in allTables)
+            {
+                await connection.ExecuteAsync($"DELETE FROM sqlite_sequence WHERE name = '{table}';", transaction: transaction);
+            }
+
+            transaction.Commit();
+
+            // เปิดการตรวจสอบ Foreign Key กลับคืนตามเดิม
+            await connection.ExecuteAsync("PRAGMA foreign_keys = ON;");
+
+            _logger.Info(LogCategory.Database, "ทำรายการล้างข้อมูลธุรกรรมระบบเป็น 0 (Set Zero) สำเร็จ", correlationId);
+        }
+        catch (Exception ex)
+        {
+            _logger.Error(LogCategory.Database, "ล้างข้อมูลระบบเป็น 0 ไม่สำเร็จ", ex, correlationId);
+            throw;
+        }
+    }
 }

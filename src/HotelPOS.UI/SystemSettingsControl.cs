@@ -28,6 +28,8 @@ public class SystemSettingsControl : UserControl
     private ComboBox _cboPaperType = null!;
     private CheckBox _chkAutoPrintOnCheckout = null!;
     private CheckBox _chkShowSignatureBox = null!;
+    private NumericUpDown _numPrinterFeedLines = null!;
+    private CheckBox _chkPrinterAutoCut = null!;
 
     // Section 3: Operations & Deposit
     private TextBox _txtCheckInTime = null!;
@@ -40,6 +42,11 @@ public class SystemSettingsControl : UserControl
     private TextBox _txtDocPrefix = null!;
     private NumericUpDown _numDocRunning = null!;
     private Button _btnResetSequences = null!;
+
+    // Section 5: Security & Set Zero
+    private TextBox _txtAdminPassword = null!;
+    private TextBox _txtConfirmPassword = null!;
+    private Button _btnZetZero = null!;
 
     private Button _btnSave = null!;
     private Button _btnReload = null!;
@@ -91,12 +98,12 @@ public class SystemSettingsControl : UserControl
         currentY += 530;
 
         // Group 2: Printer & Paper
-        var grpPrinter = CreateGroupPanel("2. ตั้งค่าเครื่องพิมพ์และขนาดกระดาษ (Printer & Paper Settings)", currentY, 210);
+        var grpPrinter = CreateGroupPanel("2. ตั้งค่าเครื่องพิมพ์และขนาดกระดาษ (Printer & Paper Settings)", currentY, 245);
         BuildPrinterFields(grpPrinter);
-        currentY += 225;
+        currentY += 260;
 
-        // Group 3: Hotel Operations & Deposit
-        var grpOps = CreateGroupPanel("3. ตั้งค่าการดำเนินงานโรงแรมและเงินประกัน (Hotel Operations & Deposit)", currentY, 230);
+        // Group 3: Operations & Deposit
+        var grpOps = CreateGroupPanel("3. ตั้งค่าการดำเนินงานและเงินประกัน (Operations & Deposit)", currentY, 230);
         BuildOpsFields(grpOps);
         currentY += 245;
 
@@ -104,6 +111,11 @@ public class SystemSettingsControl : UserControl
         var grpDocSeq = CreateGroupPanel("4. ตั้งค่าเลขที่เอกสารและการรีเซ็ตคีย์หลัก (Document Prefix & Reset)", currentY, 160);
         BuildDocSeqFields(grpDocSeq);
         currentY += 175;
+
+        // Group 5: Security & Set Zero
+        var grpSecurity = CreateGroupPanel("5. ความปลอดภัยและล้างข้อมูลเริ่มใช้งานจริง (Security & Set Zero)", currentY, 170);
+        BuildSecurityFields(grpSecurity);
+        currentY += 185;
 
         // Bottom Action Bar
         var pnlActions = new Panel
@@ -153,7 +165,7 @@ public class SystemSettingsControl : UserControl
 
         mainScrollPanel.Controls.AddRange(new Control[]
         {
-            titleLabel, subtitleLabel, grpShop, grpPrinter, grpOps, grpDocSeq, pnlActions, pnlBottomSpacer
+            titleLabel, subtitleLabel, grpShop, grpPrinter, grpOps, grpDocSeq, grpSecurity, pnlActions, pnlBottomSpacer
         });
 
         Controls.Add(mainScrollPanel);
@@ -212,7 +224,7 @@ public class SystemSettingsControl : UserControl
         _txtBillFooter = new TextBox { Location = new Point(180, 226), Width = 680, Font = new Font("Segoe UI", 10F) };
 
         var lblLobbyTerms = new Label { Text = "ข้อตกลงหน้าล็อบบี้/ใบเสร็จ:", Location = new Point(20, 268), AutoSize = true, Font = new Font("Segoe UI", 10F, FontStyle.Bold) };
-        _txtLobbyTerms = new TextBox { Location = new Point(180, 264), Width = 680, Height = 65, Multiline = true, ScrollBars = ScrollBars.Vertical, Font = new Font("Segoe UI", 9.5F) };
+        _txtLobbyTerms = new TextBox { Location = new Point(210, 264), Width = 650, Height = 65, Multiline = true, ScrollBars = ScrollBars.Vertical, Font = new Font("Segoe UI", 9.5F) };
 
         // Logo & QR Code Image Upload Box
         var lblLogoHeader = new Label { Text = "รูปโลโก้โรงแรม (Logo):", Location = new Point(20, 345), AutoSize = true, Font = new Font("Segoe UI", 10F, FontStyle.Bold) };
@@ -385,10 +397,30 @@ public class SystemSettingsControl : UserControl
             Font = new Font("Segoe UI", 10F, FontStyle.Bold)
         };
 
+        var lblFeedLines = new Label { Text = "ระยะป้อนกระดาษท้ายสลิป (บรรทัด):", Location = new Point(20, 180), AutoSize = true, Font = new Font("Segoe UI", 10F, FontStyle.Bold) };
+        _numPrinterFeedLines = new NumericUpDown
+        {
+            Location = new Point(245, 177),
+            Width = 70,
+            Minimum = 0,
+            Maximum = 20,
+            Value = 4,
+            Font = new Font("Segoe UI", 10F)
+        };
+
+        _chkPrinterAutoCut = new CheckBox
+        {
+            Text = "สั่งตัดกระดาษอัตโนมัติหลังพิมพ์ (Auto Cut)",
+            Location = new Point(340, 178),
+            AutoSize = true,
+            Font = new Font("Segoe UI", 10F, FontStyle.Bold)
+        };
+
         pnl.Controls.AddRange(new Control[]
         {
             lblPrinter, _cboPrinterList, lblPaper, _cboPaperType,
-            _chkAutoPrintOnCheckout, _chkShowSignatureBox
+            _chkAutoPrintOnCheckout, _chkShowSignatureBox,
+            lblFeedLines, _numPrinterFeedLines, _chkPrinterAutoCut
         });
     }
 
@@ -457,6 +489,111 @@ public class SystemSettingsControl : UserControl
         });
     }
 
+    private void BuildSecurityFields(Panel pnl)
+    {
+        var lblPassword = new Label { Text = "รหัสผ่าน Admin ใหม่:", Location = new Point(20, 48), AutoSize = true, Font = new Font("Segoe UI", 10F, FontStyle.Bold) };
+        _txtAdminPassword = new TextBox { Location = new Point(180, 44), Width = 200, UseSystemPasswordChar = true, Font = new Font("Segoe UI", 10F) };
+
+        var lblConfirm = new Label { Text = "ยืนยันรหัสผ่าน Admin:", Location = new Point(410, 48), AutoSize = true, Font = new Font("Segoe UI", 10F, FontStyle.Bold) };
+        _txtConfirmPassword = new TextBox { Location = new Point(580, 44), Width = 200, UseSystemPasswordChar = true, Font = new Font("Segoe UI", 10F) };
+
+        var lblPasswordInfo = new Label
+        {
+            Text = "* เว้นว่างไว้หากไม่ต้องการเปลี่ยนรหัสผ่าน / ใช้สำหรับเข้าใช้งานบัญชี admin",
+            Location = new Point(20, 80),
+            AutoSize = true,
+            Font = new Font("Segoe UI", 9F, FontStyle.Italic),
+            ForeColor = Color.DimGray
+        };
+
+        _btnZetZero = new Button
+        {
+            Text = "ล้างข้อมูลระบบทั้งหมดเป็น 0 (Set Zero)",
+            BackColor = Color.FromArgb(220, 38, 38),
+            ForeColor = Color.White,
+            FlatStyle = FlatStyle.Flat,
+            Font = new Font("Segoe UI", 9.5F, FontStyle.Bold),
+            Location = new Point(20, 115),
+            Size = new Size(320, 36),
+            Cursor = Cursors.Hand
+        };
+        _btnZetZero.FlatAppearance.BorderSize = 0;
+        _btnZetZero.Click += BtnZetZero_Click;
+
+        var lblZetZeroInfo = new Label
+        {
+            Text = "* ปุ่ม Set Zero จะล้างลูกค้า การจอง การเงิน ค่าน้ำค่าไฟ และบันทึกประวัติเพื่อเริ่มใช้งานจริง (ห้ามลบประเภทและห้องพัก)",
+            Location = new Point(350, 122),
+            AutoSize = true,
+            Font = new Font("Segoe UI", 9F, FontStyle.Italic),
+            ForeColor = Color.DimGray
+        };
+
+        pnl.Controls.AddRange(new Control[]
+        {
+            lblPassword, _txtAdminPassword, lblConfirm, _txtConfirmPassword, lblPasswordInfo,
+            _btnZetZero, lblZetZeroInfo
+        });
+    }
+
+    private async void BtnZetZero_Click(object? sender, EventArgs e)
+    {
+        var confirmResult = MessageBox.Show(
+            "คุณต้องการล้างธุรกรรมในระบบทั้งหมดเพื่อเริ่มใช้งานจริง (Set Zero) ใช่หรือไม่?\n\nการดำเนินการนี้จะลบการจอง ประวัติลูกค้า ประวัติมิเตอร์ บิลน้ำไฟ คลังสินค้า และบันทึกธุรกรรมทั้งหมด แต่จะยังคงเหลือรายการประเภทห้อง รายชื่อห้องพัก และการตั้งค่าของท่านไว้",
+            "ยืนยันการล้างข้อมูลระบบ (Set Zero)",
+            MessageBoxButtons.YesNo,
+            MessageBoxIcon.Warning,
+            MessageBoxDefaultButton.Button2);
+
+        if (confirmResult != DialogResult.Yes) return;
+
+        using (var confirmDlg = new Form())
+        {
+            confirmDlg.Text = "ยืนยันรหัสผ่านเพื่อล้างระบบ";
+            confirmDlg.Size = new Size(380, 200);
+            confirmDlg.StartPosition = FormStartPosition.CenterParent;
+            confirmDlg.FormBorderStyle = FormBorderStyle.FixedDialog;
+            confirmDlg.MaximizeBox = false;
+            confirmDlg.MinimizeBox = false;
+            confirmDlg.Font = new Font("Segoe UI", 10F);
+
+            var lblPrompt = new Label { Text = "กรุณากรอกรหัสผ่าน Admin เพื่อดำเนินการต่อ:", Location = new Point(20, 20), Size = new Size(320, 25) };
+            var txtPwd = new TextBox { Location = new Point(20, 50), Width = 320, UseSystemPasswordChar = true };
+            var btnOk = new Button { Text = "ยืนยัน", Location = new Point(140, 100), Size = new Size(95, 36), DialogResult = DialogResult.OK, BackColor = Color.FromArgb(220, 38, 38), ForeColor = Color.White, FlatStyle = FlatStyle.Flat };
+            btnOk.FlatAppearance.BorderSize = 0;
+            var btnCancel = new Button { Text = "ยกเลิก", Location = new Point(245, 100), Size = new Size(95, 36), DialogResult = DialogResult.Cancel, BackColor = Color.FromArgb(226, 232, 240), FlatStyle = FlatStyle.Flat };
+            btnCancel.FlatAppearance.BorderSize = 0;
+
+            confirmDlg.Controls.AddRange(new Control[] { lblPrompt, txtPwd, btnOk, btnCancel });
+            confirmDlg.AcceptButton = btnOk;
+            confirmDlg.CancelButton = btnCancel;
+
+            if (confirmDlg.ShowDialog() == DialogResult.OK)
+            {
+                var inputPwd = txtPwd.Text.Trim();
+                var currentPwd = await _settingsService.GetAsync("admin_password") ?? "psoft123";
+                if (string.IsNullOrWhiteSpace(currentPwd)) currentPwd = "psoft123";
+
+                if (inputPwd != currentPwd)
+                {
+                    MessageBox.Show("รหัสผ่านไม่ถูกต้อง การทำรายการล้มเหลว", "ข้อผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    return;
+                }
+
+                try
+                {
+                    await _settingsService.ZetZeroDatabaseAsync();
+                    MessageBox.Show("ทำความสะอาดและเคลียร์ระบบเป็น 0 (Set Zero) เรียบร้อยแล้ว\n\nระบบจะทำการรีสตาร์ทแอปพลิเคชันเพื่อโหลดข้อมูลใหม่ทั้งหมด", "สำเร็จ", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    Application.Restart();
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"เกิดข้อผิดพลาดในการล้างระบบ: {ex.Message}", "ข้อผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
+            }
+        }
+    }
+
     private async Task ResetDatabaseSequencesAsync()
     {
         if (MessageBox.Show("ยืนยันการรีเซ็ตคีย์หลักในฐานข้อมูลและเลขรันบิลทั้งหมด?\nการดำเนินการนี้จะปรับค่า Auto-increment ID ของทุกตารางให้รันต่อจากข้อมูลล่าสุดที่มีอยู่ และตั้งค่าเลขรันบิลกลับไปเป็น 0", "ยืนยันการรีเซ็ต", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) == DialogResult.Yes)
@@ -523,6 +660,8 @@ public class SystemSettingsControl : UserControl
 
             _chkAutoPrintOnCheckout.Checked = dto.AutoPrintOnCheckout;
             _chkShowSignatureBox.Checked = dto.ShowSignatureBox;
+            _numPrinterFeedLines.Value = Math.Min(_numPrinterFeedLines.Maximum, Math.Max(0, dto.PrinterFeedLines));
+            _chkPrinterAutoCut.Checked = dto.PrinterAutoCut;
 
             _txtCheckInTime.Text = dto.DefaultCheckInTime;
             _txtCheckOutTime.Text = dto.DefaultCheckOutTime;
@@ -532,6 +671,9 @@ public class SystemSettingsControl : UserControl
 
             _txtDocPrefix.Text = dto.ReceiptDocPrefix;
             _numDocRunning.Value = Math.Min(_numDocRunning.Maximum, Math.Max(0, dto.ReceiptDocRunningNumber));
+
+            _txtAdminPassword.Text = "";
+            _txtConfirmPassword.Text = "";
         }
         catch (Exception ex)
         {
@@ -561,6 +703,8 @@ public class SystemSettingsControl : UserControl
                 PaperType = _cboPaperType.SelectedItem?.ToString() ?? "A4",
                 AutoPrintOnCheckout = _chkAutoPrintOnCheckout.Checked,
                 ShowSignatureBox = _chkShowSignatureBox.Checked,
+                PrinterFeedLines = (int)_numPrinterFeedLines.Value,
+                PrinterAutoCut = _chkPrinterAutoCut.Checked,
 
                 DefaultCheckInTime = _txtCheckInTime.Text.Trim(),
                 DefaultCheckOutTime = _txtCheckOutTime.Text.Trim(),
@@ -572,8 +716,23 @@ public class SystemSettingsControl : UserControl
                 ReceiptDocRunningNumber = (int)_numDocRunning.Value
             };
 
+            string pwd = _txtAdminPassword.Text.Trim();
+            string confirm = _txtConfirmPassword.Text.Trim();
+            if (!string.IsNullOrEmpty(pwd))
+            {
+                if (pwd != confirm)
+                {
+                    MessageBox.Show("รหัสผ่านใหม่และการยืนยันรหัสผ่านไม่ตรงกัน", "ข้อผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    return;
+                }
+                await _settingsService.SetAsync("admin_password", pwd);
+                await _settingsService.SetAsync("is_custom_admin_password_set", "1");
+            }
+
             await _settingsService.SaveAllSettingsAsync(dto);
             MessageBox.Show("บันทึกการตั้งค่าระบบและรูปภาพเรียบร้อยแล้ว", "สำเร็จ", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            _txtAdminPassword.Text = "";
+            _txtConfirmPassword.Text = "";
         }
         catch (Exception ex)
         {

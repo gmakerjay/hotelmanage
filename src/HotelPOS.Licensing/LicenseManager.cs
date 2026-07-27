@@ -14,7 +14,7 @@ public static class LicenseManager
     public static string LicenseFileName = "license.dat";
 
     public static string GetDefaultLicenseDirectory() =>
-        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "HotelPOS");
+        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "PSoftRestRentManager");
 
     public static string GetDefaultLicenseFilePath() =>
         Path.Combine(GetDefaultLicenseDirectory(), LicenseFileName);

@@ -11,6 +11,8 @@ public class CheckOutForm : Form
     private readonly Customer? _customer;
     private readonly Folio? _folio;
     private readonly IBookingService _bookingService;
+    private readonly IUtilityBillService? _utilityBillService;
+    private readonly ISettingsService? _settingsService;
 
     private Label _lblCustomer = null!;
     private Label _lblCheckInTime = null!;
@@ -28,13 +30,17 @@ public class CheckOutForm : Form
         Booking booking,
         Customer? customer,
         Folio? folio,
-        IBookingService bookingService)
+        IBookingService bookingService,
+        IUtilityBillService? utilityBillService = null,
+        ISettingsService? settingsService = null)
     {
         _room = room;
         _booking = booking;
         _customer = customer;
         _folio = folio;
         _bookingService = bookingService;
+        _utilityBillService = utilityBillService;
+        _settingsService = settingsService;
 
         InitializeUI();
     }
@@ -211,7 +217,7 @@ public class CheckOutForm : Form
         _lblTotalAmount.Text = $"{total:N2} บาท";
     }
 
-    private void PrintReceipt()
+    private async void PrintReceipt()
     {
         var currentFolio = _folio ?? new Folio
         {
@@ -221,16 +227,41 @@ public class CheckOutForm : Form
             TotalAmount = Math.Max(0, _numRoomCharges.Value + _numExtraCharges.Value - _numDiscount.Value)
         };
 
+        SystemSettingsDto? settings = null;
+        if (_settingsService != null)
+        {
+            try
+            {
+                settings = await _settingsService.GetAllSettingsAsync();
+            }
+            catch { }
+        }
+
+        UtilityBill? utilityBill = null;
+        if (_utilityBillService != null && _booking.RatePlan == RatePlanType.Monthly)
+        {
+            try
+            {
+                var checkoutDate = _booking.CheckOutActual ?? DateTime.Now;
+                string billingMonth = checkoutDate.ToString("yyyy-MM");
+                var bills = await _utilityBillService.GetBillsByMonthAsync(billingMonth);
+                utilityBill = bills.FirstOrDefault(b => b.RoomId == _booking.RoomId);
+            }
+            catch { }
+        }
+
         var printer = new HotelPOS.Printing.ReceiptInvoicePrinter(
-            "โรงแรม HotelPOS TH",
-            "123/45 ถนนสุขุมวิท กรุงเทพฯ",
-            "02-123-4567",
-            "0105560000000",
+            settings?.ShopName ?? "โรงแรม HotelPOS TH",
+            settings?.ShopAddress ?? "123/45 ถนนสุขุมวิท กรุงเทพฯ",
+            settings?.ShopPhone ?? "02-123-4567",
+            settings?.ShopTaxId ?? "0105560000000",
             _booking,
             _room,
             _customer,
             currentFolio,
-            "admin"
+            "admin",
+            settings,
+            utilityBill
         );
         printer.ShowPrintPreview();
     }

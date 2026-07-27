@@ -21,6 +21,16 @@ public class MainForm : Form
     private LicenseFile? _license;
     private int _daysRemaining;
 
+    // USB Dongle continuous detection
+    private System.Windows.Forms.Timer? _dongleCheckTimer;
+    private int _gracePeriodRemainingSeconds;
+    private bool _inGracePeriod;
+    private Form? _graceWarningDlg;
+    private Label? _graceTimeLabel;
+
+    private System.Windows.Forms.Timer? _trialDongleCheckTimer;
+    private bool _trialDongleDetected;
+
     private Panel _sidebarPanel = null!;
     private Panel _contentPanel = null!;
     private Panel? _licenseBannerPanel;
@@ -35,6 +45,7 @@ public class MainForm : Form
     private AuditLogControl _auditLogControl = null!;
     private SystemBackupControl _backupControl = null!;
     private SystemSettingsControl _systemSettingsControl = null!;
+    private POSControl _posControl = null!;
 
     private readonly List<Button> _navButtons = new();
     private Control? _activeControl;
@@ -59,6 +70,8 @@ public class MainForm : Form
         ICustomerRepository customerRepo = new CustomerRepository(connectionFactory, _logger);
         IFolioRepository folioRepo = new FolioRepository(connectionFactory, _logger);
         IAuditRepository auditRepo = new AuditRepository(connectionFactory, _logger);
+        IProductRepository productRepo = new ProductRepository(connectionFactory, _logger);
+        ISaleRepository saleRepo = new SaleRepository(connectionFactory, _logger);
 
         var auditService = new AuditService(auditRepo, _logger);
         _roomService = new RoomService(roomRepo, _logger);
@@ -66,33 +79,51 @@ public class MainForm : Form
         _bookingService = new BookingService(bookingRepo, roomRepo, customerRepo, folioRepo, _logger);
         var backupService = new BackupService(connectionFactory, auditService, _logger);
         var exportImportService = new ExportImportService(_customerService, _roomService, auditService);
+        IPOSService posService = new POSService(productRepo, saleRepo, connectionFactory, _logger);
 
         // Utility Billing Services
         IMeterReadingRepository meterRepo = new MeterReadingRepository(connectionFactory, _logger);
         IUtilityBillRepository utilityBillRepo = new UtilityBillRepository(connectionFactory, _logger);
         _utilityBillService = new UtilityBillService(meterRepo, utilityBillRepo, _settingsService, roomRepo, _logger);
 
-        Text = "โปรแกรมจัดการห้องพัก PSOFT";
+        Text = "PSoft Rest & Rent Manager - โปรแกรมจัดการห้องพักและห้องเช่า";
         Width = 1280;
         Height = 850;
+        MinimumSize = new Size(1100, 720);
         StartPosition = FormStartPosition.CenterScreen;
         Font = new Font("Segoe UI", 10.5F, FontStyle.Regular);
         try { Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath); } catch { }
 
-        InitializeViews(auditService, backupService, exportImportService);
+        InitializeViews(auditService, backupService, exportImportService, posService);
         InitializeLayout();
+
+        if (_license != null && _license.LicenseType != LicenseType.Trial && !string.IsNullOrEmpty(_license.UsbHardwareId))
+        {
+            InitializeDongleTimer();
+        }
+        else if (_license != null && _license.LicenseType == LicenseType.Trial)
+        {
+            InitializeTrialDongleTimer();
+        }
+
+        FormClosing += (s, e) =>
+        {
+            _dongleCheckTimer?.Stop();
+            _trialDongleCheckTimer?.Stop();
+        };
     }
 
-    private void InitializeViews(IAuditService auditService, IBackupService backupService, IExportImportService exportImportService)
+    private void InitializeViews(IAuditService auditService, IBackupService backupService, IExportImportService exportImportService, IPOSService posService)
     {
-        _roomGridControl = new RoomGridControl(_roomService, _bookingService, _customerService) { Dock = DockStyle.Fill };
-        _bookingListControl = new BookingListControl(_bookingService, _roomService, _customerService) { Dock = DockStyle.Fill };
+        _roomGridControl = new RoomGridControl(_roomService, _bookingService, _customerService, _settingsService) { Dock = DockStyle.Fill };
+        _bookingListControl = new BookingListControl(_bookingService, _roomService, _customerService, _settingsService, _utilityBillService) { Dock = DockStyle.Fill };
         _roomManagementControl = new RoomManagementControl(_roomService) { Dock = DockStyle.Fill };
         _customerManagementControl = new CustomerManagementControl(_customerService) { Dock = DockStyle.Fill };
         _meterReadingControl = new MeterReadingControl(_utilityBillService, _roomService, _settingsService, _bookingService, _customerService) { Dock = DockStyle.Fill };
         _auditLogControl = new AuditLogControl(auditService) { Dock = DockStyle.Fill };
         _backupControl = new SystemBackupControl(backupService, exportImportService) { Dock = DockStyle.Fill };
         _systemSettingsControl = new SystemSettingsControl(_settingsService) { Dock = DockStyle.Fill };
+        _posControl = new POSControl(posService, _settingsService, _logger) { Dock = DockStyle.Fill };
     }
 
     private void InitializeLayout()
@@ -156,7 +187,7 @@ public class MainForm : Form
 
         var lblBrandTitle = new Label
         {
-            Text = "PSOFT HOTEL",
+            Text = "PSoft R&R",
             Font = new Font("Segoe UI", 15F, FontStyle.Bold),
             ForeColor = Color.White,
             Location = new Point(18, 14),
@@ -165,7 +196,7 @@ public class MainForm : Form
 
         var lblBrandSub = new Label
         {
-            Text = "โปรแกรมจัดการห้องพัก PSOFT",
+            Text = "Rest & Rent Manager",
             Font = new Font("Segoe UI", 8.5F, FontStyle.Regular),
             ForeColor = Color.FromArgb(148, 163, 184),
             Location = new Point(18, 48),
@@ -200,6 +231,7 @@ public class MainForm : Form
         {
             ("ผังห้องพัก", _roomGridControl, async () => await _roomGridControl.RefreshGridAsync()),
             ("รายการจอง", _bookingListControl, async () => await _bookingListControl.LoadBookingsAsync()),
+            ("บริการเสริม & มินิบาร์ (POS)", _posControl, null),
             ("การจัดการห้องพัก", _roomManagementControl, null),
             ("ข้อมูลลูกค้า", _customerManagementControl, null),
             ("ค่าน้ำ / ค่าไฟ", _meterReadingControl, async () => await _meterReadingControl.LoadMeterDataAsync()),
@@ -418,6 +450,160 @@ public class MainForm : Form
         catch (Exception ex)
         {
             _logger.Error(LogCategory.UI, "โหลดข้อมูลหน้าหลักไม่สำเร็จ", ex, correlationId);
+        }
+    }
+
+    private void InitializeDongleTimer()
+    {
+        _dongleCheckTimer = new System.Windows.Forms.Timer();
+        _dongleCheckTimer.Interval = 15000; // Check every 15 seconds
+        _dongleCheckTimer.Tick += DongleCheckTimer_Tick;
+        _dongleCheckTimer.Start();
+    }
+
+    private void DongleCheckTimer_Tick(object? sender, EventArgs e)
+    {
+        var (dongleLicense, usbInfo, _) = UsbDongleManager.ScanForDongleKey();
+        
+        bool dongleFound = false;
+        if (dongleLicense != null && usbInfo != null)
+        {
+            if (dongleLicense.UsbHardwareId == _license?.UsbHardwareId && usbInfo.UsbHardwareId == _license?.UsbHardwareId)
+            {
+                dongleFound = true;
+            }
+        }
+
+        if (dongleFound)
+        {
+            if (_inGracePeriod)
+            {
+                _inGracePeriod = false;
+                _gracePeriodRemainingSeconds = 0;
+                if (_graceWarningDlg != null)
+                {
+                    _graceWarningDlg.Close();
+                    _graceWarningDlg = null;
+                }
+                _logger.Info(LogCategory.License, "พบ USB Dongle กลับมาเชื่อมต่อตามปกติ ยกเลิกโหมดผ่อนผัน");
+            }
+        }
+        else
+        {
+            if (!_inGracePeriod)
+            {
+                _inGracePeriod = true;
+                _gracePeriodRemainingSeconds = 300; // 5 minutes grace period
+                _logger.Info(LogCategory.License, "WARNING: ไม่พบ USB Dongle ลิขสิทธิ์หลัก เริ่มโหมดผ่อนผัน 5 นาที");
+                ShowGraceWarningDialog();
+            }
+            else
+            {
+                _gracePeriodRemainingSeconds -= 15;
+                if (_graceTimeLabel != null)
+                {
+                    int mins = _gracePeriodRemainingSeconds / 60;
+                    int secs = _gracePeriodRemainingSeconds % 60;
+                    _graceTimeLabel.Text = $"เวลาที่เหลือ: {mins} นาที {secs:D2} วินาที";
+                }
+
+                if (_gracePeriodRemainingSeconds <= 0)
+                {
+                    _dongleCheckTimer?.Stop();
+                    if (_graceWarningDlg != null)
+                    {
+                        _graceWarningDlg.Close();
+                        _graceWarningDlg = null;
+                    }
+                    _logger.Error(LogCategory.License, "หมดเวลาผ่อนผัน USB Dongle ยังคงไม่ถูกเสียบกลับคืน ทำการปิดโปรแกรม");
+                    MessageBox.Show("หมดเวลาการผ่อนผันการตรวจพบอุปกรณ์ลิขสิทธิ์ (USB Dongle) ระบบจะทำการปิดตัวเองเพื่อความปลอดภัย", "ตรวจสอบลิขสิทธิ์ล้มเหลว", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    Application.Exit();
+                }
+            }
+        }
+    }
+
+    private void ShowGraceWarningDialog()
+    {
+        _graceWarningDlg = new Form
+        {
+            Text = "คำเตือน: อุปกรณ์ลิขสิทธิ์ขาดการเชื่อมต่อ",
+            Size = new Size(480, 240),
+            StartPosition = FormStartPosition.CenterScreen,
+            FormBorderStyle = FormBorderStyle.FixedDialog,
+            MaximizeBox = false,
+            MinimizeBox = false,
+            ControlBox = false,
+            TopMost = true,
+            Font = new Font("Segoe UI", 10F)
+        };
+
+        var lblIcon = new Label
+        {
+            Text = "",
+            Font = new Font("Segoe UI", 24F),
+            ForeColor = Color.OrangeRed,
+            Location = new Point(20, 20),
+            AutoSize = true
+        };
+
+        var lblTitle = new Label
+        {
+            Text = "ไม่พบ USB Dongle ลิขสิทธิ์หลัก!",
+            Font = new Font("Segoe UI", 12F, FontStyle.Bold),
+            ForeColor = Color.FromArgb(220, 38, 38),
+            Location = new Point(70, 20),
+            AutoSize = true
+        };
+
+        var lblDesc = new Label
+        {
+            Text = "กรุณาเสียบ USB Dongle กลับคืนเข้าพอร์ตเดิมโดยเร็วที่สุด ระบบอนุญาตให้ท่านกรอกและบันทึกข้อมูลทำงานต่อชั่วคราวได้อีก 5 นาที หากหมดเวลาโปรแกรมจะปิดตัวเองโดยอัตโนมัติ",
+            Location = new Point(70, 50),
+            Size = new Size(370, 80)
+        };
+
+        _graceTimeLabel = new Label
+        {
+            Text = "เวลาที่เหลือ: 5 นาที 00 วินาที",
+            Font = new Font("Segoe UI", 12F, FontStyle.Bold),
+            ForeColor = Color.OrangeRed,
+            Location = new Point(70, 140),
+            AutoSize = true
+        };
+
+        _graceWarningDlg.Controls.AddRange(new Control[] { lblIcon, lblTitle, lblDesc, _graceTimeLabel });
+        _graceWarningDlg.Show(); // Non-modal so they can save their work
+    }
+
+    private void InitializeTrialDongleTimer()
+    {
+        _trialDongleCheckTimer = new System.Windows.Forms.Timer();
+        _trialDongleCheckTimer.Interval = 15000; // Check every 15 seconds
+        _trialDongleCheckTimer.Tick += TrialDongleCheckTimer_Tick;
+        _trialDongleCheckTimer.Start();
+    }
+
+    private void TrialDongleCheckTimer_Tick(object? sender, EventArgs e)
+    {
+        if (_trialDongleDetected) return;
+
+        var (dongleLicense, usbInfo, _) = UsbDongleManager.ScanForDongleKey();
+        if (dongleLicense != null && usbInfo != null)
+        {
+            var currentAppSerial = AppWatermarkManager.GetCurrentAppSerial();
+            var status = LicenseValidator.ValidateDongle(dongleLicense, usbInfo.UsbHardwareId, currentAppSerial);
+            if (status == LicenseStatus.Active)
+            {
+                _trialDongleDetected = true;
+                _trialDongleCheckTimer?.Stop();
+
+                MessageBox.Show(
+                    "ตรวจพบอุปกรณ์ลิขสิทธิ์ (USB Dongle) แล้ว!\n\nกรุณาปิดและเปิดโปรแกรมใหม่อีกครั้งเพื่อเริ่มใช้งานรุ่นเต็มรูปแบบ โดยข้อมูลทั้งหมดที่ถูกบันทึกไว้จะยังคงอยู่ครบถ้วน",
+                    "ตรวจพบอุปกรณ์ลิขสิทธิ์",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information);
+            }
         }
     }
 }

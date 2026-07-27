@@ -35,15 +35,19 @@ public class RoomGridControl : UserControl
 
     private string? _selectedFilterMode = null; // null = ทั้งหมด, "Available", "Occupied", "Monthly", "Daily", "Hourly", "Cleaning", "Reserved", "Maintenance"
     private System.Windows.Forms.Timer _autoRefreshTimer = null!;
+    private readonly ISettingsService _settingsService;
+    private Label _lblUtilityRates = null!;
 
     public RoomGridControl(
         IRoomService roomService,
         IBookingService bookingService,
-        ICustomerService customerService)
+        ICustomerService customerService,
+        ISettingsService settingsService)
     {
         _roomService = roomService;
         _bookingService = bookingService;
         _customerService = customerService;
+        _settingsService = settingsService;
 
         InitializeUI();
         InitializeTimer();
@@ -85,6 +89,15 @@ public class RoomGridControl : UserControl
             Font = new Font("Segoe UI", 15F, FontStyle.Bold),
             ForeColor = Color.FromArgb(30, 41, 59),
             Location = new Point(15, 8),
+            AutoSize = true
+        };
+
+        _lblUtilityRates = new Label
+        {
+            Text = "อัตราค่าไฟ: - /หน่วย",
+            Font = new Font("Segoe UI", 10.5F, FontStyle.Bold),
+            ForeColor = Color.FromArgb(234, 88, 12),
+            Location = new Point(440, 14),
             AutoSize = true
         };
 
@@ -155,7 +168,7 @@ public class RoomGridControl : UserControl
 
         _headerPanel.Controls.AddRange(new Control[]
         {
-            titleLabel,
+            titleLabel, _lblUtilityRates,
             _lblAvailableCount, _lblOccupiedCount, _lblCleaningCount, _lblReservedCount,
             _lblNearCheckoutCount, _lblOverdueCount,
             lblSearch, _txtSearch, lblFloor, _cboFloorFilter, lblType, _cboTypeFilter,
@@ -168,7 +181,21 @@ public class RoomGridControl : UserControl
             Dock = DockStyle.Fill,
             AutoScroll = true,
             Padding = new Padding(15),
-            BackColor = Color.FromArgb(241, 245, 249)
+            BackColor = Color.FromArgb(241, 245, 249),
+            FlowDirection = FlowDirection.TopDown,
+            WrapContents = false
+        };
+        _cardsContainer.SizeChanged += (s, e) =>
+        {
+            int w = _cardsContainer.ClientSize.Width - 40;
+            if (w < 200) w = 200;
+            foreach (Control ctrl in _cardsContainer.Controls)
+            {
+                if (ctrl is FlowLayoutPanel or Panel)
+                {
+                    ctrl.Width = w;
+                }
+            }
         };
 
         Controls.Add(_cardsContainer);
@@ -183,9 +210,9 @@ public class RoomGridControl : UserControl
             ("ทั้งหมด", null, Color.FromArgb(30, 41, 59)),
             ("ห้องว่าง", "Available", Color.FromArgb(6, 95, 70)),
             ("มีผู้เข้าพัก", "Occupied", Color.FromArgb(153, 27, 27)),
-            ("📅 รายเดือน", "Monthly", Color.FromArgb(107, 33, 168)),
-            ("🌞 รายวัน", "Daily", Color.FromArgb(37, 99, 235)),
-            ("⏱️ รายชั่วโมง", "Hourly", Color.FromArgb(146, 64, 14)),
+            ("รายเดือน", "Monthly", Color.FromArgb(107, 33, 168)),
+            ("รายวัน", "Daily", Color.FromArgb(37, 99, 235)),
+            ("รายชั่วโมง", "Hourly", Color.FromArgb(146, 64, 14)),
             ("รอทำความสะอาด", "Cleaning", Color.FromArgb(180, 83, 9)),
             ("จองล่วงหน้า", "Reserved", Color.FromArgb(30, 58, 138)),
             ("ปิดซ่อม", "Maintenance", Color.FromArgb(71, 85, 105))
@@ -280,6 +307,17 @@ public class RoomGridControl : UserControl
 
     private async Task ApplyFilterAsync()
     {
+        try
+        {
+            var settings = await _settingsService.GetAllSettingsAsync();
+            _lblUtilityRates.Text = $"ค่าไฟ: {settings.ElectricRatePerUnit:N2} บ./หน่วย | ค่าน้ำ: " +
+                (settings.WaterBillingMode == "METER" ? $"{settings.WaterRatePerUnit:N2} บ./หน่วย" : $"เหมาจ่าย {settings.WaterFlatRatePerPerson:N2} บ./คน");
+        }
+        catch 
+        {
+            _lblUtilityRates.Text = "ค่าไฟ: - บ./หน่วย | ค่าน้ำ: -";
+        }
+
         _cardsContainer.SuspendLayout();
         _cardsContainer.Controls.Clear();
 
@@ -303,6 +341,7 @@ public class RoomGridControl : UserControl
         int overdueCount = 0;
 
         var now = DateTime.Now;
+        var roomsToDisplay = new List<(Room Room, RoomType? Type, Booking? Booking, Customer? Customer)>();
 
         foreach (var room in _allRooms)
         {
@@ -353,8 +392,72 @@ public class RoomGridControl : UserControl
                 if (!matchRoom && !matchCust && !matchType) continue;
             }
 
-            var card = CreateRoomTileCard(room, roomType, booking, customer, now);
-            _cardsContainer.Controls.Add(card);
+            roomsToDisplay.Add((room, roomType, booking, customer));
+        }
+
+        // Group rooms by Floor
+        var grouped = roomsToDisplay
+            .GroupBy(x => x.Room.Floor ?? "1")
+            .OrderBy(x => x.Key);
+
+        int containerWidth = _cardsContainer.ClientSize.Width - 40;
+        if (containerWidth < 200) containerWidth = 200;
+
+        foreach (var group in grouped)
+        {
+            var floorName = group.Key;
+
+            // Header bar for the floor
+            var header = new Panel
+            {
+                Width = containerWidth,
+                Height = 35,
+                Margin = new Padding(0, 8, 0, 8),
+                BackColor = Color.FromArgb(226, 232, 240) // Slate-200
+            };
+            var lblFloorHeader = new Label
+            {
+                Text = $"ชั้น {floorName} (Floor {floorName})",
+                Font = new Font("Segoe UI", 11.5F, FontStyle.Bold),
+                ForeColor = Color.FromArgb(30, 41, 59),
+                Location = new Point(10, 6),
+                AutoSize = true
+            };
+            header.Controls.Add(lblFloorHeader);
+
+            // Flow layout panel for cards on this floor
+            var floorFlow = new FlowLayoutPanel
+            {
+                Width = containerWidth,
+                FlowDirection = FlowDirection.LeftToRight,
+                WrapContents = true,
+                AutoSize = true,
+                BackColor = Color.Transparent,
+                Padding = new Padding(0),
+                Margin = new Padding(0, 0, 0, 15)
+            };
+
+            foreach (var item in group.OrderBy(x => x.Room.RoomNumber))
+            {
+                var card = CreateRoomTileCard(item.Room, item.Type, item.Booking, item.Customer, now);
+                floorFlow.Controls.Add(card);
+            }
+
+            _cardsContainer.Controls.Add(header);
+            _cardsContainer.Controls.Add(floorFlow);
+        }
+
+        if (roomsToDisplay.Count == 0)
+        {
+            var lblEmpty = new Label
+            {
+                Text = "ไม่พบห้องพักตามเงื่อนไขที่ระบุ",
+                Font = new Font("Segoe UI", 12F, FontStyle.Italic),
+                ForeColor = Color.Gray,
+                Location = new Point(20, 20),
+                AutoSize = true
+            };
+            _cardsContainer.Controls.Add(lblEmpty);
         }
 
         _lblAvailableCount.Text = $"ว่าง: {avail}";
@@ -409,14 +512,14 @@ public class RoomGridControl : UserControl
                     headerColor = Color.FromArgb(185, 28, 28);
                     backColor = Color.FromArgb(254, 226, 226);
                     textColor = Color.DarkRed;
-                    statusText = "🚨 เลยกำหนด!";
+                    statusText = "เลยกำหนด!";
                 }
                 else if (isNearCheckout)
                 {
                     headerColor = Color.FromArgb(217, 119, 6);
                     backColor = Color.FromArgb(254, 243, 199);
                     textColor = Color.DarkGoldenrod;
-                    statusText = "⚠️ ใกล้ครบกำหนด";
+                    statusText = "ใกล้ครบกำหนด";
                 }
                 else
                 {
@@ -488,25 +591,25 @@ public class RoomGridControl : UserControl
 
         if (roomType != null && roomType.MonthlyRate > 0 && roomType.DailyRate == 0)
         {
-            rateBadgeText = $"📅 รายเดือน  ฿{roomType.MonthlyRate:N0}/เดือน";
+            rateBadgeText = $"รายเดือน  ฿{roomType.MonthlyRate:N0}/เดือน";
             rateBadgeBg = Color.FromArgb(243, 232, 255); // Purple
             rateBadgeFg = Color.FromArgb(107, 33, 168);
         }
         else if (roomType != null && roomType.HourlyRate > 0 && roomType.DailyRate == 0)
         {
-            rateBadgeText = $"⏱️ รายชั่วโมง  ฿{roomType.HourlyRate:N0}/ชม.";
+            rateBadgeText = $"รายชั่วโมง  ฿{roomType.HourlyRate:N0}/ชม.";
             rateBadgeBg = Color.FromArgb(254, 243, 199); // Amber
             rateBadgeFg = Color.FromArgb(146, 64, 14);
         }
         else if (roomType != null && roomType.MonthlyRate > 0 && roomType.DailyRate > 0)
         {
-            rateBadgeText = $"📅 รายเดือน ฿{roomType.MonthlyRate:N0} / 🌞 รายวัน ฿{roomType.DailyRate:N0}";
+            rateBadgeText = $"รายเดือน ฿{roomType.MonthlyRate:N0} / รายวัน ฿{roomType.DailyRate:N0}";
             rateBadgeBg = Color.FromArgb(238, 242, 255); // Indigo
             rateBadgeFg = Color.FromArgb(55, 48, 163);
         }
         else
         {
-            rateBadgeText = $"🌞 รายวัน  ฿{(roomType != null ? roomType.DailyRate.ToString("N0") : "0")}/วัน";
+            rateBadgeText = $"รายวัน  ฿{(roomType != null ? roomType.DailyRate.ToString("N0") : "0")}/วัน";
             rateBadgeBg = Color.FromArgb(236, 253, 245); // Emerald
             rateBadgeFg = Color.FromArgb(6, 95, 70);
         }
@@ -564,12 +667,12 @@ public class RoomGridControl : UserControl
         {
             if (isOverdue)
             {
-                timeAlertText = $"🚨 เลยกำหนด {Math.Abs((int)minutesDiff)} นาที (ออก: {booking.CheckOutPlanned.Value:HH:mm} น.)";
+                timeAlertText = $"เลยกำหนด {Math.Abs((int)minutesDiff)} นาที (ออก: {booking.CheckOutPlanned.Value:HH:mm} น.)";
                 alertColor = Color.DarkRed;
             }
             else if (isNearCheckout)
             {
-                timeAlertText = $"⚠️ เหลืออีก {Math.Ceiling(minutesDiff)} นาที (กำหนดออก: {booking.CheckOutPlanned.Value:HH:mm} น.)";
+                timeAlertText = $"เหลืออีก {Math.Ceiling(minutesDiff)} นาที (กำหนดออก: {booking.CheckOutPlanned.Value:HH:mm} น.)";
                 alertColor = Color.DarkOrange;
             }
             else

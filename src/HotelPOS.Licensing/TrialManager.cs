@@ -8,17 +8,17 @@ namespace HotelPOS.Licensing;
 
 public static class TrialManager
 {
-    public static string RegistrySubKey = @"Software\HotelPOS";
+    public static string RegistrySubKey = @"Software\PSoftRestRentManager";
     public static string RegistryValueName = "TData";
     public static string HiddenFileName = ".tdata";
 
     private const int TrialDaysLimit = 30;
 
     public static string GetDefaultDbPath() =>
-        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "HotelPOS", "hotelpos.db");
+        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "PSoftRestRentManager", "restrent.db");
 
     public static string GetDefaultHiddenFileFolder() =>
-        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "HotelPOS");
+        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "PSoftRestRentManager");
 
     /// <summary>
     /// ตรวจสอบและดึงข้อมูลวันที่เริ่มใช้งาน Trial (ซิงค์ข้อมูลจาก Registry, ไฟล์ซ่อน และฐานข้อมูล SQLite)

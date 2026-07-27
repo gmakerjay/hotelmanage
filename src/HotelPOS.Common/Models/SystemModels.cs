@@ -30,17 +30,19 @@ public class AppSetting
 
 public class SystemSettingsDto
 {
-    public string ShopName { get; set; } = "โรงแรม HotelPOS TH";
+    public string ShopName { get; set; } = "PSoft Rest & Rent Manager";
     public string ShopAddress { get; set; } = "123/45 ถนนสุขุมวิท กรุงเทพมหานคร";
     public string ShopPhone { get; set; } = "02-123-4567";
     public string ShopTaxId { get; set; } = "0105560000000";
-    public string BillHeader { get; set; } = "ยินดีต้อนรับสู่โรงแรมของเรา";
-    public string BillFooter { get; set; } = "ขอบคุณที่ใช้บริการ / Thank you for staying with us";
+    public string BillHeader { get; set; } = "ยินดีต้อนรับสู่ PSoft Rest & Rent Manager";
+    public string BillFooter { get; set; } = "ขอบคุณที่ใช้บริการ / Thank you";
 
     public string PrinterName { get; set; } = "";
     public string PaperType { get; set; } = "A4"; // A4 | 80mm | 58mm
     public bool AutoPrintOnCheckout { get; set; } = true;
     public bool ShowSignatureBox { get; set; } = true;
+    public int PrinterFeedLines { get; set; } = 4;
+    public bool PrinterAutoCut { get; set; } = true;
 
     public string DefaultCheckInTime { get; set; } = "14:00";
     public string DefaultCheckOutTime { get; set; } = "12:00";

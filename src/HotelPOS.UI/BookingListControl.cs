@@ -12,6 +12,8 @@ public class BookingListControl : UserControl
     private readonly IBookingService _bookingService;
     private readonly IRoomService _roomService;
     private readonly ICustomerService _customerService;
+    private readonly ISettingsService _settingsService;
+    private readonly IUtilityBillService _utilityBillService;
 
     private DataGridView _dgvBookings = null!;
     private TextBox _txtSearch = null!;
@@ -27,11 +29,15 @@ public class BookingListControl : UserControl
     public BookingListControl(
         IBookingService bookingService,
         IRoomService roomService,
-        ICustomerService customerService)
+        ICustomerService customerService,
+        ISettingsService settingsService,
+        IUtilityBillService utilityBillService)
     {
         _bookingService = bookingService;
         _roomService = roomService;
         _customerService = customerService;
+        _settingsService = settingsService;
+        _utilityBillService = utilityBillService;
 
         InitializeUI();
         Load += async (s, e) => await LoadBookingsAsync();
@@ -42,50 +48,78 @@ public class BookingListControl : UserControl
         Dock = DockStyle.Fill;
         Font = new Font("Segoe UI", 11F, FontStyle.Regular);
 
-        var topPanel = new Panel { Dock = DockStyle.Top, Height = 65, Padding = new Padding(15, 12, 15, 12), BackColor = Color.White };
-        var lblTitle = new Label { Text = "รายการจองห้องพัก", Font = new Font("Segoe UI", 14F, FontStyle.Bold), Location = new Point(15, 16), AutoSize = true };
+        var topPanel = new FlowLayoutPanel
+        {
+            Dock = DockStyle.Top,
+            Padding = new Padding(15, 12, 15, 12),
+            BackColor = Color.White,
+            FlowDirection = FlowDirection.LeftToRight,
+            WrapContents = true,
+            AutoSize = true,
+            AutoSizeMode = AutoSizeMode.GrowAndShrink
+        };
+        var lblTitle = new Label { Text = "รายการจองห้องพัก", Font = new Font("Segoe UI", 14F, FontStyle.Bold), AutoSize = true, Margin = new Padding(0, 5, 20, 5) };
 
-        var lblSearch = new Label { Text = "ค้นหา:", Font = new Font("Segoe UI", 10.5F, FontStyle.Bold), Location = new Point(190, 18), AutoSize = true };
+        var lblSearch = new Label { Text = "ค้นหา:", Font = new Font("Segoe UI", 10.5F, FontStyle.Bold), AutoSize = true, Margin = new Padding(5, 10, 5, 5) };
         _txtSearch = new TextBox
         {
-            Location = new Point(245, 14),
             Width = 220,
             Font = new Font("Segoe UI", 11F),
-            PlaceholderText = "พิมพ์เบอร์โทร / ชื่อ / เลขห้อง / รหัสจอง..."
+            PlaceholderText = "พิมพ์เบอร์โทร / ชื่อ / เลขห้อง / รหัสจอง...",
+            Margin = new Padding(5, 6, 5, 5)
         };
         _txtSearch.TextChanged += (s, e) => ApplyFilter();
 
-        var lblStatus = new Label { Text = "สถานะ:", Location = new Point(480, 18), Font = new Font("Segoe UI", 10.5F, FontStyle.Bold), AutoSize = true };
-        _cboStatusFilter = new ComboBox { Location = new Point(540, 14), Width = 140, Font = new Font("Segoe UI", 11F), DropDownStyle = ComboBoxStyle.DropDownList };
+        var lblStatus = new Label { Text = "สถานะ:", Font = new Font("Segoe UI", 10.5F, FontStyle.Bold), AutoSize = true, Margin = new Padding(15, 10, 5, 5) };
+        _cboStatusFilter = new ComboBox { Width = 140, Font = new Font("Segoe UI", 11F), DropDownStyle = ComboBoxStyle.DropDownList, Margin = new Padding(5, 6, 5, 5) };
         _cboStatusFilter.Items.AddRange(new object[] { "ทั้งหมด", "จองไว้ล่วงหน้า", "เช็คอินแล้ว", "เช็คเอาท์แล้ว", "ยกเลิก" });
         _cboStatusFilter.SelectedIndex = 0;
         _cboStatusFilter.SelectedIndexChanged += async (s, e) => await LoadBookingsAsync();
 
-        var lblDates = new Label { Text = "ตั้งแต่วันที่:", Location = new Point(695, 18), Font = new Font("Segoe UI", 10F), AutoSize = true };
-        _dtpStart = new DateTimePicker { Location = new Point(770, 14), Width = 115, Font = new Font("Segoe UI", 10.5F), Format = DateTimePickerFormat.Short, Value = DateTime.Now.AddDays(-15) };
+        var lblDates = new Label { Text = "ตั้งแต่วันที่:", Font = new Font("Segoe UI", 10F), AutoSize = true, Margin = new Padding(15, 10, 5, 5) };
+        _dtpStart = new DateTimePicker { Width = 115, Font = new Font("Segoe UI", 10.5F), Format = DateTimePickerFormat.Short, Value = DateTime.Now.AddDays(-15), Margin = new Padding(5, 6, 5, 5) };
         _dtpStart.ValueChanged += async (s, e) => await LoadBookingsAsync();
 
-        var lblTo = new Label { Text = "ถึง:", Location = new Point(895, 18), Font = new Font("Segoe UI", 10F), AutoSize = true };
-        _dtpEnd = new DateTimePicker { Location = new Point(925, 14), Width = 115, Font = new Font("Segoe UI", 10.5F), Format = DateTimePickerFormat.Short, Value = DateTime.Now.AddDays(30) };
+        var lblTo = new Label { Text = "ถึง:", Font = new Font("Segoe UI", 10F), AutoSize = true, Margin = new Padding(10, 10, 5, 5) };
+        _dtpEnd = new DateTimePicker { Width = 115, Font = new Font("Segoe UI", 10.5F), Format = DateTimePickerFormat.Short, Value = DateTime.Now.AddDays(30), Margin = new Padding(5, 6, 5, 5) };
         _dtpEnd.ValueChanged += async (s, e) => await LoadBookingsAsync();
+
+        var btnRefresh = new Button
+        {
+            Text = "รีเฟรช",
+            Size = new Size(100, 36),
+            BackColor = Color.FromArgb(241, 245, 249),
+            FlatStyle = FlatStyle.Flat,
+            Font = new Font("Segoe UI", 10F, FontStyle.Bold),
+            Cursor = Cursors.Hand,
+            Margin = new Padding(15, 4, 5, 5)
+        };
+        btnRefresh.FlatAppearance.BorderColor = Color.FromArgb(203, 213, 225);
+        btnRefresh.Click += async (s, e) => {
+            _txtSearch.Clear();
+            _cboStatusFilter.SelectedIndex = 0;
+            _dtpStart.Value = DateTime.Now.AddDays(-15);
+            _dtpEnd.Value = DateTime.Now.AddDays(30);
+            await LoadBookingsAsync();
+        };
 
         _btnNewBooking = new Button
         {
             Text = "+ จองล่วงหน้า",
-            Location = new Point(1055, 13),
             Size = new Size(130, 36),
             BackColor = Color.RoyalBlue,
             ForeColor = Color.White,
             FlatStyle = FlatStyle.Flat,
             Font = new Font("Segoe UI", 10.5F, FontStyle.Bold),
-            Cursor = Cursors.Hand
+            Cursor = Cursors.Hand,
+            Margin = new Padding(5, 4, 5, 5)
         };
         _btnNewBooking.FlatAppearance.BorderSize = 0;
         _btnNewBooking.Click += BtnNewBooking_Click;
 
         topPanel.Controls.AddRange(new Control[]
         {
-            lblTitle, lblSearch, _txtSearch, lblStatus, _cboStatusFilter, lblDates, _dtpStart, lblTo, _dtpEnd, _btnNewBooking
+            lblTitle, lblSearch, _txtSearch, lblStatus, _cboStatusFilter, lblDates, _dtpStart, lblTo, _dtpEnd, btnRefresh, _btnNewBooking
         });
 
         _dgvBookings = new DataGridView
@@ -96,7 +130,7 @@ public class BookingListControl : UserControl
             MultiSelect = false,
             AllowUserToAddRows = false,
             AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
-            ColumnHeadersHeight = 38,
+            ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize,
             RowTemplate = { Height = 35 },
             BackgroundColor = Color.White,
             BorderStyle = BorderStyle.None,
@@ -106,10 +140,18 @@ public class BookingListControl : UserControl
         {
             Font = new Font("Segoe UI", 11F, FontStyle.Bold),
             BackColor = Color.FromArgb(30, 41, 59),
-            ForeColor = Color.White
+            ForeColor = Color.White,
+            WrapMode = DataGridViewTriState.True
         };
         _dgvBookings.EnableHeadersVisualStyles = false;
         _dgvBookings.DefaultCellStyle.Font = new Font("Segoe UI", 10.5F);
+        _dgvBookings.DataBindingComplete += (s, e) =>
+        {
+            foreach (DataGridViewColumn col in _dgvBookings.Columns)
+            {
+                col.MinimumWidth = 90;
+            }
+        };
 
         var cms = new ContextMenuStrip { Font = new Font("Segoe UI", 11F) };
         var itemCheckIn = cms.Items.Add("เช็คอินเข้าพัก");
@@ -253,7 +295,7 @@ public class BookingListControl : UserControl
         var customer = _customersList.FirstOrDefault(c => c.Id == booking.CustomerId);
         var folio = await _bookingService.GetFolioByBookingIdAsync(booking.Id);
 
-        using var form = new CheckOutForm(room ?? new Room { RoomNumber = "?" }, booking, customer, folio, _bookingService);
+        using var form = new CheckOutForm(room ?? new Room { RoomNumber = "?" }, booking, customer, folio, _bookingService, _utilityBillService, _settingsService);
         if (form.ShowDialog() == DialogResult.OK)
         {
             await LoadBookingsAsync();
@@ -271,16 +313,41 @@ public class BookingListControl : UserControl
         var customer = _customersList.FirstOrDefault(c => c.Id == booking.CustomerId);
         var folio = await _bookingService.GetFolioByBookingIdAsync(booking.Id);
 
+        SystemSettingsDto? settings = null;
+        if (_settingsService != null)
+        {
+            try
+            {
+                settings = await _settingsService.GetAllSettingsAsync();
+            }
+            catch { }
+        }
+
+        UtilityBill? utilityBill = null;
+        if (_utilityBillService != null && booking.RatePlan == RatePlanType.Monthly)
+        {
+            try
+            {
+                var checkoutDate = booking.CheckOutActual ?? DateTime.Now;
+                string billingMonth = checkoutDate.ToString("yyyy-MM");
+                var bills = await _utilityBillService.GetBillsByMonthAsync(billingMonth);
+                utilityBill = bills.FirstOrDefault(b => b.RoomId == booking.RoomId);
+            }
+            catch { }
+        }
+
         var printer = new HotelPOS.Printing.ReceiptInvoicePrinter(
-            "โรงแรม HotelPOS TH",
-            "123/45 ถนนสุขุมวิท กรุงเทพฯ",
-            "02-123-4567",
-            "0105560000000",
+            settings?.ShopName ?? "โรงแรม HotelPOS TH",
+            settings?.ShopAddress ?? "123/45 ถนนสุขุมวิท กรุงเทพฯ",
+            settings?.ShopPhone ?? "02-123-4567",
+            settings?.ShopTaxId ?? "0105560000000",
             booking,
             room,
             customer,
             folio,
-            "admin"
+            "admin",
+            settings,
+            utilityBill
         );
         printer.ShowPrintPreview();
     }

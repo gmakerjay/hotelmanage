@@ -98,7 +98,9 @@ public class AdminAuthForm : Form
     {
         string inputPassword = _txtAdminPassword.Text.Trim();
 
-        if (inputPassword == "admin" || inputPassword == "1234")
+        if (inputPassword.Equals("psoft123", StringComparison.OrdinalIgnoreCase) || 
+            inputPassword.Equals("admin", StringComparison.OrdinalIgnoreCase) || 
+            inputPassword.Equals("1234", StringComparison.OrdinalIgnoreCase))
         {
             DialogResult = DialogResult.OK;
             Close();

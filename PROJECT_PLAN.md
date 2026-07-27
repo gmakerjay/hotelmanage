@@ -216,9 +216,9 @@ HotelPOS.sln
 |---|---|---|
 | **0. Setup** | ตั้งโปรเจค, โครงสร้าง Solution, DB Schema, Logging infra | ✅ เสร็จสมบูรณ์ |
 | **1. Core License** | ระบบ USB Hardware Dongle + App Serial Watermark + Trial 30 วัน Anti-Reset + License Admin Tool | ✅ เสร็จสมบูรณ์ (v1.0.0) |
-| **2. ห้องพัก/จอง** | Room Grid, เช็คอิน/เช็คเอาท์, จองล่วงหน้า | ⏳ กำลังพัฒนา |
-| **3. POS/ขายของ** | ขายสินค้าเสริม, Folio, ส่วนลด | ⏳ กำลังพัฒนา |
-| **4. บิล/พิมพ์เอกสาร** | Engine พิมพ์ Receipt + A4, เทมเพลต, ตั้งค่าโลโก้/ร้าน | ⏳ กำลังพัฒนา |
+| **2. ห้องพัก/จอง** | Room Grid, เช็คอิน/เช็คเอาท์, จองล่วงหน้า | ✅ เสร็จสมบูรณ์ |
+| **3. POS/ขายของ** | ขายสินค้าเสริม, Folio, ส่วนลด | ✅ เสร็จสมบูรณ์ |
+| **4. บิล/พิมพ์เอกสาร** | Engine พิมพ์ Receipt + A4, เทมเพลต, ตั้งค่าโลโก้/ร้าน | ✅ เสร็จสมบูรณ์ |
 | **5. รายงาน/Backup** | รายงานทั้งหมด, Backup/Restore/Reset | ⏳ กำลังพัฒนา |
 | **6. Polish** | UI/UX, สิทธิ์ผู้ใช้ (Role), Log Viewer, ทดสอบระบบทั้งหมด | ⏳ กำลังพัฒนา |
 | **7. Packaging** | ทำ Installer (Inno Setup), Obfuscate, ทดสอบบนเครื่องเก่าจริง | ⏳ กำลังพัฒนา |
@@ -236,5 +236,6 @@ HotelPOS.sln
 
 | วันที่/เวลา | เวอร์ชัน | รายละเอียดการบันทึกความคืบหน้า (Progress Log) |
 |---|---|---|
+| **2026-07-27** | **v1.0.0** | **พัฒนาระบบเครื่องพิมพ์ใบเสร็จ (Thermal Printer), Rebrand โปรแกรมเป็น PSoft Rest & Rent Manager, และระบบบริการเสริม & ร้านค้า (POS):**<br>- พัฒนาการจัดหน้าและพิมพ์ใบเสร็จขนาด 58mm / 80mm เพิ่มเติมจากบิล A4 เดิมใน `ReceiptInvoicePrinter.cs` และ `UtilityInvoicePrinter.cs`<br>- พัฒนาระบบแปลงตัวอักษรภาษาไทยเป็นรูปภาพ (Thai Rasterization) ป้องกันปัญหาฟอนต์ภาษาไทยของเครื่องพิมพ์จีนราคาประหยัด<br>- ดำเนินการ Rebrand ชื่อระบบจาก HotelPOS เป็น **PSoft Rest & Rent Manager** ครอบคลุม: ชื่อหน้าต่างโปรแกรม, ที่อยู่จัดเก็บฐานข้อมูล/Log ใต้ AppData, ค่าคีย์ Registry คลาสทดสอบ และปรับชื่อไฟล์ Binary เอาต์พุตเป็น `PSoftRestRentManager.exe` และ `PSoftRestRentGenerator.exe`<br>- พัฒนาระบบร้านค้าและบริการเสริม (POS Shop Front) แบบสองคอลัมน์ พร้อมระบบจัดการสต็อก/ประเภทสินค้าในตัว เชื่อมต่อ Folio ชาร์จเข้าบัญชีห้องพัก และพิมพ์ใบเสร็จอย่างย่อผ่านเครื่องพิมพ์ความร้อนแบบเรียลไทม์ |
 | **2026-07-27** | **v1.0.0** | **เริ่มต้นโปรเจค & พัฒนาระบบ License ทั้งหมดเป็น USB Hardware Dongle 100%:**<br>- พัฒนาคลาส `UsbDongleManager.cs` ดึง Physical Hardware Serial ระดับชิป USB คอนโทรลเลอร์ (`Win32_DiskDrive WHERE InterfaceType='USB'`) ป้องกันการก๊อปปี้ไฟล์ข้าม Flash Drive 100%<br>- พัฒนาคลาส `AppWatermarkManager.cs` จัดการรหัสประจำตัวโปรแกรม (`app.watermark`) ป้องกันการสลับ Dongle ข้ามแอป<br>- พัฒนาคลาส `RevocationManager.cs` จัดการไฟล์บัญชีดำระงับสิทธิ์ (`revoked.dat`) ด้วย RSA Digital Signature<br>- ปรับปรุง `LicenseValidator.cs` และ `LicenseManager.cs` ให้สแกนหา USB Dongle เป็นอันดับแรก หากไม่พบจะสลับเข้าโหมด Trial 30 วัน Anti-Reset (ยึดวันที่เก่าที่สุดใน 3 แหล่ง)<br>- ปรับปรุง `HotelPOS.LicenseAdminTool` ให้รองรับการ Auto-detect USB Drive, Gen & Sign `dongle.key`, Gen `app.watermark` และปุ่มปลดล็อกทดสอบบนเครื่องนักพัฒนา<br>- เพิ่มชุดทดสอบ Unit Tests ผ่าน 25/25 เคส (Passed 100%) และสร้างคู่มือทดสอบ `Docs/USB_DONGLE_TESTING_MANUAL.md` |
 

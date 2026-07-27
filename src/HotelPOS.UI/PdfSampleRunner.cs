@@ -20,12 +20,12 @@ public class PdfGenerator
 
         var settings = new SystemSettingsDto
         {
-            ShopName = "โรงแรม PSOFT HOTEL & RESORT",
+            ShopName = "PSOFT REST & RENT",
             ShopAddress = "88/9 หมู่ 5 ถนนสุขุมวิท ตำบลแสนสุข อำเภอเมือง ชลบุรี 20130",
             ShopPhone = "038-765-4321 / 081-234-5678",
             ShopTaxId = "0105565012345",
-            BillHeader = "ยินดีต้อนรับสู่ PSOFT HOTEL",
-            BillFooter = "ขอบคุณที่เลือกใช้บริการ พักผ่อนให้สบาย / Thank you for staying with us",
+            BillHeader = "ยินดีต้อนรับสู่ PSOFT REST & RENT",
+            BillFooter = "ขอบคุณที่ใช้บริการ / Thank you",
             PaperType = "A4",
             EnableVat = true,
             VatRate = 7.00m,

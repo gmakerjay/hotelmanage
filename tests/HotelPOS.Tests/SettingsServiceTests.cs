@@ -52,6 +52,63 @@ public class SettingsServiceTests : IDisposable
         Assert.NotEqual(first, second);
     }
 
+    [Fact]
+    public async Task ZetZeroDatabaseAsync_ควรล้างข้อมูลระบบสำเร็จโดยไม่ติด_ForeignKey_Constraint()
+    {
+        using (var conn = _connectionFactory.CreateConnection())
+        {
+            await conn.OpenAsync();
+            // สร้างข้อมูลทดสอบในทุกตารางธุรกรรม
+            await Dapper.SqlMapper.ExecuteAsync(conn, @"
+                INSERT INTO room_types (id, name) VALUES (1, 'Standard');
+                INSERT INTO rooms (id, room_number, room_type_id, status) VALUES (1, '101', 1, 1);
+                INSERT INTO customers (id, full_name, phone) VALUES (1, 'สมชาย สายดี', '0812345678');
+                INSERT INTO bookings (id, booking_code, room_id, customer_id, check_in_planned, status) VALUES (1, 'BK-001', 1, 1, '2026-07-27', 1);
+                INSERT INTO folios (id, booking_id, room_charges) VALUES (1, 1, 1000);
+                INSERT INTO product_categories (id, name) VALUES (1, 'เครื่องดื่ม');
+                INSERT INTO products (id, category_id, name, price) VALUES (1, 1, 'น้ำดื่ม', 15);
+                INSERT INTO sales (id, sale_code, folio_id, customer_id, total_amount) VALUES (1, 'SL-001', 1, 1, 1015);
+                INSERT INTO sale_items (id, sale_id, product_id, product_name_snapshot, unit_price, quantity, line_total) VALUES (1, 1, 1, 'น้ำดื่ม', 15, 1, 15);
+                INSERT INTO payments (id, sale_id, method, amount) VALUES (1, 1, 0, 1015);
+                INSERT INTO invoice_documents (id, sale_id, doc_type, document_number, printed_paper_size) VALUES (1, 1, 0, 'RC-000001', 0);
+                INSERT INTO meter_readings (id, room_id, utility_type, billing_month, reading_curr) VALUES (1, 1, 0, '2026-07', 100);
+                INSERT INTO utility_bills (id, bill_code, room_id, billing_month, total_amount) VALUES (1, 'UB-001', 1, '2026-07', 500);
+                INSERT INTO audit_logs (id, action) VALUES (1, 'TEST_ACTION');
+                INSERT INTO backup_history (id, file_path, checksum) VALUES (1, 'C:\\backup.db', 'abc');
+            ");
+        }
+
+        // Act: สั่งล้างข้อมูลเป็น 0
+        await _settingsService.ZetZeroDatabaseAsync();
+
+        // Assert: ตรวจสอบว่าตารางธุรกรรมเป็น 0 ทั้งหมด และห้องพักกลับเป็นสถานะ 0 (Available)
+        using (var conn = _connectionFactory.CreateConnection())
+        {
+            await conn.OpenAsync();
+
+            Assert.Equal(0, await Dapper.SqlMapper.ExecuteScalarAsync<int>(conn, "SELECT COUNT(*) FROM bookings"));
+            Assert.Equal(0, await Dapper.SqlMapper.ExecuteScalarAsync<int>(conn, "SELECT COUNT(*) FROM customers"));
+            Assert.Equal(0, await Dapper.SqlMapper.ExecuteScalarAsync<int>(conn, "SELECT COUNT(*) FROM folios"));
+            Assert.Equal(0, await Dapper.SqlMapper.ExecuteScalarAsync<int>(conn, "SELECT COUNT(*) FROM sales"));
+            Assert.Equal(0, await Dapper.SqlMapper.ExecuteScalarAsync<int>(conn, "SELECT COUNT(*) FROM sale_items"));
+            Assert.Equal(0, await Dapper.SqlMapper.ExecuteScalarAsync<int>(conn, "SELECT COUNT(*) FROM payments"));
+            Assert.Equal(0, await Dapper.SqlMapper.ExecuteScalarAsync<int>(conn, "SELECT COUNT(*) FROM invoice_documents"));
+            Assert.Equal(0, await Dapper.SqlMapper.ExecuteScalarAsync<int>(conn, "SELECT COUNT(*) FROM meter_readings"));
+            Assert.Equal(0, await Dapper.SqlMapper.ExecuteScalarAsync<int>(conn, "SELECT COUNT(*) FROM utility_bills"));
+            Assert.Equal(0, await Dapper.SqlMapper.ExecuteScalarAsync<int>(conn, "SELECT COUNT(*) FROM audit_logs"));
+            Assert.Equal(0, await Dapper.SqlMapper.ExecuteScalarAsync<int>(conn, "SELECT COUNT(*) FROM backup_history"));
+
+            // ตารางมาสเตอร์ (rooms, room_types) ต้องอยู่ครบ
+            Assert.Equal(1, await Dapper.SqlMapper.ExecuteScalarAsync<int>(conn, "SELECT COUNT(*) FROM rooms"));
+            Assert.Equal(1, await Dapper.SqlMapper.ExecuteScalarAsync<int>(conn, "SELECT COUNT(*) FROM room_types"));
+            // สถานะห้องต้องถูกรีเซ็ตเป็น Available (0)
+            Assert.Equal(0, await Dapper.SqlMapper.ExecuteScalarAsync<int>(conn, "SELECT status FROM rooms WHERE id = 1"));
+        }
+
+        var runningNo = await _settingsService.GetAsync("receipt_doc_running_number");
+        Assert.Equal("0", runningNo);
+    }
+
     public void Dispose()
     {
         if (_logger is IDisposable disposableLogger)

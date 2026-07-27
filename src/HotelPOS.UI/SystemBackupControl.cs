@@ -33,7 +33,7 @@ public class SystemBackupControl : UserControl
         Font = new Font("Segoe UI", 11F, FontStyle.Regular);
 
         var pnlHeader = new Panel { Dock = DockStyle.Top, Height = 60, Padding = new Padding(15, 12, 15, 12), BackColor = Color.White };
-        var lblTitle = new Label { Text = "⚙️ ระบบสำรอง คืนค่า และนำเข้า/ส่งออกข้อมูล", Font = new Font("Segoe UI", 14F, FontStyle.Bold), Location = new Point(15, 16), AutoSize = true };
+        var lblTitle = new Label { Text = "ระบบสำรอง คืนค่า และนำเข้า/ส่งออกข้อมูล", Font = new Font("Segoe UI", 14F, FontStyle.Bold), Location = new Point(15, 16), AutoSize = true };
         pnlHeader.Controls.Add(lblTitle);
 
         var container = new FlowLayoutPanel
@@ -48,7 +48,7 @@ public class SystemBackupControl : UserControl
         // Group 1: Backup & Restore DB
         var grpBackup = new GroupBox
         {
-            Text = "💾 สำรองและคืนค่าฐานข้อมูล (Database Backup & Restore)",
+            Text = "สำรองและคืนค่าฐานข้อมูล (Database Backup & Restore)",
             Size = new Size(780, 180),
             Font = new Font("Segoe UI", 11F, FontStyle.Bold),
             Margin = new Padding(0, 0, 0, 20)
@@ -65,7 +65,7 @@ public class SystemBackupControl : UserControl
 
         _btnBackup = new Button
         {
-            Text = "💾 สำรองฐานข้อมูลทันที (Backup DB)",
+            Text = "สำรองฐานข้อมูลทันที (Backup DB)",
             Location = new Point(20, 85),
             Size = new Size(260, 45),
             BackColor = Color.ForestGreen,
@@ -77,7 +77,7 @@ public class SystemBackupControl : UserControl
 
         _btnRestore = new Button
         {
-            Text = "🔄 คืนค่าฐานข้อมูล (Restore DB)",
+            Text = "คืนค่าฐานข้อมูล (Restore DB)",
             Location = new Point(300, 85),
             Size = new Size(260, 45),
             BackColor = Color.DarkOrange,
@@ -92,7 +92,7 @@ public class SystemBackupControl : UserControl
         // Group 2: Import & Export CSV
         var grpCsv = new GroupBox
         {
-            Text = "📁 นำเข้าและส่งออกข้อมูล (CSV Import & Export)",
+            Text = "นำเข้าและส่งออกข้อมูล (CSV Import & Export)",
             Size = new Size(780, 220),
             Font = new Font("Segoe UI", 11F, FontStyle.Bold),
             Margin = new Padding(0, 0, 0, 20)
@@ -100,7 +100,7 @@ public class SystemBackupControl : UserControl
 
         _btnExportRooms = new Button
         {
-            Text = "📤 ส่งออกห้องพัก (Rooms.csv)",
+            Text = "ส่งออกห้องพัก (Rooms.csv)",
             Location = new Point(20, 45),
             Size = new Size(250, 40),
             Font = new Font("Segoe UI", 10.5F, FontStyle.Bold)
@@ -109,7 +109,7 @@ public class SystemBackupControl : UserControl
 
         _btnImportRooms = new Button
         {
-            Text = "📥 นำเข้าห้องพัก (Rooms.csv)",
+            Text = "นำเข้าห้องพัก (Rooms.csv)",
             Location = new Point(290, 45),
             Size = new Size(250, 40),
             Font = new Font("Segoe UI", 10.5F, FontStyle.Bold)
@@ -118,7 +118,7 @@ public class SystemBackupControl : UserControl
 
         _btnExportCustomers = new Button
         {
-            Text = "📤 ส่งออกลูกค้า (Customers.csv)",
+            Text = "ส่งออกลูกค้า (Customers.csv)",
             Location = new Point(20, 105),
             Size = new Size(250, 40),
             Font = new Font("Segoe UI", 10.5F, FontStyle.Bold)
@@ -127,7 +127,7 @@ public class SystemBackupControl : UserControl
 
         _btnImportCustomers = new Button
         {
-            Text = "📥 นำเข้าลูกค้า (Customers.csv)",
+            Text = "นำเข้าลูกค้า (Customers.csv)",
             Location = new Point(290, 105),
             Size = new Size(250, 40),
             Font = new Font("Segoe UI", 10.5F, FontStyle.Bold)
@@ -159,7 +159,7 @@ public class SystemBackupControl : UserControl
             using var sfd = new SaveFileDialog
             {
                 Filter = "Database File (*.db)|*.db|All Files (*.*)|*.*",
-                FileName = $"HotelPOS_Backup_{DateTime.Now:yyyyMMdd_HHmmss}.db"
+                FileName = $"PSoftRestRent_Backup_{DateTime.Now:yyyyMMdd_HHmmss}.db"
             };
 
             if (sfd.ShowDialog() == DialogResult.OK)

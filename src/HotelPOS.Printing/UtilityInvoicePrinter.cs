@@ -30,12 +30,25 @@ public class UtilityInvoicePrinter
     {
         using var printDoc = new PrintDocument();
 
-        if (!string.IsNullOrWhiteSpace(printerName))
+        string targetPrinter = !string.IsNullOrWhiteSpace(printerName) ? printerName : (_settings.PrinterName ?? "");
+        if (!string.IsNullOrWhiteSpace(targetPrinter))
         {
-            printDoc.PrinterSettings.PrinterName = printerName;
+            printDoc.PrinterSettings.PrinterName = targetPrinter;
         }
 
-        if (_settings.PaperType == "A4")
+        if (_settings.PaperType == "80mm")
+        {
+            int estimatedHeight = CalculateEstimatedHeight(80);
+            printDoc.DefaultPageSettings.PaperSize = new System.Drawing.Printing.PaperSize("Receipt80", 283, estimatedHeight);
+            printDoc.DefaultPageSettings.Margins = new Margins(10, 10, 10, 10);
+        }
+        else if (_settings.PaperType == "58mm")
+        {
+            int estimatedHeight = CalculateEstimatedHeight(58);
+            printDoc.DefaultPageSettings.PaperSize = new System.Drawing.Printing.PaperSize("Receipt58", 204, estimatedHeight);
+            printDoc.DefaultPageSettings.Margins = new Margins(5, 5, 5, 5);
+        }
+        else
         {
             printDoc.DefaultPageSettings.PaperSize = new System.Drawing.Printing.PaperSize("A4", 827, 1169);
             printDoc.DefaultPageSettings.Margins = new Margins(40, 40, 40, 40);
@@ -48,8 +61,32 @@ public class UtilityInvoicePrinter
     public void ShowPrintPreview()
     {
         using var printDoc = new PrintDocument();
-        printDoc.DefaultPageSettings.PaperSize = new System.Drawing.Printing.PaperSize("A4", 827, 1169);
-        printDoc.DefaultPageSettings.Margins = new Margins(40, 40, 40, 40);
+        
+        if (!string.IsNullOrWhiteSpace(_settings.PrinterName))
+        {
+            printDoc.PrinterSettings.PrinterName = _settings.PrinterName;
+        }
+
+        string paperLabel = "A4";
+        if (_settings.PaperType == "80mm")
+        {
+            int estimatedHeight = CalculateEstimatedHeight(80);
+            printDoc.DefaultPageSettings.PaperSize = new System.Drawing.Printing.PaperSize("Receipt80", 283, estimatedHeight);
+            printDoc.DefaultPageSettings.Margins = new Margins(10, 10, 10, 10);
+            paperLabel = "80mm";
+        }
+        else if (_settings.PaperType == "58mm")
+        {
+            int estimatedHeight = CalculateEstimatedHeight(58);
+            printDoc.DefaultPageSettings.PaperSize = new System.Drawing.Printing.PaperSize("Receipt58", 204, estimatedHeight);
+            printDoc.DefaultPageSettings.Margins = new Margins(5, 5, 5, 5);
+            paperLabel = "58mm";
+        }
+        else
+        {
+            printDoc.DefaultPageSettings.PaperSize = new System.Drawing.Printing.PaperSize("A4", 827, 1169);
+            printDoc.DefaultPageSettings.Margins = new Margins(40, 40, 40, 40);
+        }
 
         printDoc.PrintPage += PrintDoc_PrintPage;
 
@@ -59,9 +96,122 @@ public class UtilityInvoicePrinter
             Width = 960,
             Height = 720,
             StartPosition = FormStartPosition.CenterScreen,
-            Text = $"ตัวอย่างก่อนพิมพ์ - ใบแจ้งหนี้ประจำเดือน {_bill.BillingMonth} (A4)"
+            Text = $"ตัวอย่างก่อนพิมพ์ - ใบแจ้งหนี้ประจำเดือน {_bill.BillingMonth} ({paperLabel})"
         };
+
+        if (previewDlg.Controls.Count > 1 && previewDlg.Controls[1] is ToolStrip toolStrip)
+        {
+            try
+            {
+                var printButton = toolStrip.Items[0];
+                if (printButton != null)
+                {
+                    printButton.Visible = false;
+
+                    var customPrintBtn = new ToolStripButton
+                    {
+                        Image = printButton.Image,
+                        ToolTipText = "พิมพ์ (เลือกเครื่องพิมพ์)"
+                    };
+                    customPrintBtn.Click += (s, ev) =>
+                    {
+                        using var printDlg = new PrintDialog
+                        {
+                            Document = printDoc,
+                            UseEXDialog = true
+                        };
+                        if (printDlg.ShowDialog() == DialogResult.OK)
+                        {
+                            printDoc.Print();
+                            previewDlg.Close();
+                        }
+                    };
+                    toolStrip.Items.Insert(0, customPrintBtn);
+                }
+            }
+            catch { }
+        }
+
         previewDlg.ShowDialog();
+    }
+
+    private int CalculateEstimatedHeight(int paperWidthMm)
+    {
+        float scale = (paperWidthMm == 58) ? 0.75f : 1.0f;
+        float height = 20f; // Top padding
+
+        if (!string.IsNullOrEmpty(_settings.LogoImagePath) && File.Exists(_settings.LogoImagePath))
+        {
+            height += 58f;
+        }
+
+        string shopName = string.IsNullOrWhiteSpace(_settings.ShopName) ? "อพาร์ทเม้นท์ / ห้องเช่า" : _settings.ShopName;
+        height += 24f * scale; // Shop name
+
+        if (!string.IsNullOrEmpty(_settings.ShopAddress) && _settings.ShopAddress != "-")
+        {
+            using var bmpTemp = new Bitmap(1, 1);
+            using var gTemp = Graphics.FromImage(bmpTemp);
+            var fontSmall = new Font("Segoe UI", 7.5F * scale, FontStyle.Regular);
+            float printableWidth = (paperWidthMm == 58) ? 180f : 260f;
+            var size = gTemp.MeasureString(_settings.ShopAddress, fontSmall, (int)printableWidth);
+            height += size.Height + 4f;
+        }
+
+        string contactInfo = "";
+        if (!string.IsNullOrEmpty(_settings.ShopPhone) && _settings.ShopPhone != "-") contactInfo += $"โทร: {_settings.ShopPhone} ";
+        if (!string.IsNullOrEmpty(_settings.ShopTaxId) && _settings.ShopTaxId != "-") contactInfo += $"TAX: {_settings.ShopTaxId}";
+        if (!string.IsNullOrEmpty(contactInfo))
+        {
+            height += 18f * scale + 4f;
+        }
+
+        height += 50f * scale; // Title box/line
+
+        height += 18f * scale * 5; // Metadata (Bill No, Room, Month, Guest, Status)
+        height += 10f;
+
+        height += 22f * scale; // Table Header
+
+        int itemCount = 1; // Room charges is always printed
+        if (_bill.ElectricUnits > 0 || _bill.ElectricAmount > 0) itemCount++;
+        if (_bill.WaterAmount > 0) itemCount++;
+        if (_bill.CommonAreaFee > 0) itemCount++;
+        if (_bill.GarbageFee > 0) itemCount++;
+        if (_bill.ExtraCharges > 0) itemCount++;
+        if (_bill.DiscountAmount > 0) itemCount++;
+        height += itemCount * 18f * scale;
+        height += 10f; // separators
+
+        height += 30f * scale; // Totals
+        height += 10f;
+
+        if (!string.IsNullOrEmpty(_settings.QrCodeImagePath) && File.Exists(_settings.QrCodeImagePath))
+        {
+            float qrSize = (paperWidthMm == 58) ? 90f : 110f;
+            height += qrSize + 25f;
+        }
+
+        if (!string.IsNullOrEmpty(_settings.LobbyTerms))
+        {
+            height += 20f * scale;
+            using var bmpTemp = new Bitmap(1, 1);
+            using var gTemp = Graphics.FromImage(bmpTemp);
+            var fontSmall = new Font("Segoe UI", 7.5F * scale, FontStyle.Regular);
+            float printableWidth = (paperWidthMm == 58) ? 180f : 260f;
+            foreach (var termLine in _settings.LobbyTerms.Split('\n'))
+            {
+                var size = gTemp.MeasureString(termLine, fontSmall, (int)printableWidth);
+                height += size.Height + 2f;
+            }
+        }
+
+        height += 25f * scale + 10f; // Footer
+
+        int feedLines = _settings.PrinterFeedLines;
+        height += feedLines * 15f; // Extra Spacing
+
+        return (int)Math.Ceiling(height);
     }
 
     private void PrintDoc_PrintPage(object sender, PrintPageEventArgs e)
@@ -72,13 +222,235 @@ public class UtilityInvoicePrinter
         g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
         g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
 
+        if (_settings.PaperType == "80mm" || _settings.PaperType == "58mm")
+        {
+            string paperType = _settings.PaperType;
+            int paperWidthMm = (paperType == "58mm") ? 58 : 80;
+            int paperWidthUnits = (paperType == "58mm") ? 204 : 283;
+            int estimatedHeightUnits = CalculateEstimatedHeight(paperWidthMm);
+
+            // Rasterize to memory bitmap at 203 DPI to bypass buggy Chinese printer drivers and map fonts cleanly
+            float dpi = 203f;
+            int widthPixels = (paperType == "58mm") ? 384 : 576;
+            int heightPixels = (int)Math.Ceiling(estimatedHeightUnits * (dpi / 100f));
+
+            using var bmp = new Bitmap(widthPixels, heightPixels);
+            using (var bg = Graphics.FromImage(bmp))
+            {
+                bg.Clear(Color.White);
+                bg.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                bg.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
+
+                // Scale drawing units from 100ths of inch to 203 DPI pixel grid
+                float transformScale = dpi / 100f;
+                bg.ScaleTransform(transformScale, transformScale);
+
+                float printableWidth = (paperType == "58mm") ? 194f : 263f;
+                float leftMarg = (paperType == "58mm") ? 5f : 10f;
+                float rightMarg = leftMarg + printableWidth;
+
+                RenderReceiptLayout(bg, printableWidth, leftMarg, rightMarg, 15f, paperType);
+            }
+
+            g.DrawImage(bmp, e.MarginBounds.Left, e.MarginBounds.Top, paperWidthUnits, estimatedHeightUnits);
+        }
+        else
+        {
+            RenderA4Layout(g, e);
+        }
+    }
+
+    private void RenderReceiptLayout(Graphics g, float contentWidth, float leftMargin, float rightMargin, float topMargin, string paperType)
+    {
+        float scale = (paperType == "58mm") ? 0.75f : 1.0f;
+        var fontTitle = new Font("Segoe UI", 12F * scale, FontStyle.Bold);
+        var fontSubtitle = new Font("Segoe UI", 9.5F * scale, FontStyle.Bold);
+        var fontBody = new Font("Segoe UI", 8.5F * scale, FontStyle.Regular);
+        var fontBodyBold = new Font("Segoe UI", 8.5F * scale, FontStyle.Bold);
+        var fontSmall = new Font("Segoe UI", 7.5F * scale, FontStyle.Regular);
+
+        float y = topMargin;
+        float center = leftMargin + contentWidth / 2;
+
+        void DrawLeftRight(string left, string right, Font fLeft, Font fRight, float drawY)
+        {
+            g.DrawString(left, fLeft, Brushes.Black, leftMargin, drawY);
+            var size = g.MeasureString(right, fRight);
+            g.DrawString(right, fRight, Brushes.Black, rightMargin - size.Width, drawY);
+        }
+
+        // 1. Logo
+        if (!string.IsNullOrEmpty(_settings.LogoImagePath) && File.Exists(_settings.LogoImagePath))
+        {
+            try
+            {
+                using var logoImg = Image.FromFile(_settings.LogoImagePath);
+                float maxW = (paperType == "58mm") ? 90f : 120f;
+                float maxH = 50f;
+                float scaleImg = Math.Min(maxW / logoImg.Width, maxH / logoImg.Height);
+                float drawW = logoImg.Width * scaleImg;
+                float drawH = logoImg.Height * scaleImg;
+                g.DrawImage(logoImg, center - drawW / 2, y, drawW, drawH);
+                y += drawH + 8;
+            }
+            catch { }
+        }
+
+        // 2. Shop Header
+        var sfCenter = new StringFormat { Alignment = StringAlignment.Center };
+        string shopName = string.IsNullOrWhiteSpace(_settings.ShopName) ? "อพาร์ทเม้นท์ / ห้องเช่า" : _settings.ShopName;
+        g.DrawString(shopName, fontTitle, Brushes.Black, new RectangleF(leftMargin, y, contentWidth, 40), sfCenter);
+        y += 22 * scale + 4;
+
+        if (!string.IsNullOrEmpty(_settings.ShopAddress) && _settings.ShopAddress != "-")
+        {
+            var size = g.MeasureString(_settings.ShopAddress, fontSmall, (int)contentWidth);
+            g.DrawString(_settings.ShopAddress, fontSmall, Brushes.DimGray, new RectangleF(leftMargin, y, contentWidth, size.Height), sfCenter);
+            y += size.Height + 2;
+        }
+
+        string contactInfo = "";
+        if (!string.IsNullOrEmpty(_settings.ShopPhone) && _settings.ShopPhone != "-") contactInfo += $"โทร: {_settings.ShopPhone} ";
+        if (!string.IsNullOrEmpty(_settings.ShopTaxId) && _settings.ShopTaxId != "-") contactInfo += $"TAX: {_settings.ShopTaxId}";
+        if (!string.IsNullOrEmpty(contactInfo))
+        {
+            g.DrawString(contactInfo, fontSmall, Brushes.DimGray, new RectangleF(leftMargin, y, contentWidth, 30), sfCenter);
+            y += 18 * scale + 4;
+        }
+
+        // 3. Document Title
+        g.DrawLine(Pens.Black, leftMargin, y, rightMargin, y);
+        y += 6;
+        g.DrawString("ใบแจ้งหนี้ค่าเช่าและค่าบริการ", fontSubtitle, Brushes.Black, new RectangleF(leftMargin, y, contentWidth, 30), sfCenter);
+        y += 20 * scale + 4;
+        g.DrawLine(Pens.Black, leftMargin, y, rightMargin, y);
+        y += 8;
+
+        // 4. Metadata
+        DrawLeftRight("เลขที่บิล:", _bill.BillCode ?? "", fontBody, fontBodyBold, y);
+        y += 18 * scale;
+
+        DrawLeftRight("ห้องพัก:", _bill.RoomNumber ?? "", fontBody, fontBodyBold, y);
+        y += 18 * scale;
+
+        DrawLeftRight("ประจำเดือน:", _bill.BillingMonth ?? "", fontBody, fontBody, y);
+        y += 18 * scale;
+
+        if (_customer != null)
+        {
+            DrawLeftRight("ผู้เช่า:", _customer.FullName ?? "", fontBody, fontBody, y);
+            y += 18 * scale;
+        }
+
+        DrawLeftRight("สถานะ:", _bill.IsPaid ? "ชำระแล้ว" : "ยังไม่ชำระ", fontBody, fontBodyBold, y);
+        y += 18 * scale;
+
+        g.DrawLine(Pens.LightGray, leftMargin, y, rightMargin, y);
+        y += 6;
+
+        // 5. Items List
+        g.DrawString("รายการค่าใช้จ่าย", fontBodyBold, Brushes.Black, leftMargin, y);
+        var priceTitleSize = g.MeasureString("จำนวนเงิน", fontBodyBold);
+        g.DrawString("จำนวนเงิน", fontBodyBold, Brushes.Black, rightMargin - priceTitleSize.Width, y);
+        y += 20 * scale;
+
+        DrawLeftRight("ค่าเช่าห้องพักรายเดือน", $"{_bill.RoomCharge:N2}", fontBody, fontBodyBold, y);
+        y += 18 * scale;
+
+        if (_bill.ElectricUnits > 0 || _bill.ElectricAmount > 0)
+        {
+            DrawLeftRight($"ค่าไฟ ({_bill.ElectricPrev:N0}->{_bill.ElectricCurr:N0} = {_bill.ElectricUnits:N0} หน่วย)", $"{_bill.ElectricAmount:N2}", fontBody, fontBody, y);
+            y += 18 * scale;
+        }
+
+        if (_bill.WaterBillingMode == "FLAT")
+        {
+            DrawLeftRight($"ค่าน้ำ (เหมาจ่าย {_bill.WaterRate:N2} ฿/คน x {_bill.WaterPersonCount} คน)", $"{_bill.WaterAmount:N2}", fontBody, fontBody, y);
+            y += 18 * scale;
+        }
+        else if (_bill.WaterUnits > 0 || _bill.WaterAmount > 0)
+        {
+            DrawLeftRight($"ค่าน้ำ ({_bill.WaterPrev:N0}->{_bill.WaterCurr:N0} = {_bill.WaterUnits:N0} หน่วย)", $"{_bill.WaterAmount:N2}", fontBody, fontBody, y);
+            y += 18 * scale;
+        }
+
+        if (_bill.CommonAreaFee > 0)
+        {
+            DrawLeftRight("ค่าบริการส่วนกลาง", $"{_bill.CommonAreaFee:N2}", fontBody, fontBody, y);
+            y += 18 * scale;
+        }
+
+        if (_bill.GarbageFee > 0)
+        {
+            DrawLeftRight("ค่าจัดเก็บขยะรายเดือน", $"{_bill.GarbageFee:N2}", fontBody, fontBody, y);
+            y += 18 * scale;
+        }
+
+        if (_bill.ExtraCharges > 0)
+        {
+            DrawLeftRight("ค่าบริการอื่นๆ", $"{_bill.ExtraCharges:N2}", fontBody, fontBody, y);
+            y += 18 * scale;
+        }
+
+        if (_bill.DiscountAmount > 0)
+        {
+            DrawLeftRight("ส่วนลดพิเศษ", $"-{_bill.DiscountAmount:N2}", fontBody, fontBody, y);
+            y += 18 * scale;
+        }
+
+        g.DrawLine(Pens.LightGray, leftMargin, y, rightMargin, y);
+        y += 6;
+
+        // 6. Grand Total
+        DrawLeftRight("ยอดรวมทั้งสิ้น (TOTAL):", $"{_bill.TotalAmount:N2} บาท", fontSubtitle, fontSubtitle, y);
+        y += 24 * scale;
+        g.DrawLine(Pens.Black, leftMargin, y, rightMargin, y);
+        y += 8;
+
+        // 7. QR Code
+        if (!string.IsNullOrEmpty(_settings.QrCodeImagePath) && File.Exists(_settings.QrCodeImagePath))
+        {
+            try
+            {
+                using var qrImg = Image.FromFile(_settings.QrCodeImagePath);
+                float maxW = (paperType == "58mm") ? 90f : 110f;
+                g.DrawImage(qrImg, center - maxW / 2, y, maxW, maxW);
+                y += maxW + 4;
+                g.DrawString("สแกนจ่าย PromptPay", fontSmall, Brushes.DimGray, new RectangleF(leftMargin, y, contentWidth, 20), sfCenter);
+                y += 18 * scale + 10;
+            }
+            catch { }
+        }
+
+        // 8. Lobby Terms
+        if (!string.IsNullOrEmpty(_settings.LobbyTerms))
+        {
+            g.DrawString("ข้อตกลงและเงื่อนไข:", fontBodyBold, Brushes.Black, leftMargin, y);
+            y += 18 * scale;
+            foreach (var termLine in _settings.LobbyTerms.Split('\n'))
+            {
+                var size = g.MeasureString(termLine, fontSmall, (int)contentWidth);
+                g.DrawString(termLine, fontSmall, Brushes.DarkSlateGray, new RectangleF(leftMargin, y, contentWidth, size.Height));
+                y += size.Height + 1;
+            }
+            y += 8;
+        }
+
+        // 9. Footer Message
+        string footerMsg = !string.IsNullOrWhiteSpace(_settings.BillFooter) ? _settings.BillFooter : "ขอบคุณที่ใช้บริการ / Thank you";
+        g.DrawString(footerMsg, fontSubtitle, Brushes.Black, new RectangleF(leftMargin, y, contentWidth, 30), sfCenter);
+        y += 20 * scale;
+    }
+
+    private void RenderA4Layout(Graphics g, PrintPageEventArgs e)
+    {
         // Fonts
-        var fontTitle = new Font("Segoe UI", 18F, FontStyle.Bold);
-        var fontSubtitle = new Font("Segoe UI", 12F, FontStyle.Bold);
-        var fontHeader = new Font("Segoe UI", 10.5F, FontStyle.Bold);
-        var fontBody = new Font("Segoe UI", 10F, FontStyle.Regular);
-        var fontBodyBold = new Font("Segoe UI", 10F, FontStyle.Bold);
-        var fontSmall = new Font("Segoe UI", 9F, FontStyle.Regular);
+        var fontTitle = new Font("Segoe UI", 20F, FontStyle.Bold);
+        var fontSubtitle = new Font("Segoe UI", 13.5F, FontStyle.Bold);
+        var fontHeader = new Font("Segoe UI", 11.5F, FontStyle.Bold);
+        var fontBody = new Font("Segoe UI", 10.5F, FontStyle.Regular);
+        var fontBodyBold = new Font("Segoe UI", 10.5F, FontStyle.Bold);
+        var fontSmall = new Font("Segoe UI", 9.5F, FontStyle.Regular);
 
         // Pens & Brushes
         var penDark = new Pen(Color.FromArgb(30, 41, 59), 1.5F);
@@ -261,32 +633,35 @@ public class UtilityInvoicePrinter
         }
 
         g.DrawLine(penDark, leftMargin, currentY, rightMargin, currentY);
-        currentY += 12;
+        currentY += 15;
 
         // Total Box (Large Green Callout Box)
-        var totalRect = new RectangleF(rightMargin - 320, currentY, 320, 42);
+        var totalRect = new RectangleF(rightMargin - 360, currentY, 360, 46);
         g.FillRectangle(new SolidBrush(Color.FromArgb(240, 253, 244)), totalRect);
         g.DrawRectangle(new Pen(Color.ForestGreen, 1.5F), totalRect.X, totalRect.Y, totalRect.Width, totalRect.Height);
 
-        g.DrawString("ยอดรวมทั้งสิ้น (TOTAL DUE):", fontHeader, Brushes.DarkGreen, rightMargin - 305, currentY + 10);
-        g.DrawString($"{_bill.TotalAmount:N2} บาท", new Font("Segoe UI", 13F, FontStyle.Bold), Brushes.DarkGreen, rightMargin - 130, currentY + 8);
+        var sfLeft = new StringFormat { Alignment = StringAlignment.Near, LineAlignment = StringAlignment.Center };
+        var sfRight = new StringFormat { Alignment = StringAlignment.Far, LineAlignment = StringAlignment.Center };
 
-        currentY += 60;
+        g.DrawString("ยอดรวมทั้งสิ้น (TOTAL DUE):", fontHeader, Brushes.DarkGreen, new RectangleF(rightMargin - 345, currentY, 210, 46), sfLeft);
+        g.DrawString($"{_bill.TotalAmount:N2} บาท", new Font("Segoe UI", 13.5F, FontStyle.Bold), Brushes.DarkGreen, new RectangleF(rightMargin - 360, currentY, 345, 46), sfRight);
+
+        currentY += 75;
 
         // 5. Lobby Terms & Special Agreements Section (ข้อตกลงและเงื่อนไขหน้าเคาน์เตอร์/ล็อบบี้)
         if (!string.IsNullOrWhiteSpace(_settings.LobbyTerms))
         {
-            var termsRect = new RectangleF(leftMargin, currentY, contentWidth, 90);
+            var termsRect = new RectangleF(leftMargin, currentY, contentWidth, 100);
             g.FillRectangle(new SolidBrush(Color.FromArgb(248, 250, 252)), termsRect);
             g.DrawRectangle(penLight, termsRect.X, termsRect.Y, termsRect.Width, termsRect.Height);
 
-            g.DrawString("ข้อตกลงและเงื่อนไขหน้าล็อบบี้ / Lobby Terms & Conditions", fontHeader, brushDark, leftMargin + 10, currentY + 6);
+            g.DrawString("ข้อตกลงและเงื่อนไขหน้าล็อบบี้ / Lobby Terms & Conditions", fontHeader, brushDark, leftMargin + 10, currentY + 8);
 
             var sf = new StringFormat { Alignment = StringAlignment.Near, LineAlignment = StringAlignment.Near };
             g.DrawString(_settings.LobbyTerms, fontSmall, Brushes.DarkSlateGray,
-                new RectangleF(leftMargin + 12, currentY + 30, contentWidth - 24, 55), sf);
+                new RectangleF(leftMargin + 12, currentY + 34, contentWidth - 24, 60), sf);
 
-            currentY += 105;
+            currentY += 120;
         }
 
         // 6. QR Code & Signatures Container
@@ -311,25 +686,25 @@ public class UtilityInvoicePrinter
 
             // Left Signature Box (Tenant)
             float sig1X = leftMargin + 130;
-            var sig1Rect = new RectangleF(sig1X, currentY, sigBoxWidth, 115);
+            var sig1Rect = new RectangleF(sig1X, currentY, sigBoxWidth, 130);
             g.DrawRectangle(penLight, sig1Rect.X, sig1Rect.Y, sig1Rect.Width, sig1Rect.Height);
 
             g.DrawString("ลงลายมือชื่อผู้เช่า / Tenant Signature", fontHeader, brushDark, sig1X + 10, currentY + 8);
-            g.DrawLine(penLight, sig1X + 15, currentY + 68, sig1X + sigBoxWidth - 15, currentY + 68);
-            g.DrawString($"({(_customer?.FullName ?? "_________________________")})", fontSmall, Brushes.DimGray, sig1X + 20, currentY + 75);
-            g.DrawString("วันที่ / Date: _____ / _____ / ________", fontSmall, Brushes.DimGray, sig1X + 20, currentY + 93);
+            g.DrawLine(penLight, sig1X + 15, currentY + 75, sig1X + sigBoxWidth - 15, currentY + 75);
+            g.DrawString($"({(_customer?.FullName ?? "_________________________")})", fontSmall, Brushes.DimGray, sig1X + 20, currentY + 85);
+            g.DrawString("วันที่ / Date: _____ / _____ / ________", fontSmall, Brushes.DimGray, sig1X + 20, currentY + 105);
 
             // Right Signature Box (Staff)
             float sig2X = sig1X + sigBoxWidth + 15;
-            var sig2Rect = new RectangleF(sig2X, currentY, sigBoxWidth, 115);
+            var sig2Rect = new RectangleF(sig2X, currentY, sigBoxWidth, 130);
             g.DrawRectangle(penLight, sig2Rect.X, sig2Rect.Y, sig2Rect.Width, sig2Rect.Height);
 
             g.DrawString("ลงลายมือชื่อผู้รับเงิน / Receiver Signature", fontHeader, brushDark, sig2X + 10, currentY + 8);
-            g.DrawLine(penLight, sig2X + 15, currentY + 68, sig2X + sigBoxWidth - 15, currentY + 68);
-            g.DrawString($"({_staffName})", fontSmall, Brushes.DimGray, sig2X + 45, currentY + 75);
-            g.DrawString("วันที่ / Date: _____ / _____ / ________", fontSmall, Brushes.DimGray, sig2X + 20, currentY + 93);
+            g.DrawLine(penLight, sig2X + 15, currentY + 75, sig2X + sigBoxWidth - 15, currentY + 75);
+            g.DrawString($"({_staffName})", fontSmall, Brushes.DimGray, sig2X + 45, currentY + 85);
+            g.DrawString("วันที่ / Date: _____ / _____ / ________", fontSmall, Brushes.DimGray, sig2X + 20, currentY + 105);
 
-            currentY += 130;
+            currentY += 150;
         }
         else
         {
@@ -338,6 +713,6 @@ public class UtilityInvoicePrinter
 
         // 7. Footer Note
         string footerMsg = !string.IsNullOrWhiteSpace(_settings.BillFooter) ? _settings.BillFooter : "ขอบคุณที่ใช้บริการ / Thank you for staying with us";
-        g.DrawString(footerMsg, new Font("Segoe UI", 10F, FontStyle.Bold), Brushes.DarkSlateBlue, leftMargin + (contentWidth / 2) - 150, currentY);
+        g.DrawString(footerMsg, new Font("Segoe UI", 10.5F, FontStyle.Bold), Brushes.DarkSlateBlue, leftMargin + (contentWidth / 2) - 150, currentY);
     }
 }

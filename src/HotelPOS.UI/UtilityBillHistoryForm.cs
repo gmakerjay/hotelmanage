@@ -117,7 +117,25 @@ public class UtilityBillHistoryForm : Form
         btnMarkPaid.FlatAppearance.BorderSize = 0;
         btnMarkPaid.Click += async (s, e) => await MarkSelectedAsPaidAsync();
 
-        headerPanel.Controls.AddRange(new Control[] { lblTitle, lblSearch, _txtSearch, lblFilter, _cmbFilter, _btnPrintSelected, btnMarkPaid });
+        var btnRefresh = new Button
+        {
+            Text = "รีเฟรช",
+            Font = new Font("Segoe UI", 10F, FontStyle.Bold),
+            ForeColor = Color.FromArgb(30, 41, 59),
+            BackColor = Color.FromArgb(241, 245, 249),
+            FlatStyle = FlatStyle.Flat,
+            Size = new Size(100, 36),
+            Location = new Point(1075, 12),
+            Cursor = Cursors.Hand
+        };
+        btnRefresh.FlatAppearance.BorderColor = Color.FromArgb(203, 213, 225);
+        btnRefresh.Click += async (s, e) => {
+            _txtSearch.Clear();
+            _cmbFilter.SelectedIndex = 0;
+            await LoadBillsAsync();
+        };
+
+        headerPanel.Controls.AddRange(new Control[] { lblTitle, lblSearch, _txtSearch, lblFilter, _cmbFilter, _btnPrintSelected, btnMarkPaid, btnRefresh });
 
         // === DataGridView ===
         _dgvBills = new DataGridView
@@ -143,12 +161,21 @@ public class UtilityBillHistoryForm : Form
                 BackColor = Color.FromArgb(30, 41, 59),
                 ForeColor = Color.White,
                 Padding = new Padding(6),
-                Alignment = DataGridViewContentAlignment.MiddleCenter
+                Alignment = DataGridViewContentAlignment.MiddleCenter,
+                WrapMode = DataGridViewTriState.True
             },
             EnableHeadersVisualStyles = false,
-            ColumnHeadersHeight = 42,
+            ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize,
             RowTemplate = { Height = 40 },
             GridColor = Color.FromArgb(226, 232, 240)
+        };
+
+        _dgvBills.DataBindingComplete += (s, e) =>
+        {
+            foreach (DataGridViewColumn col in _dgvBills.Columns)
+            {
+                col.MinimumWidth = 90;
+            }
         };
 
         _dgvBills.Columns.AddRange(new DataGridViewColumn[]

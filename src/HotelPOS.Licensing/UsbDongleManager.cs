@@ -89,7 +89,60 @@ public static class UsbDongleManager
         string cleanLetter = driveLetter.TrimEnd('\\').ToUpperInvariant();
         try
         {
-            // ดึงข้อมูละดับ Physical Disk ผ่าน WMI Win32_DiskDrive
+            // Query partitions associated with this logical disk drive letter
+            string partitionQuery = $"ASSOCIATORS OF {{Win32_LogicalDisk.DeviceID='{cleanLetter}'}} WHERE AssocClass = Win32_LogicalDiskToPartition";
+            using var partitionSearcher = new ManagementObjectSearcher(partitionQuery);
+            using var partitions = partitionSearcher.Get();
+
+            foreach (var partition in partitions)
+            {
+                string partitionId = partition["DeviceID"]?.ToString() ?? "";
+                if (string.IsNullOrEmpty(partitionId)) continue;
+
+                // Query physical disk drives associated with this partition
+                string diskQuery = $"ASSOCIATORS OF {{Win32_DiskPartition.DeviceID='{partitionId}'}} WHERE AssocClass = Win32_DiskDriveToDiskPartition";
+                using var diskSearcher = new ManagementObjectSearcher(diskQuery);
+                using var disks = diskSearcher.Get();
+
+                foreach (var disk in disks)
+                {
+                    var pnpId = disk["PNPDeviceID"]?.ToString() ?? "";
+                    var serial = disk["SerialNumber"]?.ToString() ?? "";
+
+                    // หากมี SerialNumber ระดับชิปโดยตรง
+                    if (!string.IsNullOrWhiteSpace(serial) && serial.Length >= 5)
+                    {
+                        return serial.Trim();
+                    }
+
+                    // หากไม่มี SerialNumber ให้อ่านจาก PNPDeviceID
+                    if (!string.IsNullOrWhiteSpace(pnpId))
+                    {
+                        // PNPDeviceID มักอยู่ในรูป USBSTOR\DISK&VEN_...\[SERIAL_NUMBER]
+                        var parts = pnpId.Split('\\');
+                        if (parts.Length > 0)
+                        {
+                            var lastPart = parts[parts.Length - 1];
+                            if (lastPart.Contains("&"))
+                            {
+                                var subParts = lastPart.Split('&');
+                                lastPart = subParts[0];
+                            }
+                            if (!string.IsNullOrWhiteSpace(lastPart))
+                            {
+                                return lastPart.Trim();
+                            }
+                        }
+                        return pnpId.Trim();
+                    }
+                }
+            }
+        }
+        catch { }
+
+        // Fallback 1: ค้นหาใน USB Storage ทั่วไปหากความเชื่อมโยงของ WMI พัง
+        try
+        {
             using var searcher = new ManagementObjectSearcher("SELECT DeviceID, PNPDeviceID, SerialNumber, InterfaceType FROM Win32_DiskDrive WHERE InterfaceType = 'USB'");
             using var collection = searcher.Get();
 
@@ -98,37 +151,15 @@ public static class UsbDongleManager
                 var pnpId = drive["PNPDeviceID"]?.ToString() ?? "";
                 var serial = drive["SerialNumber"]?.ToString() ?? "";
 
-                // หากมี SerialNumber ระดับชิปโดยตรง
                 if (!string.IsNullOrWhiteSpace(serial) && serial.Length >= 5)
                 {
                     return serial.Trim();
-                }
-
-                // หากไม่มี SerialNumber ให้อ่านจาก PNPDeviceID
-                if (!string.IsNullOrWhiteSpace(pnpId))
-                {
-                    // PNPDeviceID มักอยู่ในรูป USBSTOR\DISK&VEN_...\[SERIAL_NUMBER]
-                    var parts = pnpId.Split('\\');
-                    if (parts.Length > 0)
-                    {
-                        var lastPart = parts[parts.Length - 1];
-                        if (lastPart.Contains("&"))
-                        {
-                            var subParts = lastPart.Split('&');
-                            lastPart = subParts[0];
-                        }
-                        if (!string.IsNullOrWhiteSpace(lastPart))
-                        {
-                            return lastPart.Trim();
-                        }
-                    }
-                    return pnpId.Trim();
                 }
             }
         }
         catch { }
 
-        // Fallback กรณี WMI อ่านไม่ได้ ให้ใช้ Drive Volume Label + Letter
+        // Fallback 2: กรณี WMI อ่านไม่ได้ ให้ใช้ Drive Volume Label + Letter
         return $"GENERIC-USB-{cleanLetter}";
     }
 
@@ -142,14 +173,14 @@ public static class UsbDongleManager
     /// <summary>
     /// ฟอร์แมต USB Flash Drive (Quick Format) เป็นระบบไฟล์ FAT32 หรือ NTFS พร้อมตั้งชื่อ Volume Label
     /// </summary>
-    public static bool FormatUsbDrive(string driveLetter, string fileSystem = "FAT32", string volumeLabel = "HOTELPOS_KEY")
+    public static bool FormatUsbDrive(string driveLetter, string fileSystem = "FAT32", string volumeLabel = "REST_RENT_KEY")
     {
         try
         {
             string cleanLetter = driveLetter.TrimEnd('\\').Replace(":", "").Trim();
             if (string.IsNullOrEmpty(cleanLetter)) return false;
 
-            // ใช้ PowerShell Format-Volume เพื่อ Quick Format ไดรฟ์ USB โดยไม่ต้องพึ่ง exe ภายนอก
+            // 1. ลองใช้ PowerShell Format-Volume ก่อน
             var psi = new System.Diagnostics.ProcessStartInfo
             {
                 FileName = "powershell.exe",
@@ -158,9 +189,26 @@ public static class UsbDongleManager
                 UseShellExecute = false
             };
 
-            using var proc = System.Diagnostics.Process.Start(psi);
-            proc?.WaitForExit(40000);
-            return proc?.ExitCode == 0;
+            using (var proc = System.Diagnostics.Process.Start(psi))
+            {
+                proc?.WaitForExit(40000);
+                if (proc?.ExitCode == 0) return true;
+            }
+
+            // 2. Fallback: ใช้ cmd.exe format command (กรณี PowerShell โดนล็อก)
+            var psiCmd = new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = "cmd.exe",
+                Arguments = $"/c format {cleanLetter}: /FS:{fileSystem} /V:{volumeLabel} /Q /Y",
+                CreateNoWindow = true,
+                UseShellExecute = false
+            };
+
+            using (var procCmd = System.Diagnostics.Process.Start(psiCmd))
+            {
+                procCmd?.WaitForExit(40000);
+                return procCmd?.ExitCode == 0;
+            }
         }
         catch
         {

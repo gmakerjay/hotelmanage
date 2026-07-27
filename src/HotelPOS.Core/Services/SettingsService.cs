@@ -77,6 +77,8 @@ public class SettingsService : ISettingsService
         dto.PaperType = await GetAsync("paper_type") ?? dto.PaperType;
         dto.AutoPrintOnCheckout = bool.TryParse(await GetAsync("auto_print_on_checkout"), out var ap) ? ap : dto.AutoPrintOnCheckout;
         dto.ShowSignatureBox = bool.TryParse(await GetAsync("show_signature_box"), out var sb) ? sb : dto.ShowSignatureBox;
+        dto.PrinterFeedLines = int.TryParse(await GetAsync("printer_feed_lines"), out var fl) ? fl : dto.PrinterFeedLines;
+        dto.PrinterAutoCut = bool.TryParse(await GetAsync("printer_auto_cut"), out var ac) ? ac : dto.PrinterAutoCut;
 
         dto.DefaultCheckInTime = await GetAsync("default_checkin_time") ?? dto.DefaultCheckInTime;
         dto.DefaultCheckOutTime = await GetAsync("default_checkout_time") ?? dto.DefaultCheckOutTime;
@@ -118,6 +120,8 @@ public class SettingsService : ISettingsService
             await SetAsync("paper_type", settings.PaperType);
             await SetAsync("auto_print_on_checkout", settings.AutoPrintOnCheckout.ToString());
             await SetAsync("show_signature_box", settings.ShowSignatureBox.ToString());
+            await SetAsync("printer_feed_lines", settings.PrinterFeedLines.ToString());
+            await SetAsync("printer_auto_cut", settings.PrinterAutoCut.ToString());
 
             await SetAsync("default_checkin_time", settings.DefaultCheckInTime);
             await SetAsync("default_checkout_time", settings.DefaultCheckOutTime);
@@ -161,6 +165,22 @@ public class SettingsService : ISettingsService
         catch (Exception ex)
         {
             _logger.Error(LogCategory.System, "รีเซ็ตคีย์หลักในฐานข้อมูลและเลขรันบิลไม่สำเร็จ", ex, correlationId);
+            throw;
+        }
+    }
+
+    public async Task ZetZeroDatabaseAsync()
+    {
+        var correlationId = _logger.NewCorrelationId();
+        try
+        {
+            await _repository.ZetZeroDatabaseAsync();
+            await SetAsync("receipt_doc_running_number", "0");
+            _logger.Info(LogCategory.System, "ล้างธุรกรรมระบบทั้งหมดเป็น 0 (Set Zero) และรีเซ็ตเลขรันบิลเริ่มต้นใหม่สำเร็จ", correlationId);
+        }
+        catch (Exception ex)
+        {
+            _logger.Error(LogCategory.System, "ล้างธุรกรรมระบบทั้งหมดเป็น 0 ไม่สำเร็จ", ex, correlationId);
             throw;
         }
     }

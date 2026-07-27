@@ -11,6 +11,7 @@ using Xunit;
 
 namespace HotelPOS.Tests;
 
+[Collection("Licensing Tests Collection")]
 public class LicensingTests : IDisposable
 {
     private readonly string _tempDbPath;
@@ -25,7 +26,7 @@ public class LicensingTests : IDisposable
         _tempFolder = Path.Combine(Path.GetTempPath(), $"hotelpos-lic-folder-{Guid.NewGuid():N}");
 
         // สลับการชี้เป้าหมายข้อมูลสำหรับการรันเทส (ห้ามรบกวนข้อมูลจริงของเครื่องและฐานข้อมูลลูกค้า)
-        TrialManager.RegistrySubKey = @"Software\HotelPOS\Tests";
+        TrialManager.RegistrySubKey = @"Software\PSoftRestRentManager\Tests";
         TrialManager.RegistryValueName = "TestTData";
         TrialManager.HiddenFileName = ".test-tdata";
 

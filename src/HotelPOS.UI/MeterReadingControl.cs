@@ -25,6 +25,7 @@ public class MeterReadingControl : UserControl
     private Button _btnViewHistory = null!;
     private Button _btnConfigureRates = null!;
     private Label _lblWaterMode = null!;
+    private CheckBox _chkShowOccupiedOnly = null!;
 
     private List<Room> _rooms = new();
     private SystemSettingsDto _settings = null!;
@@ -51,11 +52,14 @@ public class MeterReadingControl : UserControl
         Padding = new Padding(20);
 
         // === Header Section ===
-        var headerPanel = new Panel
+        var headerPanel = new FlowLayoutPanel
         {
             Dock = DockStyle.Top,
-            Height = 115,
-            Padding = new Padding(5)
+            FlowDirection = FlowDirection.TopDown,
+            WrapContents = false,
+            AutoSize = true,
+            Padding = new Padding(5),
+            BackColor = Color.Transparent
         };
 
         var lblTitle = new Label
@@ -63,8 +67,8 @@ public class MeterReadingControl : UserControl
             Text = "ระบบคำนวณและออกใบแจ้งหนี้รวมรายห้อง (ค่าห้อง + ค่าไฟ + ค่าน้ำ + ค่าขยะ + จิปาถะ)",
             Font = new Font("Segoe UI", 15F, FontStyle.Bold),
             ForeColor = Color.FromArgb(15, 23, 42),
-            Location = new Point(5, 5),
-            AutoSize = true
+            AutoSize = true,
+            Margin = new Padding(5, 5, 5, 2)
         };
 
         var lblSubtitle = new Label
@@ -72,27 +76,35 @@ public class MeterReadingControl : UserControl
             Text = "กรอกเลขมิเตอร์ -> บันทึกข้อมูล -> ระบบออกใบแจ้งหนี้รวมประจำห้อง (บิลใบเดียวแยกรายห้อง รวมค่าเช่า + มิเตอร์ + ค่าบริการ)",
             Font = new Font("Segoe UI", 9.5F, FontStyle.Regular),
             ForeColor = Color.FromArgb(100, 116, 139),
-            Location = new Point(5, 38),
-            AutoSize = true
+            AutoSize = true,
+            Margin = new Padding(5, 0, 5, 10)
         };
 
-        // === Billing Month Selector ===
+        var inputFlowPanel = new FlowLayoutPanel
+        {
+            FlowDirection = FlowDirection.LeftToRight,
+            WrapContents = true,
+            AutoSize = true,
+            BackColor = Color.Transparent,
+            Margin = new Padding(0)
+        };
+
         var lblMonth = new Label
         {
             Text = "รอบบิลเดือน:",
             Font = new Font("Segoe UI", 10.5F, FontStyle.Bold),
             ForeColor = Color.FromArgb(30, 41, 59),
-            Location = new Point(5, 74),
-            AutoSize = true
+            AutoSize = true,
+            Margin = new Padding(5, 10, 5, 5)
         };
 
         _cmbBillingMonth = new ComboBox
         {
-            Location = new Point(110, 70),
             Width = 190,
             Font = new Font("Segoe UI", 11F),
             DropDownStyle = ComboBoxStyle.DropDownList,
-            BackColor = Color.White
+            BackColor = Color.White,
+            Margin = new Padding(5, 6, 5, 5)
         };
 
         // Water billing mode indicator
@@ -100,8 +112,8 @@ public class MeterReadingControl : UserControl
         {
             Font = new Font("Segoe UI", 9.5F, FontStyle.Bold),
             ForeColor = Color.FromArgb(37, 99, 235),
-            Location = new Point(315, 74),
-            AutoSize = true
+            AutoSize = true,
+            Margin = new Padding(15, 10, 5, 5)
         };
 
         // Populate months (current ± 6 months)
@@ -122,26 +134,55 @@ public class MeterReadingControl : UserControl
         }
         _cmbBillingMonth.SelectedIndexChanged += async (s, e) => await LoadMeterDataAsync();
 
+        _chkShowOccupiedOnly = new CheckBox
+        {
+            Text = "แสดงเฉพาะห้องที่มีผู้เช่ารายเดือน",
+            Width = 320,
+            Font = new Font("Segoe UI", 10.5F, FontStyle.Bold),
+            ForeColor = Color.FromArgb(30, 41, 59),
+            Checked = true,
+            Margin = new Padding(15, 8, 5, 5)
+        };
+        _chkShowOccupiedOnly.CheckedChanged += async (s, e) => await LoadMeterDataAsync();
+
         // Instant Search Box
         var lblSearch = new Label
         {
             Text = "ค้นหาห้อง/ผู้เช่า:",
             Font = new Font("Segoe UI", 10.5F, FontStyle.Bold),
             ForeColor = Color.FromArgb(30, 41, 59),
-            Location = new Point(680, 74),
-            AutoSize = true
+            AutoSize = true,
+            Margin = new Padding(15, 10, 5, 5)
         };
 
         _txtSearch = new TextBox
         {
-            Location = new Point(810, 70),
             Width = 260,
             Font = new Font("Segoe UI", 10.5F),
-            PlaceholderText = "พิมพ์เบอร์โทร / ชื่อ / เลขห้อง..."
+            PlaceholderText = "พิมพ์เบอร์โทร / ชื่อ / เลขห้อง...",
+            Margin = new Padding(5, 6, 5, 5)
         };
         _txtSearch.TextChanged += (s, e) => FilterMeterGrid();
 
-        headerPanel.Controls.AddRange(new Control[] { lblTitle, lblSubtitle, lblMonth, _cmbBillingMonth, _lblWaterMode, lblSearch, _txtSearch });
+        var btnRefresh = new Button
+        {
+            Text = "รีเฟรช",
+            Size = new Size(100, 36),
+            BackColor = Color.FromArgb(241, 245, 249),
+            FlatStyle = FlatStyle.Flat,
+            Font = new Font("Segoe UI", 10F, FontStyle.Bold),
+            Cursor = Cursors.Hand,
+            Margin = new Padding(15, 4, 5, 5)
+        };
+        btnRefresh.FlatAppearance.BorderColor = Color.FromArgb(203, 213, 225);
+        btnRefresh.Click += async (s, e) => {
+            _txtSearch.Clear();
+            _chkShowOccupiedOnly.Checked = true;
+            await LoadMeterDataAsync();
+        };
+
+        inputFlowPanel.Controls.AddRange(new Control[] { lblMonth, _cmbBillingMonth, _lblWaterMode, _chkShowOccupiedOnly, lblSearch, _txtSearch, btnRefresh });
+        headerPanel.Controls.AddRange(new Control[] { lblTitle, lblSubtitle, inputFlowPanel });
 
         // === DataGridView ===
         _dgvMeterReadings = new DataGridView
@@ -170,12 +211,21 @@ public class MeterReadingControl : UserControl
                 BackColor = Color.FromArgb(30, 41, 59),
                 ForeColor = Color.White,
                 Padding = new Padding(6, 8, 6, 8),
-                Alignment = DataGridViewContentAlignment.MiddleCenter
+                Alignment = DataGridViewContentAlignment.MiddleCenter,
+                WrapMode = DataGridViewTriState.True
             },
             EnableHeadersVisualStyles = false,
-            ColumnHeadersHeight = 44,
+            ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize,
             RowTemplate = { Height = 42 },
             GridColor = Color.FromArgb(226, 232, 240)
+        };
+
+        _dgvMeterReadings.DataBindingComplete += (s, e) =>
+        {
+            foreach (DataGridViewColumn col in _dgvMeterReadings.Columns)
+            {
+                col.MinimumWidth = 85;
+            }
         };
 
         // Define columns
@@ -355,19 +405,27 @@ public class MeterReadingControl : UserControl
 
         foreach (var room in _rooms)
         {
-            string tenantName = "ผู้เช่าทั่วไป";
+            Booking? activeBooking = null;
+            Customer? cust = null;
+            string tenantName = "-";
             if (_bookingService != null && _customerService != null)
             {
                 try
                 {
-                    var activeBooking = await _bookingService.GetActiveBookingByRoomIdAsync(room.Id);
+                    activeBooking = await _bookingService.GetActiveBookingByRoomIdAsync(room.Id);
                     if (activeBooking != null)
                     {
-                        var cust = await _customerService.GetCustomerByIdAsync(activeBooking.CustomerId);
+                        cust = await _customerService.GetCustomerByIdAsync(activeBooking.CustomerId);
                         if (cust != null) tenantName = cust.FullName;
                     }
                 }
                 catch { }
+            }
+
+            if (_chkShowOccupiedOnly.Checked)
+            {
+                if (room.Status != RoomStatus.Occupied) continue;
+                if (activeBooking == null || activeBooking.RatePlan != RatePlanType.Monthly) continue;
             }
 
             var roomType = await _roomService.GetRoomTypeByIdAsync(room.RoomTypeId);

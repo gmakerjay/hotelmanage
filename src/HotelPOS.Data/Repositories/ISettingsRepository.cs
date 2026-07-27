@@ -8,4 +8,5 @@ public interface ISettingsRepository
     Task<AppSetting?> GetByKeyAsync(string key);
     Task UpsertAsync(string key, string? value);
     Task ResetDatabaseSequencesAsync();
+    Task ZetZeroDatabaseAsync();
 }

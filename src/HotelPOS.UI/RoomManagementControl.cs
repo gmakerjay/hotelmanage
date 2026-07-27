@@ -126,13 +126,21 @@ public class RoomManagementControl : UserControl
             MultiSelect = false,
             AllowUserToAddRows = false,
             AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
-            ColumnHeadersHeight = 38,
+            ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize,
             RowTemplate = { Height = 38 }
         };
         _dgvRoomTypes.ColumnHeadersDefaultCellStyle.Font = new Font("Segoe UI", 10.5F, FontStyle.Bold);
+        _dgvRoomTypes.ColumnHeadersDefaultCellStyle.WrapMode = DataGridViewTriState.True;
         _dgvRoomTypes.DefaultCellStyle.Font = new Font("Segoe UI", 10F);
         _dgvRoomTypes.CellContentClick += DgvRoomTypes_CellContentClick;
         _dgvRoomTypes.CellDoubleClick += (s, e) => UpdateRoomTypeSelectionFromGrid();
+        _dgvRoomTypes.DataBindingComplete += (s, e) =>
+        {
+            foreach (DataGridViewColumn col in _dgvRoomTypes.Columns)
+            {
+                col.MinimumWidth = 90;
+            }
+        };
 
         var panelInput = new Panel { Dock = DockStyle.Fill, Padding = new Padding(15), AutoScroll = true };
         
@@ -247,13 +255,21 @@ public class RoomManagementControl : UserControl
             MultiSelect = false,
             AllowUserToAddRows = false,
             AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
-            ColumnHeadersHeight = 38,
+            ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize,
             RowTemplate = { Height = 38 }
         };
         _dgvRooms.ColumnHeadersDefaultCellStyle.Font = new Font("Segoe UI", 10.5F, FontStyle.Bold);
+        _dgvRooms.ColumnHeadersDefaultCellStyle.WrapMode = DataGridViewTriState.True;
         _dgvRooms.DefaultCellStyle.Font = new Font("Segoe UI", 10F);
         _dgvRooms.CellContentClick += DgvRooms_CellContentClick;
         _dgvRooms.CellDoubleClick += (s, e) => UpdateRoomSelectionFromGrid();
+        _dgvRooms.DataBindingComplete += (s, e) =>
+        {
+            foreach (DataGridViewColumn col in _dgvRooms.Columns)
+            {
+                col.MinimumWidth = 90;
+            }
+        };
 
         var panelInput = new Panel { Dock = DockStyle.Fill, Padding = new Padding(15), AutoScroll = true };
 
@@ -425,10 +441,10 @@ public class RoomManagementControl : UserControl
     private static string GetRateTypeTag(RoomType? type)
     {
         if (type == null) return "-";
-        if (type.MonthlyRate > 0 && type.DailyRate == 0) return "📅 รายเดือน";
-        if (type.HourlyRate > 0 && type.DailyRate == 0) return "⏱️ รายชั่วโมง";
-        if (type.MonthlyRate > 0 && type.DailyRate > 0) return "📅 รายเดือน / 🌞 รายวัน";
-        return "🌞 รายวัน";
+        if (type.MonthlyRate > 0 && type.DailyRate == 0) return "รายเดือน";
+        if (type.HourlyRate > 0 && type.DailyRate == 0) return "รายชั่วโมง";
+        if (type.MonthlyRate > 0 && type.DailyRate > 0) return "รายเดือน / รายวัน";
+        return "รายวัน";
     }
 
     private static string GetPrimaryRateText(RoomType? type)
@@ -442,10 +458,23 @@ public class RoomManagementControl : UserControl
 
     private static void ApplyGridRowColors(DataGridView dgv)
     {
+        bool hasRatePlan = dgv.Columns.Contains("รูปแบบราคา");
+        bool hasPrimaryRate = dgv.Columns.Contains("ประเภทราคาหลัก");
+
         foreach (DataGridViewRow row in dgv.Rows)
         {
             if (row.IsNewRow) continue;
-            string rateTag = (row.Cells["รูปแบบราคา"]?.Value ?? row.Cells["ประเภทราคาหลัก"]?.Value)?.ToString() ?? "";
+
+            string rateTag = "";
+            if (hasRatePlan)
+            {
+                rateTag = row.Cells["รูปแบบราคา"]?.Value?.ToString() ?? "";
+            }
+            else if (hasPrimaryRate)
+            {
+                rateTag = row.Cells["ประเภทราคาหลัก"]?.Value?.ToString() ?? "";
+            }
+
             if (rateTag.Contains("รายเดือน"))
             {
                 row.DefaultCellStyle.BackColor = Color.FromArgb(243, 232, 255); // Soft Purple

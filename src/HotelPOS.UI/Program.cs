@@ -26,7 +26,7 @@ internal static class Program
         // ---------- 1) ตั้งค่า Logger ก่อนสิ่งอื่นใด (ต้อง log ได้ตั้งแต่บรรทัดแรก) ----------
         var logFolder = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "HotelPOS", "logs");
+            "PSoftRestRentManager", "logs");
         _logger = new AppLogger(logFolder, retentionDays: 90);
         LogContext.MachineId = Environment.MachineName;
 
@@ -74,7 +74,7 @@ internal static class Program
                 
                 var dialogResult = MessageBox.Show(
                     $"ระบบยังไม่ได้ลงทะเบียนใช้งาน หรือลิขสิทธิ์หมดอายุ ({currentStatusText})\n\nคุณต้องการเปิดใช้งานรหัสลิขสิทธิ์ในตอนนี้หรือไม่?\n(หากยกเลิก โปรแกรมจะทำงานในโหมดจำกัดสิทธิ์ / อ่านอย่างเดียว)",
-                    "HotelPOS - ตรวจสอบลิขสิทธิ์",
+                    "PSoft Rest & Rent Manager - ตรวจสอบลิขสิทธิ์",
                     MessageBoxButtons.YesNo,
                     MessageBoxIcon.Warning);
 
@@ -92,8 +92,19 @@ internal static class Program
                 _logger.Info(LogCategory.System, $"กำลังใช้งานโหมดทดลองใช้ (เหลืออีก {licenseResult.DaysRemaining} วัน)");
             }
 
-            // ---------- 6) ยืนยันตัวตนผู้ใช้งาน (Login Authentication: admin / psoft123) ----------
-            using (var loginForm = new LoginForm())
+            // ---------- 5.5) ตั้งค่ารหัสผ่านผู้ดูแลระบบครั้งแรกเมื่อเปิดสิทธิ์หลัก ----------
+            if (licenseResult.Status == LicenseStatus.Active && licenseResult.License != null && licenseResult.License.LicenseType != LicenseType.Trial)
+            {
+                var isPasswordSet = settingsService.GetAsync("is_custom_admin_password_set").GetAwaiter().GetResult();
+                if (isPasswordSet != "1")
+                {
+                    using var pwdSetupForm = new AdminPasswordSetupForm(settingsService);
+                    pwdSetupForm.ShowDialog();
+                }
+            }
+
+            // ---------- 6) ยืนยันตัวตนผู้ใช้งาน (Login Authentication) ----------
+            using (var loginForm = new LoginForm(settingsService))
             {
                 if (loginForm.ShowDialog() != DialogResult.OK)
                 {
@@ -103,7 +114,7 @@ internal static class Program
                 _logger.Info(LogCategory.System, $"เข้าสู่ระบบสำเร็จ โดยผู้ใช้: {loginForm.LoggedInUser}");
             }
 
-            _logger.Info(LogCategory.System, "เริ่มโปรแกรม HotelPOS สำเร็จ กำลังเปิดหน้าหลัก");
+            _logger.Info(LogCategory.System, "เริ่มโปรแกรม PSoft Rest & Rent Manager สำเร็จ กำลังเปิดหน้าหลัก");
 
             Application.Run(new MainForm(settingsService, _logger, licenseResult.Status, licenseResult.License, licenseResult.DaysRemaining));
         }
@@ -118,7 +129,7 @@ internal static class Program
     {
         var logFolder = customLogFolder ?? Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "HotelPOS", "logs");
+            "PSoftRestRentManager", "logs");
 
         using var errorDlg = new DetailedErrorDialog(ex, userMessage, logFolder);
         errorDlg.ShowDialog();

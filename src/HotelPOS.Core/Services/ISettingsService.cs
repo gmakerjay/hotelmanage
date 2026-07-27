@@ -16,4 +16,7 @@ public interface ISettingsService
 
     /// <summary>รีเซ็ตลำดับคีย์หลัก (Auto-increment ID) และเลขรันบิลทั้งหมดให้กลับเป็นจุดเริ่มต้นข้อมูลปัจจุบัน</summary>
     Task ResetDatabaseSequencesAsync();
+
+    /// <summary>ล้างธุรกรรมในระบบทั้งหมดให้เป็น 0 สำหรับพร้อมเริ่มเปิดใช้จริง</summary>
+    Task ZetZeroDatabaseAsync();
 }

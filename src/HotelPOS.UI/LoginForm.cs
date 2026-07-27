@@ -1,9 +1,11 @@
 using HotelPOS.Logging;
+using HotelPOS.Core.Services;
 
 namespace HotelPOS.UI;
 
 public class LoginForm : Form
 {
+    private readonly ISettingsService _settingsService;
     private TextBox _txtUsername = null!;
     private TextBox _txtPassword = null!;
     private Button _btnLogin = null!;
@@ -12,8 +14,9 @@ public class LoginForm : Form
 
     public string LoggedInUser { get; private set; } = "admin";
 
-    public LoginForm()
+    public LoginForm(ISettingsService settingsService)
     {
+        _settingsService = settingsService;
         InitializeComponent();
         try
         {
@@ -44,7 +47,7 @@ public class LoginForm : Form
 
         var lblIcon = new Label
         {
-            Text = "🔒",
+            Text = "",
             Font = new Font("Segoe UI", 24F),
             ForeColor = Color.White,
             Location = new Point(20, 18),
@@ -116,7 +119,7 @@ public class LoginForm : Form
 
         _btnLogin = new Button
         {
-            Text = "🔑 เข้าสู่ระบบ",
+            Text = "เข้าสู่ระบบ",
             Location = new Point(40, 260),
             Size = new Size(180, 42),
             Font = new Font("Segoe UI", 11F, FontStyle.Bold),
@@ -130,7 +133,7 @@ public class LoginForm : Form
 
         _btnCancel = new Button
         {
-            Text = "❌ ปิดโปรแกรม",
+            Text = "ปิดโปรแกรม",
             Location = new Point(225, 260),
             Size = new Size(180, 42),
             Font = new Font("Segoe UI", 10.5F),
@@ -159,19 +162,21 @@ public class LoginForm : Form
         });
     }
 
-    private void BtnLogin_Click(object? sender, EventArgs e)
+    private async void BtnLogin_Click(object? sender, EventArgs e)
     {
         string username = _txtUsername.Text.Trim();
         string password = _txtPassword.Text.Trim();
 
         if (string.IsNullOrEmpty(username) || string.IsNullOrEmpty(password))
         {
-            _lblError.Text = "⚠️ กรุณากรอกชื่อผู้ใช้และรหัสผ่านให้ครบถ้วน";
+            _lblError.Text = "กรุณากรอกชื่อผู้ใช้และรหัสผ่านให้ครบถ้วน";
             return;
         }
 
-        // ตรวจสอบชื่อผู้ใช้และรหัสผ่านเริ่มต้น (admin / psoft123)
-        if (username.Equals("admin", StringComparison.OrdinalIgnoreCase) && password == "psoft123")
+        string dbPassword = await _settingsService.GetAsync("admin_password") ?? "psoft123";
+        if (string.IsNullOrWhiteSpace(dbPassword)) dbPassword = "psoft123";
+
+        if (username.Equals("admin", StringComparison.OrdinalIgnoreCase) && password == dbPassword)
         {
             LoggedInUser = username;
             DialogResult = DialogResult.OK;
@@ -179,7 +184,7 @@ public class LoginForm : Form
         }
         else
         {
-            _lblError.Text = "❌ ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง (ตัวอย่าง: admin / psoft123)";
+            _lblError.Text = "ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง";
             _txtPassword.SelectAll();
             _txtPassword.Focus();
         }

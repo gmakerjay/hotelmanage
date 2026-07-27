@@ -12,12 +12,12 @@ public class DbConnectionFactory
 
     public DbConnectionFactory(string? dbFilePath = null)
     {
-        // ค่าเริ่มต้น: เก็บไฟล์ DB ไว้ใน %AppData%\HotelPOS\hotelpos.db
+        // ค่าเริ่มต้น: เก็บไฟล์ DB ไว้ใน %AppData%\PSoftRestRentManager\restrent.db
         // เลือกใช้ AppData แทน Program Files เพราะ Program Files มักไม่มีสิทธิ์เขียนไฟล์บนเครื่องลูกค้า
         _dbFilePath = dbFilePath ?? Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "HotelPOS",
-            "hotelpos.db");
+            "PSoftRestRentManager",
+            "restrent.db");
 
         var dir = Path.GetDirectoryName(_dbFilePath)!;
         if (!Directory.Exists(dir))

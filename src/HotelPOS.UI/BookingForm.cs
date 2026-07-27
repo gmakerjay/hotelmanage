@@ -23,6 +23,9 @@ public class BookingForm : Form
     private Button _btnSave = null!;
     private Button _btnCancel = null!;
 
+    private ComboBox _cboCustomerSelect = null!;
+    private List<Customer> _allCustomers = new();
+
     private List<Room> _roomsList = new();
     private List<RoomType> _roomTypesList = new();
 
@@ -44,7 +47,7 @@ public class BookingForm : Form
     private void InitializeUI()
     {
         Text = "จองห้องพักล่วงหน้า (Advance Reservation)";
-        Size = new Size(580, 580);
+        Size = new Size(580, 620);
         StartPosition = FormStartPosition.CenterParent;
         FormBorderStyle = FormBorderStyle.FixedDialog;
         MaximizeBox = false;
@@ -66,22 +69,26 @@ public class BookingForm : Form
 
         var lblCustomerInfo = new Label { Text = "ข้อมูลผู้จอง:", Font = new Font("Segoe UI", 11.5F, FontStyle.Bold), Location = new Point(20, 95), AutoSize = true };
 
-        var lblFullName = new Label { Text = "ชื่อ-นามสกุล *:", Location = new Point(20, 130), Font = new Font("Segoe UI", 11F, FontStyle.Bold), AutoSize = true };
-        _txtFullName = new TextBox { Location = new Point(170, 127), Width = 360, Font = new Font("Segoe UI", 11F) };
+        var lblSelectCust = new Label { Text = "เลือกประวัติผู้เข้าพัก:", Location = new Point(20, 130), Font = new Font("Segoe UI", 11F), AutoSize = true };
+        _cboCustomerSelect = new ComboBox { Location = new Point(170, 127), Width = 360, Font = new Font("Segoe UI", 11F), DropDownStyle = ComboBoxStyle.DropDownList };
+        _cboCustomerSelect.SelectedIndexChanged += CboCustomerSelect_SelectedIndexChanged;
 
-        var lblPhone = new Label { Text = "เบอร์โทรศัพท์:", Location = new Point(20, 170), Font = new Font("Segoe UI", 11F), AutoSize = true };
-        _txtPhone = new TextBox { Location = new Point(170, 167), Width = 360, Font = new Font("Segoe UI", 11F) };
+        var lblFullName = new Label { Text = "ชื่อ-นามสกุล *:", Location = new Point(20, 170), Font = new Font("Segoe UI", 11F, FontStyle.Bold), AutoSize = true };
+        _txtFullName = new TextBox { Location = new Point(170, 167), Width = 360, Font = new Font("Segoe UI", 11F) };
+
+        var lblPhone = new Label { Text = "เบอร์โทรศัพท์:", Location = new Point(20, 210), Font = new Font("Segoe UI", 11F), AutoSize = true };
+        _txtPhone = new TextBox { Location = new Point(170, 207), Width = 360, Font = new Font("Segoe UI", 11F) };
         _txtPhone.Leave += TxtPhone_Leave;
 
-        var lblIdCard = new Label { Text = "เลขบัตร/พาสปอร์ต:", Location = new Point(20, 210), Font = new Font("Segoe UI", 11F), AutoSize = true };
-        _txtIdCard = new TextBox { Location = new Point(170, 207), Width = 360, Font = new Font("Segoe UI", 11F) };
+        var lblIdCard = new Label { Text = "เลขบัตร/พาสปอร์ต:", Location = new Point(20, 250), Font = new Font("Segoe UI", 11F), AutoSize = true };
+        _txtIdCard = new TextBox { Location = new Point(170, 247), Width = 360, Font = new Font("Segoe UI", 11F) };
 
-        var lblBookingDetails = new Label { Text = "กำหนดการเข้าพัก:", Font = new Font("Segoe UI", 11.5F, FontStyle.Bold), Location = new Point(20, 250), AutoSize = true };
+        var lblBookingDetails = new Label { Text = "กำหนดการเข้าพัก:", Font = new Font("Segoe UI", 11.5F, FontStyle.Bold), Location = new Point(20, 290), AutoSize = true };
 
-        var lblCheckIn = new Label { Text = "วันที่/เวลา เช็คอิน:", Location = new Point(20, 285), Font = new Font("Segoe UI", 11F), AutoSize = true };
+        var lblCheckIn = new Label { Text = "วันที่/เวลา เช็คอิน:", Location = new Point(20, 325), Font = new Font("Segoe UI", 11F), AutoSize = true };
         _dtpCheckIn = new DateTimePicker
         {
-            Location = new Point(170, 282),
+            Location = new Point(170, 322),
             Width = 230,
             Font = new Font("Segoe UI", 11F),
             Format = DateTimePickerFormat.Custom,
@@ -89,10 +96,10 @@ public class BookingForm : Form
             Value = DateTime.Now.AddDays(1)
         };
 
-        var lblCheckOut = new Label { Text = "วันที่/เวลา เช็คเอาท์:", Location = new Point(20, 325), Font = new Font("Segoe UI", 11F), AutoSize = true };
+        var lblCheckOut = new Label { Text = "วันที่/เวลา เช็คเอาท์:", Location = new Point(20, 365), Font = new Font("Segoe UI", 11F), AutoSize = true };
         _dtpCheckOut = new DateTimePicker
         {
-            Location = new Point(170, 322),
+            Location = new Point(170, 362),
             Width = 230,
             Font = new Font("Segoe UI", 11F),
             Format = DateTimePickerFormat.Custom,
@@ -100,15 +107,14 @@ public class BookingForm : Form
             Value = DateTime.Now.AddDays(2)
         };
 
-        var lblRatePlan = new Label { Text = "ประเภทราคา:", Location = new Point(20, 365), Font = new Font("Segoe UI", 11F), AutoSize = true };
-        _cboRatePlan = new ComboBox { Location = new Point(170, 362), Width = 180, Font = new Font("Segoe UI", 11F), DropDownStyle = ComboBoxStyle.DropDownList };
-        _cboRatePlan.Items.AddRange(new object[] { "รายวัน (Daily)", "รายชั่วโมง (Hourly)", "รายเดือน (Monthly)" });
-        _cboRatePlan.SelectedIndex = 0;
+        var lblRatePlan = new Label { Text = "ประเภทราคา:", Location = new Point(20, 405), Font = new Font("Segoe UI", 11F), AutoSize = true };
+        _cboRatePlan = new ComboBox { Location = new Point(170, 402), Width = 180, Font = new Font("Segoe UI", 11F), DropDownStyle = ComboBoxStyle.DropDownList };
+        _cboRatePlan.SelectedIndexChanged += CboRatePlan_SelectedIndexChanged;
 
-        var lblRate = new Label { Text = "ราคาตกลง (บาท):", Location = new Point(20, 405), Font = new Font("Segoe UI", 11F), AutoSize = true };
+        var lblRate = new Label { Text = "ราคาตกลง (บาท):", Location = new Point(20, 445), Font = new Font("Segoe UI", 11F), AutoSize = true };
         _numAgreedRate = new NumericUpDown
         {
-            Location = new Point(170, 402),
+            Location = new Point(170, 442),
             Width = 180,
             Font = new Font("Segoe UI", 11F),
             Maximum = 1000000,
@@ -116,17 +122,17 @@ public class BookingForm : Form
             Value = 500
         };
 
-        var lblNotes = new Label { Text = "หมายเหตุ:", Location = new Point(20, 445), Font = new Font("Segoe UI", 11F), AutoSize = true };
-        _txtNotes = new TextBox { Location = new Point(170, 442), Width = 360, Font = new Font("Segoe UI", 11F), Multiline = true, Height = 45 };
+        var lblNotes = new Label { Text = "หมายเหตุ:", Location = new Point(20, 485), Font = new Font("Segoe UI", 11F), AutoSize = true };
+        _txtNotes = new TextBox { Location = new Point(170, 482), Width = 360, Font = new Font("Segoe UI", 11F), Multiline = true, Height = 45 };
 
         _btnSave = new Button
         {
-            Text = "📅 บันทึกการจอง",
+            Text = "บันทึกการจอง",
             BackColor = Color.RoyalBlue,
             ForeColor = Color.White,
             FlatStyle = FlatStyle.Flat,
             Font = new Font("Segoe UI", 11.5F, FontStyle.Bold),
-            Location = new Point(250, 495),
+            Location = new Point(250, 535),
             Size = new Size(160, 42)
         };
         _btnSave.Click += BtnSave_Click;
@@ -136,26 +142,27 @@ public class BookingForm : Form
             Text = "ยกเลิก",
             DialogResult = DialogResult.Cancel,
             Font = new Font("Segoe UI", 11F),
-            Location = new Point(420, 495),
+            Location = new Point(420, 535),
             Size = new Size(110, 42)
         };
 
-        // ToolTips Onboarding Guide (Large readable font & clipping safety)
+        // ToolTips Onboarding Guide
         var tt = new AppToolTip();
         tt.SetToolTip(_cboRooms, "เลือกห้องพักที่ต้องการจองล่วงหน้า");
+        tt.SetToolTip(_cboCustomerSelect, "ค้นหาและเลือกผู้เข้าพักจากฐานข้อมูลทะเบียน");
         tt.SetToolTip(_txtFullName, "ชื่อ-นามสกุลของผู้จองห้องพัก");
         tt.SetToolTip(_txtPhone, "เบอร์โทรศัพท์ติดต่อของผู้จอง");
         tt.SetToolTip(_dtpCheckIn, "กำหนดวันเวลาที่คาดว่าจะมาเช็คอินเข้าพัก");
         tt.SetToolTip(_dtpCheckOut, "กำหนดวันเวลาที่คาดว่าจะเช็คเอาท์คืนห้อง");
-        tt.SetToolTip(_cboRatePlan, "ประเภทรูปแบบราคา: รายวัน, รายชั่วโมง, หรือ รายเดือน");
-        tt.SetToolTip(_numAgreedRate, "ราคาค่าห้องตกลงล่วงหน้าต่อหน่วย (บาท)");
+        tt.SetToolTip(_cboRatePlan, "ประเภทรูปแบบราคา");
+        tt.SetToolTip(_numAgreedRate, "ราคาค่าห้องตกลงล่วงหน้าต่อหน่วย");
         tt.SetToolTip(_btnSave, "บันทึกสร้างรายการจองห้องพักล่วงหน้าลงระบบ");
         tt.SetToolTip(_btnCancel, "ยกเลิกการจองและปิดหน้าต่าง");
 
         Controls.AddRange(new Control[]
         {
             lblHeader, lblRoom, _cboRooms,
-            lblCustomerInfo, lblFullName, _txtFullName, lblPhone, _txtPhone, lblIdCard, _txtIdCard,
+            lblCustomerInfo, lblSelectCust, _cboCustomerSelect, lblFullName, _txtFullName, lblPhone, _txtPhone, lblIdCard, _txtIdCard,
             lblBookingDetails, lblCheckIn, _dtpCheckIn, lblCheckOut, _dtpCheckOut,
             lblRatePlan, _cboRatePlan, lblRate, _numAgreedRate,
             lblNotes, _txtNotes, _btnSave, _btnCancel
@@ -171,9 +178,11 @@ public class BookingForm : Form
         {
             var rooms = await _roomService.GetRoomsAsync();
             var types = await _roomService.GetRoomTypesAsync();
+            var customers = await _customerService.GetCustomersAsync();
 
             _roomsList = rooms.ToList();
             _roomTypesList = types.ToList();
+            _allCustomers = customers.ToList();
 
             _cboRooms.Items.Clear();
             int selectedIndex = 0;
@@ -193,10 +202,41 @@ public class BookingForm : Form
             {
                 _cboRooms.SelectedIndex = selectedIndex;
             }
+
+            _cboCustomerSelect.Items.Clear();
+            _cboCustomerSelect.Items.Add("[-- พิมพ์ข้อมูลเอง / ลงทะเบียนใหม่ --]");
+            foreach (var c in _allCustomers)
+            {
+                _cboCustomerSelect.Items.Add($"{c.FullName} ({c.Phone ?? "ไม่มีเบอร์"})");
+            }
+            _cboCustomerSelect.SelectedIndex = 0;
         }
         catch (Exception ex)
         {
-            MessageBox.Show($"โหลดข้อมูลห้องพักไม่สำเร็จ: {ex.Message}", "ข้อผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            MessageBox.Show($"โหลดข้อมูลไม่สำเร็จ: {ex.Message}", "ข้อผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+    }
+
+    private void CboCustomerSelect_SelectedIndexChanged(object? sender, EventArgs e)
+    {
+        if (_cboCustomerSelect.SelectedIndex <= 0)
+        {
+            _txtFullName.Text = "";
+            _txtPhone.Text = "";
+            _txtIdCard.Text = "";
+            _txtFullName.ReadOnly = false;
+            _txtPhone.ReadOnly = false;
+            _txtIdCard.ReadOnly = false;
+        }
+        else
+        {
+            var c = _allCustomers[_cboCustomerSelect.SelectedIndex - 1];
+            _txtFullName.Text = c.FullName;
+            _txtPhone.Text = c.Phone ?? "";
+            _txtIdCard.Text = c.IdCardOrPassport ?? "";
+            _txtFullName.ReadOnly = true;
+            _txtPhone.ReadOnly = true;
+            _txtIdCard.ReadOnly = true;
         }
     }
 
@@ -205,9 +245,62 @@ public class BookingForm : Form
         if (_cboRooms.SelectedIndex < 0 || _cboRooms.SelectedIndex >= _roomsList.Count) return;
         var r = _roomsList[_cboRooms.SelectedIndex];
         var t = _roomTypesList.FirstOrDefault(x => x.Id == r.RoomTypeId);
-        if (t != null && t.DailyRate > 0)
+        if (t != null)
         {
-            _numAgreedRate.Value = t.DailyRate;
+            _cboRatePlan.SelectedIndexChanged -= CboRatePlan_SelectedIndexChanged;
+            _cboRatePlan.Items.Clear();
+
+            if (t.MonthlyRate > 0)
+            {
+                _cboRatePlan.Items.Add(new RatePlanItem { RatePlan = RatePlanType.Monthly, DisplayName = "รายเดือน (Monthly)" });
+            }
+            else
+            {
+                if (t.DailyRate > 0 || (t.DailyRate == 0 && t.HourlyRate == 0))
+                {
+                    _cboRatePlan.Items.Add(new RatePlanItem { RatePlan = RatePlanType.Daily, DisplayName = "รายวัน (Daily)" });
+                }
+                if (t.HourlyRate > 0)
+                {
+                    _cboRatePlan.Items.Add(new RatePlanItem { RatePlan = RatePlanType.Hourly, DisplayName = "รายชั่วโมง (Hourly)" });
+                }
+            }
+
+            if (_cboRatePlan.Items.Count > 0)
+            {
+                _cboRatePlan.SelectedIndex = 0;
+            }
+            _cboRatePlan.SelectedIndexChanged += CboRatePlan_SelectedIndexChanged;
+
+            // Trigger update calculations
+            CboRatePlan_SelectedIndexChanged(null, EventArgs.Empty);
+        }
+    }
+
+    private void CboRatePlan_SelectedIndexChanged(object? sender, EventArgs e)
+    {
+        if (_cboRooms.SelectedIndex < 0 || _cboRooms.SelectedIndex >= _roomsList.Count) return;
+        var r = _roomsList[_cboRooms.SelectedIndex];
+        var t = _roomTypesList.FirstOrDefault(x => x.Id == r.RoomTypeId);
+        if (t == null) return;
+
+        var item = _cboRatePlan.SelectedItem as RatePlanItem;
+        if (item == null) return;
+
+        switch (item.RatePlan)
+        {
+            case RatePlanType.Daily:
+                _numAgreedRate.Value = t.DailyRate > 0 ? t.DailyRate : 500;
+                _dtpCheckOut.Value = _dtpCheckIn.Value.AddDays(1);
+                break;
+            case RatePlanType.Hourly:
+                _numAgreedRate.Value = t.HourlyRate > 0 ? t.HourlyRate : 150;
+                _dtpCheckOut.Value = _dtpCheckIn.Value.AddHours(3);
+                break;
+            case RatePlanType.Monthly:
+                _numAgreedRate.Value = t.MonthlyRate > 0 ? t.MonthlyRate : 5000;
+                _dtpCheckOut.Value = _dtpCheckIn.Value.AddMonths(1);
+                break;
         }
     }
 
@@ -266,7 +359,9 @@ public class BookingForm : Form
                 customer.Id = existingCust.Id;
             }
 
-            var ratePlan = (RatePlanType)_cboRatePlan.SelectedIndex;
+            var selectedRateItem = _cboRatePlan.SelectedItem as RatePlanItem;
+            var ratePlan = selectedRateItem?.RatePlan ?? RatePlanType.Daily;
+
             await _bookingService.CreateReservationAsync(
                 room.Id,
                 customer,
@@ -286,5 +381,12 @@ public class BookingForm : Form
             MessageBox.Show($"เกิดข้อผิดพลาดในการสร้างการจอง: {ex.Message}", "ข้อผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Error);
             _btnSave.Enabled = true;
         }
+    }
+
+    private class RatePlanItem
+    {
+        public RatePlanType RatePlan { get; set; }
+        public string DisplayName { get; set; } = "";
+        public override string ToString() => DisplayName;
     }
 }

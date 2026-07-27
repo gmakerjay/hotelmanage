@@ -42,7 +42,7 @@ public class AdminMainForm : Form
 
     public AdminMainForm()
     {
-        Text = "HotelPOS TH - เครื่องมือจัดการกุญแจ USB Dongle (สำหรับผู้พัฒนาเท่านั้น)";
+        Text = "PSoft Rest & Rent Manager - เครื่องมือจัดการกุญแจ USB Dongle (สำหรับผู้พัฒนาเท่านั้น)";
         Width = 600;
         Height = 630;
         FormBorderStyle = FormBorderStyle.FixedDialog;
@@ -66,7 +66,7 @@ public class AdminMainForm : Form
         // ==================== [ส่วนที่ 1] เลือกแฟลชไดรฟ์ ====================
         var gbDrive = new GroupBox
         {
-            Text = " 💾 1. เลือก USB Flash Drive ที่เสียบอยู่ ",
+            Text = " 1. เลือก USB Flash Drive ที่เสียบอยู่ ",
             Font = labelFont,
             ForeColor = Color.FromArgb(30, 41, 59),
             Location = new Point(18, 15),
@@ -86,7 +86,7 @@ public class AdminMainForm : Form
 
         _btnRefreshDrives = new Button
         {
-            Text = "🔄 รีเฟรช",
+            Text = "รีเฟรช",
             Font = new Font("Segoe UI", 9.0F, FontStyle.Bold),
             BackColor = Color.FromArgb(71, 85, 105),
             ForeColor = Color.White,
@@ -115,7 +115,7 @@ public class AdminMainForm : Form
         // ==================== [ส่วนที่ 2] การตั้งค่าสิทธิ์ (License Config) ====================
         var gbConfig = new GroupBox
         {
-            Text = " 🔑 2. ตั้งค่าคีย์และ App Serial Watermark ",
+            Text = " 2. ตั้งค่าคีย์และ App Serial Watermark ",
             Font = labelFont,
             ForeColor = Color.FromArgb(30, 41, 59),
             Location = new Point(18, 140),
@@ -136,7 +136,7 @@ public class AdminMainForm : Form
 
         _btnSaveWatermark = new Button
         {
-            Text = "🏷️ เซฟ app.watermark",
+            Text = "เซฟ app.watermark",
             Font = new Font("Segoe UI", 8.5F, FontStyle.Bold),
             BackColor = Color.FromArgb(72, 149, 239),
             ForeColor = Color.White,
@@ -177,7 +177,7 @@ public class AdminMainForm : Form
 
         var lblNote = new Label
         {
-            Text = "ℹ️ ผูกสิทธิ์กับ Physical USB Serial ระดับชิป ป้องกันการคัดลอกไฟล์ข้ามไดรฟ์ 100%",
+            Text = "ผูกสิทธิ์กับ Physical USB Serial ระดับชิป ป้องกันการคัดลอกไฟล์ข้ามไดรฟ์ 100%",
             Font = new Font("Segoe UI", 8.5F, FontStyle.Italic),
             ForeColor = Color.FromArgb(71, 85, 105),
             Location = new Point(20, 104),
@@ -196,7 +196,7 @@ public class AdminMainForm : Form
         // ==================== [ส่วนที่ 3] ตัวเลือกการฟอร์แมต ====================
         var gbFormat = new GroupBox
         {
-            Text = " 🛠️ 3. ตัวเลือกการฟอร์แมตก่อนเขียนคีย์ ",
+            Text = " 3. ตัวเลือกการฟอร์แมตก่อนเขียนคีย์ ",
             Font = labelFont,
             ForeColor = Color.FromArgb(30, 41, 59),
             Location = new Point(18, 285),
@@ -234,7 +234,7 @@ public class AdminMainForm : Form
         var lblVol = new Label { Text = "ชื่อไดรฟ์:", Font = subFont, Location = new Point(230, 60), AutoSize = true };
         _tbVolumeLabel = new TextBox
         {
-            Text = "HOTELPOS_KEY",
+            Text = "REST_RENT_KEY",
             Font = inputFont,
             Location = new Point(290, 57),
             Width = 238,
@@ -250,7 +250,7 @@ public class AdminMainForm : Form
         // ==================== [ส่วนที่ 4] ปุ่มGen Key & แก้ไขคีย์ ====================
         _btnGenKey = new Button
         {
-            Text = "🔑 Gen Key (สร้างคีย์ใหม่ลง USB)",
+            Text = "Gen Key (สร้างคีย์ใหม่ลง USB)",
             Font = new Font("Segoe UI", 10.5F, FontStyle.Bold),
             BackColor = Color.FromArgb(16, 185, 129), // Emerald Green
             ForeColor = Color.White,
@@ -264,7 +264,7 @@ public class AdminMainForm : Form
 
         _btnEditKey = new Button
         {
-            Text = "✏️ แก้ไขคีย์ (อัปเดตคีย์เดิมใน USB)",
+            Text = "แก้ไขคีย์ (อัปเดตคีย์เดิมใน USB)",
             Font = new Font("Segoe UI", 10.5F, FontStyle.Bold),
             BackColor = Color.FromArgb(37, 99, 235), // Royal Blue
             ForeColor = Color.White,
@@ -278,7 +278,7 @@ public class AdminMainForm : Form
 
         _btnTestUnlock = new Button
         {
-            Text = "⚡ ทดสอบปลดล็อก (Validate)",
+            Text = "ทดสอบปลดล็อก (Validate)",
             Font = new Font("Segoe UI", 9.0F, FontStyle.Bold),
             BackColor = Color.FromArgb(245, 158, 11), // Amber
             ForeColor = Color.White,
@@ -292,7 +292,7 @@ public class AdminMainForm : Form
 
         _btnViewPayload = new Button
         {
-            Text = "📋 ดูข้อมูลคีย์ JSON Payload",
+            Text = "ดูข้อมูลคีย์ JSON Payload",
             Font = new Font("Segoe UI", 9.0F, FontStyle.Bold),
             BackColor = Color.FromArgb(100, 116, 139), // Slate
             ForeColor = Color.White,
@@ -347,7 +347,7 @@ public class AdminMainForm : Form
         {
             Filter = "Watermark File (*.watermark)|*.watermark|All Files (*.*)|*.*",
             FileName = "app.watermark",
-            Title = "บันทึกไฟล์ app.watermark สำหรับวางข้าง HotelPOS.UI.exe"
+            Title = "บันทึกไฟล์ app.watermark สำหรับวางข้าง PSoftRestRentManager.exe"
         };
 
         if (sfd.ShowDialog() == DialogResult.OK)
@@ -357,7 +357,7 @@ public class AdminMainForm : Form
                 var watermark = new AppWatermarkFile
                 {
                     AppSerial = appSerial,
-                    IssuedTo = "HotelPOS-CLIENT",
+                    IssuedTo = "PSoft-RestRentManager-CLIENT",
                     IssuedDate = DateTime.Today
                 };
 
@@ -370,7 +370,7 @@ public class AdminMainForm : Form
                 }
 
                 File.WriteAllText(sfd.FileName, watermark.ToJson());
-                MessageBox.Show($"บันทึกไฟล์ app.watermark (AppSerial: {appSerial}) สำเร็จเรียบร้อย!\n\nกรุณานำไฟล์นี้ไปวางในโฟลเดอร์เดียวกับโปรแกรม HotelPOS.UI.exe ของลูกค้า", "สำเร็จ", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                MessageBox.Show($"บันทึกไฟล์ app.watermark (AppSerial: {appSerial}) สำเร็จเรียบร้อย!\n\nกรุณานำไฟล์นี้ไปวางในโฟลเดอร์เดียวกับโปรแกรม PSoftRestRentManager.exe ของลูกค้า", "สำเร็จ", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
             catch (Exception ex)
             {
@@ -398,7 +398,7 @@ public class AdminMainForm : Form
         }
         else
         {
-            _cbUsbDrives.Items.Add("⚠️ ไม่พบ USB Flash Drive (กรุณาเสียบแฟลชไดรฟ์แล้วกดรีเฟรช)");
+            _cbUsbDrives.Items.Add("ไม่พบ USB Flash Drive (กรุณาเสียบแฟลชไดรฟ์แล้วกดรีเฟรช)");
             _cbUsbDrives.SelectedIndex = 0;
             _lblDriveDetail.Text = "รายละเอียดไดรฟ์: ไม่พบแฟลชไดรฟ์";
             _btnGenKey.Enabled = false;
@@ -478,7 +478,7 @@ public class AdminMainForm : Form
         // หากเป็นการ Gen Key ใหม่ และเลือกติ๊กฟอร์แมต ให้แสดงกล่องถามยืนยันก่อน
         if (isFormatAndNew && _chkFormatUsb.Checked)
         {
-            string confirmMsg = $"⚠️ คำเตือนการฟอร์แมตข้อมูล (Formatting Warning):\n\n" +
+            string confirmMsg = $"คำเตือนการฟอร์แมตข้อมูล (Formatting Warning):\n\n" +
                                 $"ข้อมูลทั้งหมดใน USB Flash Drive ไดรฟ์ [{drive.DriveLetter}\\] ({drive.VolumeLabel}) จะถูกลบอย่างถาวร!\n\n" +
                                 $"ระบบกำลังจะ Quick Format เป็นระบบไฟล์ {_cbFileSystem.SelectedItem} และตั้งชื่อเป็น '{_tbVolumeLabel.Text.Trim()}'\n\n" +
                                 $"คุณแน่ใจหรือไม่ว่าต้องการฟอร์แมตและสร้าง USB Dongle Key ใหม่?";
@@ -522,7 +522,7 @@ public class AdminMainForm : Form
             // 2. สร้าง License Object (ใช้ชื่อระบบทั่วไป ไม่ต้องพึ่งชื่อโรงแรม)
             var license = new LicenseFile
             {
-                CustomerName = "HotelPOS-CLIENT",
+                CustomerName = "PSoft-RestRentManager-CLIENT",
                 UsbHardwareId = drive.UsbHardwareId,
                 AppSerial = appSerial,
                 LicenseType = _cbLicenseType.SelectedIndex switch
@@ -561,7 +561,7 @@ public class AdminMainForm : Form
             var watermark = new AppWatermarkFile
             {
                 AppSerial = appSerial,
-                IssuedTo = "HotelPOS-CLIENT",
+                IssuedTo = "PSoft-RestRentManager-CLIENT",
                 IssuedDate = DateTime.Today
             };
             string watermarkSignable = watermark.GetSignableData();
@@ -577,9 +577,9 @@ public class AdminMainForm : Form
 
             _progressBar.Value = 100;
             string statusMsg = isFormatAndNew ? "Gen Key และเขียนคีย์ลง USB Drive สำเร็จเรียบร้อย!" : "แก้ไข/อัปเดตคีย์ใน USB Drive สำเร็จเรียบร้อย!";
-            _lblStatus.Text = $"✅ {statusMsg}";
+            _lblStatus.Text = $"{statusMsg}";
 
-            MessageBox.Show($"🎉 {statusMsg}\n\n" +
+            MessageBox.Show($"{statusMsg}\n\n" +
                             $"• ไดรฟ์: {drive.DriveLetter}\\\n" +
                             $"• App Serial: {appSerial}\n" +
                             $"• ประเภทสิทธิ์: {license.LicenseType}\n" +
@@ -614,7 +614,7 @@ public class AdminMainForm : Form
 
             if (status == LicenseStatus.Active)
             {
-                MessageBox.Show($"✅ ตรวจสอบ Dongle สำเร็จ 100%!\n\n" +
+                MessageBox.Show($"ตรวจสอบ Dongle สำเร็จ 100%!\n\n" +
                                 $"• ไดรฟ์: {driveInfo.DriveLetter}\\\n" +
                                 $"• App Serial: {dongleLicense.AppSerial}\n" +
                                 $"• Physical Serial: {driveInfo.PhysicalSerial}\n" +
@@ -623,7 +623,7 @@ public class AdminMainForm : Form
             }
             else
             {
-                MessageBox.Show($"❌ ตรวจสอบ Dongle ไม่ผ่าน! สถานะ: {status}\n(คีย์ถูกก๊อปปี้ข้าม Flash Drive หรือ App Serial ไม่ตรง)", "ตรวจสอบล้มเหลว", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show($"ตรวจสอบ Dongle ไม่ผ่าน! สถานะ: {status}\n(คีย์ถูกก๊อปปี้ข้าม Flash Drive หรือ App Serial ไม่ตรง)", "ตรวจสอบล้มเหลว", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
         catch (Exception ex)
