@@ -5,7 +5,6 @@ namespace HotelPOS.UI;
 
 /// <summary>
 /// ฟอร์มตั้งค่าอัตราค่าน้ำค่าไฟต่อหน่วย (กี่บาท : 1 หน่วย)
-/// ต้องผ่านการยืนยันรหัสผ่านผู้ดูแลระบบ (Admin) ก่อนเข้าถึง
 /// </summary>
 public class UtilityRateSettingsForm : Form
 {
@@ -33,7 +32,7 @@ public class UtilityRateSettingsForm : Form
 
     private void InitializeComponents()
     {
-        Text = "⚙️ ตั้งค่าอัตราค่าน้ำค่าไฟต่อหน่วย (Admin Authorized)";
+        Text = "ตั้งค่าอัตราค่าน้ำค่าไฟต่อหน่วย (Admin Authorized)";
         Width = 520;
         Height = 440;
         StartPosition = FormStartPosition.CenterParent;
@@ -45,7 +44,7 @@ public class UtilityRateSettingsForm : Form
 
         var lblHeader = new Label
         {
-            Text = "⚙️ ตั้งค่าอัตราค่าน้ำค่าไฟ (กี่บาท : 1 หน่วย)",
+            Text = "ตั้งค่าอัตราค่าน้ำค่าไฟ (กี่บาท : 1 หน่วย)",
             Font = new Font("Segoe UI", 13F, FontStyle.Bold),
             ForeColor = Color.FromArgb(15, 23, 42),
             Location = new Point(20, 15),
@@ -64,7 +63,7 @@ public class UtilityRateSettingsForm : Form
         int currentY = 85;
 
         // 1. ค่าไฟต่อหน่วย
-        var lblElec = new Label { Text = "⚡ อัตราค่าไฟฟ้า (บาท : 1 หน่วย):", Location = new Point(20, currentY), AutoSize = true, Font = new Font("Segoe UI", 10F, FontStyle.Bold) };
+        var lblElec = new Label { Text = "อัตราค่าไฟฟ้า (บาท : 1 หน่วย):", Location = new Point(20, currentY), AutoSize = true, Font = new Font("Segoe UI", 10F, FontStyle.Bold) };
         _numElectricRate = new NumericUpDown
         {
             Location = new Point(280, currentY - 4),
@@ -78,7 +77,7 @@ public class UtilityRateSettingsForm : Form
         currentY += 45;
 
         // 2. โหมดค่าน้ำ
-        var lblWaterMode = new Label { Text = "💧 รูปแบบการคิดค่าน้ำประปา:", Location = new Point(20, currentY), AutoSize = true, Font = new Font("Segoe UI", 10F, FontStyle.Bold) };
+        var lblWaterMode = new Label { Text = "รูปแบบการคิดค่าน้ำประปา:", Location = new Point(20, currentY), AutoSize = true, Font = new Font("Segoe UI", 10F, FontStyle.Bold) };
         _cboWaterMode = new ComboBox
         {
             Location = new Point(280, currentY - 4),
@@ -91,7 +90,7 @@ public class UtilityRateSettingsForm : Form
         currentY += 45;
 
         // 3. ค่าน้ำต่อหน่วย (ตามมิเตอร์)
-        var lblWater = new Label { Text = "💧 อัตราค่าน้ำประปา (บาท : 1 หน่วย):", Location = new Point(20, currentY), AutoSize = true, Font = new Font("Segoe UI", 10F, FontStyle.Bold) };
+        var lblWater = new Label { Text = "อัตราค่าน้ำประปา (บาท : 1 หน่วย):", Location = new Point(20, currentY), AutoSize = true, Font = new Font("Segoe UI", 10F, FontStyle.Bold) };
         _numWaterRate = new NumericUpDown
         {
             Location = new Point(280, currentY - 4),
@@ -105,7 +104,7 @@ public class UtilityRateSettingsForm : Form
         currentY += 45;
 
         // 4. ค่าน้ำเหมาจ่าย (บาท/คน)
-        var lblWaterFlat = new Label { Text = "💧 ค่าน้ำเหมาจ่าย (บาท / คน):", Location = new Point(20, currentY), AutoSize = true, Font = new Font("Segoe UI", 10F, FontStyle.Bold) };
+        var lblWaterFlat = new Label { Text = "ค่าน้ำเหมาจ่าย (บาท / คน):", Location = new Point(20, currentY), AutoSize = true, Font = new Font("Segoe UI", 10F, FontStyle.Bold) };
         _numWaterFlatRate = new NumericUpDown
         {
             Location = new Point(280, currentY - 4),
@@ -118,7 +117,7 @@ public class UtilityRateSettingsForm : Form
         currentY += 45;
 
         // 5. ค่าส่วนกลาง
-        var lblCommon = new Label { Text = "🏢 ค่าบริการส่วนกลาง (บาท / เดือน):", Location = new Point(20, currentY), AutoSize = true, Font = new Font("Segoe UI", 10F, FontStyle.Bold) };
+        var lblCommon = new Label { Text = "ค่าบริการส่วนกลาง (บาท / เดือน):", Location = new Point(20, currentY), AutoSize = true, Font = new Font("Segoe UI", 10F, FontStyle.Bold) };
         _numCommonAreaFee = new NumericUpDown
         {
             Location = new Point(280, currentY - 4),
@@ -131,7 +130,7 @@ public class UtilityRateSettingsForm : Form
         currentY += 45;
 
         // 6. ค่าขยะ
-        var lblGarbage = new Label { Text = "🗑️ ค่าจัดเก็บขยะ (บาท / เดือน):", Location = new Point(20, currentY), AutoSize = true, Font = new Font("Segoe UI", 10F, FontStyle.Bold) };
+        var lblGarbage = new Label { Text = "ค่าจัดเก็บขยะ (บาท / เดือน):", Location = new Point(20, currentY), AutoSize = true, Font = new Font("Segoe UI", 10F, FontStyle.Bold) };
         _numGarbageFee = new NumericUpDown
         {
             Location = new Point(280, currentY - 4),
@@ -146,7 +145,7 @@ public class UtilityRateSettingsForm : Form
         // Buttons
         _btnSave = new Button
         {
-            Text = "💾 บันทึกอัตราค่าบริการ",
+            Text = "บันทึกอัตราค่าบริการ",
             Font = new Font("Segoe UI", 10.5F, FontStyle.Bold),
             ForeColor = Color.White,
             BackColor = Color.FromArgb(22, 163, 74),
@@ -208,7 +207,7 @@ public class UtilityRateSettingsForm : Form
             _settings.GarbageFee = _numGarbageFee.Value;
 
             await _settingsService.SaveAllSettingsAsync(_settings);
-            MessageBox.Show("✅ บันทึกตั้งค่าอัตราค่าน้ำค่าไฟต่อหน่วยเรียบร้อยแล้ว", "สำเร็จ", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            MessageBox.Show("บันทึกตั้งค่าอัตราค่าน้ำค่าไฟต่อหน่วยเรียบร้อยแล้ว", "สำเร็จ", MessageBoxButtons.OK, MessageBoxIcon.Information);
             DialogResult = DialogResult.OK;
             Close();
         }

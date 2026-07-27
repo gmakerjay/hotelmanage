@@ -413,7 +413,7 @@ public class SystemSettingsControl : UserControl
 
         _btnResetSequences = new Button
         {
-            Text = "🔄 รีเซ็ตลำดับคีย์และเลขรันทั้งหมด (Reset Sequences)",
+            Text = "รีเซ็ตลำดับคีย์และเลขรันทั้งหมด (Reset Sequences)",
             BackColor = Color.FromArgb(239, 68, 68),
             ForeColor = Color.White,
             FlatStyle = FlatStyle.Flat,

@@ -2,7 +2,6 @@ namespace HotelPOS.UI;
 
 /// <summary>
 /// ฟอร์มยืนยันรหัสผ่านผู้ดูแลระบบ (Admin Authentication)
-/// ใช้ป้องกันการแก้ไขข้อมูลสำคัญ เช่น อัตราค่าน้ำค่าไฟต่อหน่วย
 /// </summary>
 public class AdminAuthForm : Form
 {
@@ -18,7 +17,7 @@ public class AdminAuthForm : Form
 
     private void InitializeComponents()
     {
-        Text = "🔐 ยืนยันรหัสผ่านผู้ดูแลระบบ (Admin Verification)";
+        Text = "ยืนยันรหัสผ่านผู้ดูแลระบบ (Admin Verification)";
         Width = 440;
         Height = 240;
         StartPosition = FormStartPosition.CenterParent;
@@ -30,7 +29,7 @@ public class AdminAuthForm : Form
 
         var lblPrompt = new Label
         {
-            Text = "🔒 กรอกรหัสผ่านผู้ดูแลระบบ (Admin) เพื่อยืนยันการตั้งค่าอัตราต่อหน่วย:",
+            Text = "กรอกรหัสผ่านผู้ดูแลระบบ (Admin) เพื่อยืนยันการตั้งค่าอัตราต่อหน่วย:",
             Font = new Font("Segoe UI", 10F, FontStyle.Bold),
             ForeColor = Color.FromArgb(15, 23, 42),
             Location = new Point(20, 20),
@@ -64,7 +63,7 @@ public class AdminAuthForm : Form
 
         _btnConfirm = new Button
         {
-            Text = "✅ ยืนยัน",
+            Text = "ยืนยัน",
             Font = new Font("Segoe UI", 10.5F, FontStyle.Bold),
             ForeColor = Color.White,
             BackColor = Color.FromArgb(22, 163, 74),
@@ -99,7 +98,6 @@ public class AdminAuthForm : Form
     {
         string inputPassword = _txtAdminPassword.Text.Trim();
 
-        // ยืนยันรหัสผ่าน Admin (รหัสผ่านเริ่มต้นคือ admin)
         if (inputPassword == "admin" || inputPassword == "1234")
         {
             DialogResult = DialogResult.OK;
@@ -107,7 +105,7 @@ public class AdminAuthForm : Form
         }
         else
         {
-            _lblError.Text = "❌ รหัสผ่าน Admin ไม่ถูกต้อง!";
+            _lblError.Text = "รหัสผ่าน Admin ไม่ถูกต้อง!";
             _txtAdminPassword.SelectAll();
             _txtAdminPassword.Focus();
         }
