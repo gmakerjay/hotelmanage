@@ -21,6 +21,7 @@ public class RoomManagementControl : UserControl
 
     // Room Types UI
     private DataGridView _dgvRoomTypes = null!;
+    private TextBox _txtSearchTypes = null!;
     private Panel _panelTypeModeBanner = null!;
     private Label _lblTypeModeText = null!;
     private Button _btnCancelTypeEdit = null!;
@@ -36,6 +37,7 @@ public class RoomManagementControl : UserControl
 
     // Rooms UI
     private DataGridView _dgvRooms = null!;
+    private TextBox _txtSearchRooms = null!;
     private Panel _panelRoomModeBanner = null!;
     private Label _lblRoomModeText = null!;
     private Button _btnCancelRoomEdit = null!;
@@ -199,7 +201,17 @@ public class RoomManagementControl : UserControl
             lblDesc, _txtTypeDesc, _btnSaveType, _btnClearType, _btnDeleteType
         });
 
-        split.Panel1.Controls.Add(_dgvRoomTypes);
+        var searchPanel = new Panel { Dock = DockStyle.Top, Height = 48, Padding = new Padding(8), BackColor = Color.White };
+        var lblSearch = new Label { Text = "ค้นหาประเภทห้อง:", Font = new Font("Segoe UI", 10F, FontStyle.Bold), Location = new Point(10, 12), AutoSize = true };
+        _txtSearchTypes = new TextBox { Location = new Point(140, 9), Width = 260, Font = new Font("Segoe UI", 10F), PlaceholderText = "พิมพ์ชื่อประเภทห้อง / รายละเอียด..." };
+        _txtSearchTypes.TextChanged += (s, e) => FilterRoomTypes();
+        searchPanel.Controls.AddRange(new Control[] { lblSearch, _txtSearchTypes });
+
+        var gridContainer = new Panel { Dock = DockStyle.Fill };
+        gridContainer.Controls.Add(_dgvRoomTypes);
+        gridContainer.Controls.Add(searchPanel);
+
+        split.Panel1.Controls.Add(gridContainer);
         split.Panel2.Controls.Add(panelInput);
 
         _tabRoomTypes.Controls.Add(split);
@@ -303,7 +315,17 @@ public class RoomManagementControl : UserControl
             lblType, _cboRoomTypes, _btnSaveRoom, _btnClearRoom, _btnDeleteRoom
         });
 
-        split.Panel1.Controls.Add(_dgvRooms);
+        var searchPanel = new Panel { Dock = DockStyle.Top, Height = 48, Padding = new Padding(8), BackColor = Color.White };
+        var lblSearch = new Label { Text = "ค้นหาห้องพัก:", Font = new Font("Segoe UI", 10F, FontStyle.Bold), Location = new Point(10, 12), AutoSize = true };
+        _txtSearchRooms = new TextBox { Location = new Point(120, 9), Width = 260, Font = new Font("Segoe UI", 10F), PlaceholderText = "พิมพ์เลขห้อง / ชั้น / ประเภทห้อง..." };
+        _txtSearchRooms.TextChanged += (s, e) => FilterRooms();
+        searchPanel.Controls.AddRange(new Control[] { lblSearch, _txtSearchRooms });
+
+        var gridContainer = new Panel { Dock = DockStyle.Fill };
+        gridContainer.Controls.Add(_dgvRooms);
+        gridContainer.Controls.Add(searchPanel);
+
+        split.Panel1.Controls.Add(gridContainer);
         split.Panel2.Controls.Add(panelInput);
 
         _tabRooms.Controls.Add(split);
@@ -316,19 +338,7 @@ public class RoomManagementControl : UserControl
             _roomTypesList = (await _roomService.GetRoomTypesAsync(false)).ToList();
             
             // Populate Room Types Grid with Action Buttons
-            _dgvRoomTypes.Columns.Clear();
-            _dgvRoomTypes.DataSource = _roomTypesList.Select(t => new
-            {
-                t.Id,
-                ชื่อประเภท = t.Name,
-                รายวัน = t.DailyRate,
-                รายชั่วโมง = t.HourlyRate,
-                รายเดือน = t.MonthlyRate,
-                รายละเอียด = t.Description,
-                สถานะ = t.IsActive ? "ใช้งาน" : "ปิดใช้งาน"
-            }).ToList();
-
-            AddGridActionColumns(_dgvRoomTypes);
+            FilterRoomTypes();
 
             // Populate Room Types ComboBox
             _cboRoomTypes.Items.Clear();
@@ -344,24 +354,63 @@ public class RoomManagementControl : UserControl
 
             // Populate Rooms Grid with Action Buttons
             _allRoomsList = (await _roomService.GetRoomsAsync()).ToList();
-            
-            _dgvRooms.Columns.Clear();
-            _dgvRooms.DataSource = _allRoomsList.Select(r => new
-            {
-                r.Id,
-                เลขห้อง = r.RoomNumber,
-                ชั้น = r.Floor ?? "-",
-                ประเภทห้อง = _roomTypesList.FirstOrDefault(t => t.Id == r.RoomTypeId)?.Name ?? "-",
-                ราคาต่อวัน = _roomTypesList.FirstOrDefault(t => t.Id == r.RoomTypeId)?.DailyRate.ToString("N0") ?? "-",
-                สถานะ = GetStatusName(r.Status)
-            }).ToList();
-
-            AddGridActionColumns(_dgvRooms);
+            FilterRooms();
         }
         catch (Exception ex)
         {
             MessageBox.Show($"โหลดข้อมูลไม่สำเร็จ: {ex.Message}", "ข้อผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
+    }
+
+    private void FilterRoomTypes()
+    {
+        string query = _txtSearchTypes.Text.Trim();
+        var filtered = _roomTypesList.Where(t =>
+        {
+            if (string.IsNullOrWhiteSpace(query)) return true;
+            return t.Name.Contains(query, StringComparison.OrdinalIgnoreCase) ||
+                   (!string.IsNullOrEmpty(t.Description) && t.Description.Contains(query, StringComparison.OrdinalIgnoreCase));
+        }).ToList();
+
+        _dgvRoomTypes.Columns.Clear();
+        _dgvRoomTypes.DataSource = filtered.Select(t => new
+        {
+            t.Id,
+            ชื่อประเภท = t.Name,
+            รายวัน = t.DailyRate,
+            รายชั่วโมง = t.HourlyRate,
+            รายเดือน = t.MonthlyRate,
+            รายละเอียด = t.Description,
+            สถานะ = t.IsActive ? "ใช้งาน" : "ปิดใช้งาน"
+        }).ToList();
+
+        AddGridActionColumns(_dgvRoomTypes);
+    }
+
+    private void FilterRooms()
+    {
+        string query = _txtSearchRooms.Text.Trim();
+        var filtered = _allRoomsList.Where(r =>
+        {
+            if (string.IsNullOrWhiteSpace(query)) return true;
+            var typeName = _roomTypesList.FirstOrDefault(t => t.Id == r.RoomTypeId)?.Name ?? "";
+            return r.RoomNumber.Contains(query, StringComparison.OrdinalIgnoreCase) ||
+                   (!string.IsNullOrEmpty(r.Floor) && r.Floor.Contains(query, StringComparison.OrdinalIgnoreCase)) ||
+                   typeName.Contains(query, StringComparison.OrdinalIgnoreCase);
+        }).ToList();
+
+        _dgvRooms.Columns.Clear();
+        _dgvRooms.DataSource = filtered.Select(r => new
+        {
+            r.Id,
+            เลขห้อง = r.RoomNumber,
+            ชั้น = r.Floor ?? "-",
+            ประเภทห้อง = _roomTypesList.FirstOrDefault(t => t.Id == r.RoomTypeId)?.Name ?? "-",
+            ราคาต่อวัน = _roomTypesList.FirstOrDefault(t => t.Id == r.RoomTypeId)?.DailyRate.ToString("N0") ?? "-",
+            สถานะ = GetStatusName(r.Status)
+        }).ToList();
+
+        AddGridActionColumns(_dgvRooms);
     }
 
     private static void AddGridActionColumns(DataGridView dgv)

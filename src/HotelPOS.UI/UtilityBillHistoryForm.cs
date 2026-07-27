@@ -16,6 +16,7 @@ public class UtilityBillHistoryForm : Form
 
     private DataGridView _dgvBills = null!;
     private Label _lblSummary = null!;
+    private TextBox _txtSearch = null!;
     private ComboBox _cmbFilter = null!;
     private Button _btnPrintSelected = null!;
 
@@ -52,11 +53,28 @@ public class UtilityBillHistoryForm : Form
             AutoSize = true
         };
 
+        var lblSearch = new Label
+        {
+            Text = "ค้นหา:",
+            Font = new Font("Segoe UI", 10.5F, FontStyle.Bold),
+            Location = new Point(360, 18),
+            AutoSize = true
+        };
+
+        _txtSearch = new TextBox
+        {
+            Location = new Point(415, 14),
+            Width = 180,
+            Font = new Font("Segoe UI", 10.5F),
+            PlaceholderText = "พิมพ์เบอร์โทร / ชื่อ / เลขห้อง / บิล..."
+        };
+        _txtSearch.TextChanged += (s, e) => ApplyFilter();
+
         var lblFilter = new Label
         {
-            Text = "กรองสถานะ:",
+            Text = "สถานะ:",
             Font = new Font("Segoe UI", 10.5F, FontStyle.Bold),
-            Location = new Point(520, 18),
+            Location = new Point(610, 18),
             AutoSize = true
         };
 
@@ -64,8 +82,8 @@ public class UtilityBillHistoryForm : Form
         {
             Items = { "ทั้งหมด", "ชำระแล้ว", "ยังไม่ชำระ" },
             SelectedIndex = 0,
-            Location = new Point(610, 14),
-            Width = 150,
+            Location = new Point(670, 14),
+            Width = 130,
             DropDownStyle = ComboBoxStyle.DropDownList,
             Font = new Font("Segoe UI", 10.5F)
         };
@@ -78,8 +96,8 @@ public class UtilityBillHistoryForm : Form
             ForeColor = Color.White,
             BackColor = Color.FromArgb(37, 99, 235),
             FlatStyle = FlatStyle.Flat,
-            Size = new Size(130, 36),
-            Location = new Point(780, 12),
+            Size = new Size(120, 36),
+            Location = new Point(815, 12),
             Cursor = Cursors.Hand
         };
         _btnPrintSelected.FlatAppearance.BorderSize = 0;
@@ -92,14 +110,14 @@ public class UtilityBillHistoryForm : Form
             ForeColor = Color.White,
             BackColor = Color.FromArgb(22, 163, 74),
             FlatStyle = FlatStyle.Flat,
-            Size = new Size(130, 36),
-            Location = new Point(920, 12),
+            Size = new Size(120, 36),
+            Location = new Point(945, 12),
             Cursor = Cursors.Hand
         };
         btnMarkPaid.FlatAppearance.BorderSize = 0;
         btnMarkPaid.Click += async (s, e) => await MarkSelectedAsPaidAsync();
 
-        headerPanel.Controls.AddRange(new Control[] { lblTitle, lblFilter, _cmbFilter, _btnPrintSelected, btnMarkPaid });
+        headerPanel.Controls.AddRange(new Control[] { lblTitle, lblSearch, _txtSearch, lblFilter, _cmbFilter, _btnPrintSelected, btnMarkPaid });
 
         // === DataGridView ===
         _dgvBills = new DataGridView
@@ -190,12 +208,26 @@ public class UtilityBillHistoryForm : Form
 
     private void ApplyFilter()
     {
-        var filtered = _cmbFilter.SelectedIndex switch
+        string query = _txtSearch.Text.Trim();
+
+        var filtered = _allBills.Where(b =>
         {
-            1 => _allBills.Where(b => b.IsPaid).ToList(),
-            2 => _allBills.Where(b => !b.IsPaid).ToList(),
-            _ => _allBills
-        };
+            bool matchStatus = _cmbFilter.SelectedIndex switch
+            {
+                1 => b.IsPaid,
+                2 => !b.IsPaid,
+                _ => true
+            };
+
+            if (!matchStatus) return false;
+            if (string.IsNullOrWhiteSpace(query)) return true;
+
+            bool matchCode = b.BillCode.Contains(query, StringComparison.OrdinalIgnoreCase);
+            bool matchRoom = b.RoomNumber.Contains(query, StringComparison.OrdinalIgnoreCase);
+            bool matchNotes = !string.IsNullOrEmpty(b.Notes) && b.Notes.Contains(query, StringComparison.OrdinalIgnoreCase);
+
+            return matchCode || matchRoom || matchNotes;
+        }).ToList();
 
         _dgvBills.Rows.Clear();
 

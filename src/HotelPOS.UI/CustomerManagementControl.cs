@@ -3,13 +3,15 @@ using HotelPOS.Core.Services;
 
 namespace HotelPOS.UI;
 
+/// <summary>
+/// หน้าจัดการข้อมูลลูกค้า พร้อมระบบค้นหาทันทีที่พิมพ์ (Instant Typing Search) ด้วยเบอร์โทร ชื่อ หรือเลขบัตร
+/// </summary>
 public class CustomerManagementControl : UserControl
 {
     private readonly ICustomerService _customerService;
 
     private DataGridView _dgvCustomers = null!;
     private TextBox _txtSearch = null!;
-    private Button _btnSearch = null!;
 
     private TextBox _txtFullName = null!;
     private TextBox _txtPhone = null!;
@@ -36,17 +38,23 @@ public class CustomerManagementControl : UserControl
     {
         Dock = DockStyle.Fill;
         Font = new Font("Segoe UI", 11F, FontStyle.Regular);
+        BackColor = Color.FromArgb(245, 247, 250);
 
-        var topPanel = new Panel { Dock = DockStyle.Top, Height = 60, Padding = new Padding(15, 10, 15, 10) };
-        var lblTitle = new Label { Text = "👤 ระบบจัดการข้อมูลลูกค้า", Font = new Font("Segoe UI", 14F, FontStyle.Bold), Location = new Point(15, 12), AutoSize = true };
+        var topPanel = new Panel { Dock = DockStyle.Top, Height = 60, Padding = new Padding(15, 10, 15, 10), BackColor = Color.White };
+        var lblTitle = new Label { Text = "ระบบจัดการข้อมูลลูกค้า", Font = new Font("Segoe UI", 14F, FontStyle.Bold), Location = new Point(15, 14), AutoSize = true };
 
-        _txtSearch = new TextBox { Location = new Point(280, 12), Width = 260, Font = new Font("Segoe UI", 11F), PlaceholderText = "ค้นหาชื่อ / เบอร์ / เลขบัตร..." };
-        _txtSearch.KeyDown += async (s, e) => { if (e.KeyCode == Keys.Enter) await LoadCustomersAsync(_txtSearch.Text); };
+        var lblSearch = new Label { Text = "ค้นหาลูกค้า:", Font = new Font("Segoe UI", 10.5F, FontStyle.Bold), Location = new Point(270, 18), AutoSize = true };
+        _txtSearch = new TextBox
+        {
+            Location = new Point(360, 14),
+            Width = 320,
+            Font = new Font("Segoe UI", 11F),
+            PlaceholderText = "พิมพ์เบอร์โทร / ชื่อ / เลขบัตรประชาชน เพื่อค้นหาทันที..."
+        };
+        // Instant search on typing
+        _txtSearch.TextChanged += async (s, e) => await LoadCustomersAsync(_txtSearch.Text);
 
-        _btnSearch = new Button { Text = "🔍 ค้นหา", Location = new Point(550, 10), Size = new Size(100, 36), Font = new Font("Segoe UI", 10.5F, FontStyle.Bold) };
-        _btnSearch.Click += async (s, e) => await LoadCustomersAsync(_txtSearch.Text);
-
-        topPanel.Controls.AddRange(new Control[] { lblTitle, _txtSearch, _btnSearch });
+        topPanel.Controls.AddRange(new Control[] { lblTitle, lblSearch, _txtSearch });
 
         var split = new SplitContainer
         {
@@ -77,14 +85,23 @@ public class CustomerManagementControl : UserControl
             AllowUserToAddRows = false,
             AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
             ColumnHeadersHeight = 38,
-            RowTemplate = { Height = 35 }
+            RowTemplate = { Height = 35 },
+            BackgroundColor = Color.White,
+            BorderStyle = BorderStyle.None,
+            GridColor = Color.FromArgb(226, 232, 240)
         };
-        _dgvCustomers.ColumnHeadersDefaultCellStyle.Font = new Font("Segoe UI", 11F, FontStyle.Bold);
+        _dgvCustomers.ColumnHeadersDefaultCellStyle = new DataGridViewCellStyle
+        {
+            Font = new Font("Segoe UI", 11F, FontStyle.Bold),
+            BackColor = Color.FromArgb(30, 41, 59),
+            ForeColor = Color.White
+        };
+        _dgvCustomers.EnableHeadersVisualStyles = false;
         _dgvCustomers.DefaultCellStyle.Font = new Font("Segoe UI", 10.5F);
         _dgvCustomers.SelectionChanged += DgvCustomers_SelectionChanged;
 
-        var panelInput = new Panel { Dock = DockStyle.Fill, Padding = new Padding(15), AutoScroll = true };
-        var lblFormTitle = new Label { Text = "ข้อมูลลูกค้า", Font = new Font("Segoe UI", 13F, FontStyle.Bold), Location = new Point(15, 10), AutoSize = true };
+        var panelInput = new Panel { Dock = DockStyle.Fill, Padding = new Padding(15), AutoScroll = true, BackColor = Color.White };
+        var lblFormTitle = new Label { Text = "ข้อมูลรายละเอียดลูกค้า", Font = new Font("Segoe UI", 13F, FontStyle.Bold), Location = new Point(15, 10), AutoSize = true };
 
         var lblName = new Label { Text = "ชื่อ-นามสกุล *:", Location = new Point(15, 45), Font = new Font("Segoe UI", 11F, FontStyle.Bold), AutoSize = true };
         _txtFullName = new TextBox { Location = new Point(160, 42), Width = 240, Font = new Font("Segoe UI", 11F) };
@@ -104,27 +121,15 @@ public class CustomerManagementControl : UserControl
         var lblNotes = new Label { Text = "หมายเหตุ:", Location = new Point(15, 270), Font = new Font("Segoe UI", 11F), AutoSize = true };
         _txtNotes = new TextBox { Location = new Point(160, 267), Width = 240, Font = new Font("Segoe UI", 11F), Multiline = true, Height = 45 };
 
-        _btnSave = new Button { Text = "💾 บันทึก", Location = new Point(160, 325), Size = new Size(110, 38), Font = new Font("Segoe UI", 11F, FontStyle.Bold), BackColor = Color.ForestGreen, ForeColor = Color.White, FlatStyle = FlatStyle.Flat };
+        _btnSave = new Button { Text = "บันทึกข้อมูล", Location = new Point(160, 325), Size = new Size(110, 38), Font = new Font("Segoe UI", 11F, FontStyle.Bold), BackColor = Color.ForestGreen, ForeColor = Color.White, FlatStyle = FlatStyle.Flat, Cursor = Cursors.Hand };
+        _btnSave.FlatAppearance.BorderSize = 0;
         _btnSave.Click += BtnSave_Click;
 
-        _btnClear = new Button { Text = "✨ ล้างฟอร์ม", Location = new Point(280, 325), Size = new Size(120, 38), Font = new Font("Segoe UI", 11F) };
+        _btnClear = new Button { Text = "ล้างฟอร์ม", Location = new Point(280, 325), Size = new Size(120, 38), Font = new Font("Segoe UI", 11F), BackColor = Color.White, FlatStyle = FlatStyle.Flat, Cursor = Cursors.Hand };
         _btnClear.Click += (s, e) => ClearForm();
 
-        _btnDelete = new Button { Text = "🗑️ ลบข้อมูลลูกค้า", Location = new Point(160, 375), Size = new Size(240, 36), Font = new Font("Segoe UI", 10.5F), ForeColor = Color.Red };
+        _btnDelete = new Button { Text = "ลบข้อมูลลูกค้า", Location = new Point(160, 375), Size = new Size(240, 36), Font = new Font("Segoe UI", 10.5F), ForeColor = Color.Red, BackColor = Color.White, FlatStyle = FlatStyle.Flat, Cursor = Cursors.Hand };
         _btnDelete.Click += BtnDelete_Click;
-
-        // ToolTips Guide
-        var tt = new ToolTip();
-        tt.SetToolTip(_txtSearch, "พิมพ์ค้นหาชื่อลูกค้า, เบอร์โทรศัพท์ หรือเลขบัตรประชาชน");
-        tt.SetToolTip(_btnSearch, "ค้นหาข้อมูลลูกค้าตามเงื่อนไขที่พิมพ์");
-        tt.SetToolTip(_txtFullName, "กรอกชื่อ-นามสกุลลูกค้า");
-        tt.SetToolTip(_txtPhone, "กรอกเบอร์โทรศัพท์ติดต่อลูกค้า");
-        tt.SetToolTip(_txtEmail, "กรอกที่อยู่อีเมลของลูกค้า");
-        tt.SetToolTip(_txtIdCard, "กรอกเลขบัตรประชาชน หรือ เลขพาสปอร์ต");
-        tt.SetToolTip(_txtAddress, "กรอกที่อยู่ของลูกค้าสำหรับการติดต่อหรือออกใบเสร็จ");
-        tt.SetToolTip(_txtNotes, "บันทึกประวัติความชอบ/หมายเหตุลูกค้าเพิ่มเติม");
-        tt.SetToolTip(_btnSave, "บันทึกข้อมูลลูกค้าลงฐานข้อมูล");
-        tt.SetToolTip(_btnDelete, "ลบประวัติและข้อมูลลูกค้าออกจากระบบ");
 
         panelInput.Controls.AddRange(new Control[]
         {
@@ -212,7 +217,7 @@ public class CustomerManagementControl : UserControl
 
             await _customerService.SaveCustomerAsync(customer);
             ClearForm();
-            await LoadCustomersAsync();
+            await LoadCustomersAsync(_txtSearch.Text);
         }
         catch (Exception ex)
         {
@@ -227,7 +232,7 @@ public class CustomerManagementControl : UserControl
         {
             await _customerService.DeleteCustomerAsync(_selectedCustomerId);
             ClearForm();
-            await LoadCustomersAsync();
+            await LoadCustomersAsync(_txtSearch.Text);
         }
     }
 }

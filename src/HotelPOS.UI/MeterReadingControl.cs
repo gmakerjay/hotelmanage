@@ -18,6 +18,7 @@ public class MeterReadingControl : UserControl
 
     private ComboBox _cmbBillingMonth = null!;
     private DataGridView _dgvMeterReadings = null!;
+    private TextBox _txtSearch = null!;
     private Label _lblSummary = null!;
     private Button _btnOneClickProcess = null!;
     private Button _btnBatchPrint = null!;
@@ -121,7 +122,26 @@ public class MeterReadingControl : UserControl
         }
         _cmbBillingMonth.SelectedIndexChanged += async (s, e) => await LoadMeterDataAsync();
 
-        headerPanel.Controls.AddRange(new Control[] { lblTitle, lblSubtitle, lblMonth, _cmbBillingMonth, _lblWaterMode });
+        // Instant Search Box
+        var lblSearch = new Label
+        {
+            Text = "ค้นหาห้อง/ผู้เช่า:",
+            Font = new Font("Segoe UI", 10.5F, FontStyle.Bold),
+            ForeColor = Color.FromArgb(30, 41, 59),
+            Location = new Point(680, 74),
+            AutoSize = true
+        };
+
+        _txtSearch = new TextBox
+        {
+            Location = new Point(810, 70),
+            Width = 260,
+            Font = new Font("Segoe UI", 10.5F),
+            PlaceholderText = "พิมพ์เบอร์โทร / ชื่อ / เลขห้อง..."
+        };
+        _txtSearch.TextChanged += (s, e) => FilterMeterGrid();
+
+        headerPanel.Controls.AddRange(new Control[] { lblTitle, lblSubtitle, lblMonth, _cmbBillingMonth, _lblWaterMode, lblSearch, _txtSearch });
 
         // === DataGridView ===
         _dgvMeterReadings = new DataGridView
@@ -414,6 +434,33 @@ public class MeterReadingControl : UserControl
                 statusCell.Style.BackColor = Color.FromArgb(254, 226, 226);
                 statusCell.Style.ForeColor = Color.FromArgb(153, 27, 27);
             }
+        }
+
+        FilterMeterGrid();
+    }
+
+    private void FilterMeterGrid()
+    {
+        string query = _txtSearch.Text.Trim();
+        _dgvMeterReadings.CurrentCell = null;
+
+        foreach (DataGridViewRow row in _dgvMeterReadings.Rows)
+        {
+            if (string.IsNullOrWhiteSpace(query))
+            {
+                row.Visible = true;
+                continue;
+            }
+
+            string roomNo = row.Cells["RoomNumber"].Value?.ToString() ?? "";
+            string tenant = row.Cells["TenantName"].Value?.ToString() ?? "";
+            string notes = row.Cells["Notes"].Value?.ToString() ?? "";
+
+            bool matchRoom = roomNo.Contains(query, StringComparison.OrdinalIgnoreCase);
+            bool matchTenant = tenant.Contains(query, StringComparison.OrdinalIgnoreCase);
+            bool matchNotes = notes.Contains(query, StringComparison.OrdinalIgnoreCase);
+
+            row.Visible = matchRoom || matchTenant || matchNotes;
         }
 
         UpdateSummary();
