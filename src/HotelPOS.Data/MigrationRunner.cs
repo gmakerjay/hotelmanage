@@ -7,8 +7,7 @@ namespace HotelPOS.Data;
 /// <summary>
 /// รัน schema.sql (ฝังอยู่ใน dll เป็น EmbeddedResource) เพื่อสร้าง/อัปเดตตารางฐานข้อมูล
 /// ออกแบบให้รันซ้ำได้ปลอดภัย (schema.sql เขียนด้วย IF NOT EXISTS ทั้งหมด)
-/// ในอนาคตถ้ามีการแก้ schema เพิ่ม ให้เพิ่มไฟล์ schema_v2.sql, schema_v3.sql ... แล้ว apply ตามลำดับ
-/// โดยเช็คจากตาราง schema_migrations ว่าอยู่เวอร์ชันไหนแล้ว
+/// มีระบบ Auto-Migration เพิ่มคอลัมน์อัตโนมัติหากฐานข้อมูลเดิมยังมีคอลัมน์ไม่ครบ
 /// </summary>
 public class MigrationRunner
 {
@@ -36,6 +35,10 @@ public class MigrationRunner
             command.Transaction = transaction;
             command.CommandText = sql;
             command.ExecuteNonQuery();
+
+            // Auto-Migrate missing columns for existing SQLite databases
+            EnsureUtilityBillColumnsExist(connection);
+
             transaction.Commit();
 
             _logger.Info(LogCategory.Database,
@@ -48,10 +51,45 @@ public class MigrationRunner
         }
     }
 
+    private static void EnsureUtilityBillColumnsExist(System.Data.IDbConnection connection)
+    {
+        var existingColumns = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        using (var cmd = connection.CreateCommand())
+        {
+            cmd.CommandText = "PRAGMA table_info(utility_bills);";
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read())
+            {
+                existingColumns.Add(reader.GetString(1)); // Column name is index 1
+            }
+        }
+
+        var columnsToAdd = new (string colName, string colDef)[]
+        {
+            ("electric_prev", "NUMERIC NOT NULL DEFAULT 0"),
+            ("electric_curr", "NUMERIC NOT NULL DEFAULT 0"),
+            ("electric_units", "NUMERIC NOT NULL DEFAULT 0"),
+            ("electric_rate", "NUMERIC NOT NULL DEFAULT 0"),
+            ("water_prev", "NUMERIC NOT NULL DEFAULT 0"),
+            ("water_curr", "NUMERIC NOT NULL DEFAULT 0"),
+            ("water_units", "NUMERIC NOT NULL DEFAULT 0"),
+            ("water_rate", "NUMERIC NOT NULL DEFAULT 0")
+        };
+
+        foreach (var (colName, colDef) in columnsToAdd)
+        {
+            if (!existingColumns.Contains(colName))
+            {
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = $"ALTER TABLE utility_bills ADD COLUMN {colName} {colDef};";
+                cmd.ExecuteNonQuery();
+            }
+        }
+    }
+
     private static string ReadEmbeddedSchemaSql()
     {
         var assembly = Assembly.GetExecutingAssembly();
-        // ชื่อ resource = <RootNamespace>.<โฟลเดอร์>.<ไฟล์> ตามที่ตั้งใน .csproj (EmbeddedResource)
         const string resourceName = "HotelPOS.Data.Database.schema.sql";
         using var stream = assembly.GetManifestResourceStream(resourceName)
             ?? throw new InvalidOperationException(
