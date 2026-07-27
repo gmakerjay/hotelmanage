@@ -86,9 +86,9 @@ public class SystemSettingsControl : UserControl
         int currentY = 85;
 
         // Group 1: Shop Branding & Logo/QR
-        var grpShop = CreateGroupPanel("1. ข้อมูลสถานประกอบการ โลโก้ และ QR Code ชำระเงิน (Shop & Branding)", currentY, 440);
+        var grpShop = CreateGroupPanel("1. ข้อมูลสถานประกอบการ โลโก้ และ QR Code ชำระเงิน (Shop & Branding)", currentY, 515);
         BuildShopFields(grpShop);
-        currentY += 455;
+        currentY += 530;
 
         // Group 2: Printer & Paper
         var grpPrinter = CreateGroupPanel("2. ตั้งค่าเครื่องพิมพ์และขนาดกระดาษ (Printer & Paper Settings)", currentY, 210);
@@ -124,6 +124,7 @@ public class SystemSettingsControl : UserControl
             Size = new Size(180, 44),
             Cursor = Cursors.Hand
         };
+        _btnSave.FlatAppearance.BorderSize = 0;
         _btnSave.Click += async (s, e) => await SaveSettingsAsync();
 
         _btnReload = new Button
@@ -142,9 +143,17 @@ public class SystemSettingsControl : UserControl
         pnlActions.Controls.Add(_btnSave);
         pnlActions.Controls.Add(_btnReload);
 
+        // Extra Bottom Padding Spacer to ensure no frame clipping when scrolling to bottom
+        var pnlBottomSpacer = new Panel
+        {
+            Location = new Point(20, currentY + 65),
+            Size = new Size(880, 40),
+            BackColor = Color.Transparent
+        };
+
         mainScrollPanel.Controls.AddRange(new Control[]
         {
-            titleLabel, subtitleLabel, grpShop, grpPrinter, grpOps, grpDocSeq, pnlActions
+            titleLabel, subtitleLabel, grpShop, grpPrinter, grpOps, grpDocSeq, pnlActions, pnlBottomSpacer
         });
 
         Controls.Add(mainScrollPanel);
@@ -185,13 +194,13 @@ public class SystemSettingsControl : UserControl
     private void BuildShopFields(Panel pnl)
     {
         var lblName = new Label { Text = "ชื่อโรงแรม / ที่พัก:", Location = new Point(20, 58), AutoSize = true, Font = new Font("Segoe UI", 10F, FontStyle.Bold) };
-        _txtShopName = new TextBox { Location = new Point(180, 54), Width = 380, Font = new Font("Segoe UI", 10.5F) };
+        _txtShopName = new TextBox { Location = new Point(180, 54), Width = 300, Font = new Font("Segoe UI", 10.5F) };
 
-        var lblTaxId = new Label { Text = "เลขประจำตัวผู้เสียภาษี:", Location = new Point(580, 58), AutoSize = true, Font = new Font("Segoe UI", 10F, FontStyle.Bold) };
-        _txtShopTaxId = new TextBox { Location = new Point(715, 54), Width = 145, Font = new Font("Segoe UI", 10.5F) };
+        var lblTaxId = new Label { Text = "เลขประจำตัวผู้เสียภาษี:", Location = new Point(500, 58), AutoSize = true, Font = new Font("Segoe UI", 10F, FontStyle.Bold) };
+        _txtShopTaxId = new TextBox { Location = new Point(670, 54), Width = 190, Font = new Font("Segoe UI", 10.5F) };
 
         var lblPhone = new Label { Text = "เบอร์โทรศัพท์ติดต่อ:", Location = new Point(20, 98), AutoSize = true, Font = new Font("Segoe UI", 10F, FontStyle.Bold) };
-        _txtShopPhone = new TextBox { Location = new Point(180, 94), Width = 260, Font = new Font("Segoe UI", 10.5F) };
+        _txtShopPhone = new TextBox { Location = new Point(180, 94), Width = 300, Font = new Font("Segoe UI", 10.5F) };
 
         var lblAddr = new Label { Text = "ที่อยู่สถานประกอบการ:", Location = new Point(20, 138), AutoSize = true, Font = new Font("Segoe UI", 10F, FontStyle.Bold) };
         _txtShopAddress = new TextBox { Location = new Point(180, 134), Width = 680, Height = 45, Multiline = true, Font = new Font("Segoe UI", 10F) };
@@ -221,7 +230,8 @@ public class SystemSettingsControl : UserControl
             Text = "เลือกรูปโลโก้",
             Location = new Point(180, 432),
             Size = new Size(100, 32),
-            Font = new Font("Segoe UI", 9F, FontStyle.Bold)
+            Font = new Font("Segoe UI", 9F, FontStyle.Bold),
+            Cursor = Cursors.Hand
         };
         btnUploadLogo.Click += (s, e) => UploadImage(true);
 
@@ -230,11 +240,12 @@ public class SystemSettingsControl : UserControl
             Text = "ลบรูป",
             Location = new Point(285, 432),
             Size = new Size(60, 32),
-            Font = new Font("Segoe UI", 9F)
+            Font = new Font("Segoe UI", 9F),
+            Cursor = Cursors.Hand
         };
         btnClearLogo.Click += (s, e) => ClearImage(true);
 
-        var lblQrHeader = new Label { Text = "รูป PromptPay QR Code:", Location = new Point(480, 345), AutoSize = true, Font = new Font("Segoe UI", 10F, FontStyle.Bold) };
+        var lblQrHeader = new Label { Text = "รูป PromptPay QR Code:", Location = new Point(460, 345), AutoSize = true, Font = new Font("Segoe UI", 10F, FontStyle.Bold) };
         _picQrCode = new PictureBox
         {
             Location = new Point(650, 341),
@@ -249,7 +260,8 @@ public class SystemSettingsControl : UserControl
             Text = "เลือกรูป QR Code",
             Location = new Point(650, 432),
             Size = new Size(120, 32),
-            Font = new Font("Segoe UI", 9F, FontStyle.Bold)
+            Font = new Font("Segoe UI", 9F, FontStyle.Bold),
+            Cursor = Cursors.Hand
         };
         btnUploadQr.Click += (s, e) => UploadImage(false);
 
@@ -258,14 +270,15 @@ public class SystemSettingsControl : UserControl
             Text = "ลบรูป",
             Location = new Point(775, 432),
             Size = new Size(60, 32),
-            Font = new Font("Segoe UI", 9F)
+            Font = new Font("Segoe UI", 9F),
+            Cursor = Cursors.Hand
         };
         btnClearQr.Click += (s, e) => ClearImage(false);
 
         var lblInfoNote = new Label
         {
             Text = "* รูปโลโก้และ QR Code จะถูกคำนวณย่อ/ขยาย (Auto-Resize) ให้เข้ากับขนาดกระดาษ A4 / 80mm โดยไม่เสียอัตราส่วน",
-            Location = new Point(20, 472),
+            Location = new Point(20, 475),
             AutoSize = true,
             Font = new Font("Segoe UI", 9.5F, FontStyle.Italic),
             ForeColor = Color.DarkSlateGray
