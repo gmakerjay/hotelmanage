@@ -97,6 +97,7 @@ public class SettingsService : ISettingsService
         dto.WaterFlatRatePerPerson = decimal.TryParse(await GetAsync("water_flat_rate_per_person"), out var wFlat) ? wFlat : dto.WaterFlatRatePerPerson;
         dto.CommonAreaFee = decimal.TryParse(await GetAsync("common_area_fee"), out var caf) ? caf : dto.CommonAreaFee;
         dto.GarbageFee = decimal.TryParse(await GetAsync("garbage_fee"), out var gf) ? gf : dto.GarbageFee;
+        dto.LobbyTerms = await GetAsync("lobby_terms") ?? dto.LobbyTerms;
 
         return dto;
     }
@@ -137,6 +138,7 @@ public class SettingsService : ISettingsService
             await SetAsync("water_flat_rate_per_person", settings.WaterFlatRatePerPerson.ToString());
             await SetAsync("common_area_fee", settings.CommonAreaFee.ToString());
             await SetAsync("garbage_fee", settings.GarbageFee.ToString());
+            await SetAsync("lobby_terms", settings.LobbyTerms);
 
             _logger.Info(LogCategory.System, "บันทึกการตั้งค่าระบบเรียบร้อยแล้ว", correlationId);
         }

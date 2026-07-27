@@ -59,8 +59,8 @@ public class MeterReadingControl : UserControl
 
         var lblTitle = new Label
         {
-            Text = "ระบบคำนวณค่าน้ำค่าไฟ & ออกใบแจ้งหนี้ (บิลเดียว)",
-            Font = new Font("Segoe UI", 16F, FontStyle.Bold),
+            Text = "ระบบคำนวณและออกใบแจ้งหนี้รวมรายห้อง (ค่าห้อง + ค่าไฟ + ค่าน้ำ + ค่าขยะ + จิปาถะ)",
+            Font = new Font("Segoe UI", 15F, FontStyle.Bold),
             ForeColor = Color.FromArgb(15, 23, 42),
             Location = new Point(5, 5),
             AutoSize = true
@@ -68,8 +68,8 @@ public class MeterReadingControl : UserControl
 
         var lblSubtitle = new Label
         {
-            Text = "กรอกเลขมิเตอร์ -> ระบบคำนวณให้อัตโนมัติ -> พิมพ์ใบแจ้งหนี้รวม (ค่าห้อง + ค่าไฟ + ค่าน้ำ + ค่าขยะ) ในใบเดียว",
-            Font = new Font("Segoe UI", 10F, FontStyle.Regular),
+            Text = "กรอกเลขมิเตอร์ -> บันทึกข้อมูล -> ระบบออกใบแจ้งหนี้รวมประจำห้อง (บิลใบเดียวแยกรายห้อง รวมค่าเช่า + มิเตอร์ + ค่าบริการ)",
+            Font = new Font("Segoe UI", 9.5F, FontStyle.Regular),
             ForeColor = Color.FromArgb(100, 116, 139),
             Location = new Point(5, 38),
             AutoSize = true
@@ -236,7 +236,7 @@ public class MeterReadingControl : UserControl
         // Main action buttons (No emojis)
         _btnOneClickProcess = new Button
         {
-            Text = "บันทึกและออกบิลรวมทั้งหมด",
+            Text = "บันทึกและสร้างบิลรวมรายห้อง",
             Font = new Font("Segoe UI", 11F, FontStyle.Bold),
             ForeColor = Color.White,
             BackColor = Color.FromArgb(22, 163, 74),
@@ -250,12 +250,12 @@ public class MeterReadingControl : UserControl
 
         _btnBatchPrint = new Button
         {
-            Text = "พิมพ์บิลทุกห้อง",
-            Font = new Font("Segoe UI", 10.5F, FontStyle.Bold),
+            Text = "พิมพ์บิลแยกรายห้อง (ทุกห้อง)",
+            Font = new Font("Segoe UI", 10F, FontStyle.Bold),
             ForeColor = Color.White,
             BackColor = Color.FromArgb(37, 99, 235),
             FlatStyle = FlatStyle.Flat,
-            Size = new Size(150, 44),
+            Size = new Size(200, 44),
             Anchor = AnchorStyles.Top | AnchorStyles.Right,
             Cursor = Cursors.Hand
         };
@@ -265,11 +265,11 @@ public class MeterReadingControl : UserControl
         _btnViewHistory = new Button
         {
             Text = "ดูประวัติ / รายงาน",
-            Font = new Font("Segoe UI", 10.5F, FontStyle.Bold),
+            Font = new Font("Segoe UI", 10F, FontStyle.Bold),
             ForeColor = Color.White,
             BackColor = Color.FromArgb(100, 116, 139),
             FlatStyle = FlatStyle.Flat,
-            Size = new Size(150, 44),
+            Size = new Size(140, 44),
             Anchor = AnchorStyles.Top | AnchorStyles.Right,
             Cursor = Cursors.Hand
         };

@@ -61,6 +61,8 @@ public class SystemSettingsDto
     public decimal WaterFlatRatePerPerson { get; set; } = 100.00m; // ค่าน้ำเหมาจ่ายต่อคน (บาท) - ใช้เมื่อ mode=FLAT
     public decimal CommonAreaFee { get; set; } = 0m;               // ค่าส่วนกลาง/ค่าบริการรายเดือน (บาท)
     public decimal GarbageFee { get; set; } = 0m;                  // ค่าขยะรายเดือน (บาท)
+
+    public string LobbyTerms { get; set; } = "1. ห้ามประกอบอาหาร หรือส่งเสียงดังรบกวนหลังเวลา 22:00 น.\n2. กำหนดชำระเงินค่าน้ำ-ค่าไฟ ไม่เกินวันที่ 5 ของทุกเดือน\n3. เงินประกันความเสียหายจะได้รับคืนเต็มจำนวนในวันเช็คเอาท์ หากห้องพักอยู่ในสภาพเรียบร้อย";
 }
 
 /// <summary>บันทึกการกระทำของผู้ใช้ในระบบ (Audit Trail) แยกจาก app_logs ที่เป็น log ทางเทคนิค</summary>

@@ -1,12 +1,11 @@
 using System.Drawing.Printing;
-using HotelPOS.Common;
 using HotelPOS.Common.Models;
 
 namespace HotelPOS.Printing;
 
 /// <summary>
-/// เครื่องพิมพ์ใบแจ้งหนี้ค่าเช่าห้องพักและสาธารณูปโภคประจำเดือน (บิลรวมใบเดียว)
-/// รวม: ค่าห้อง + ค่าไฟ (มิเตอร์) + ค่าน้ำ (มิเตอร์/เหมาจ่าย) + ค่าบริการ + ค่าขยะ
+/// พิมพ์ใบแจ้งหนี้รายเดือน (ค่าน้ำ + ค่าไฟ + ค่าห้อง + ค่าส่วนกลาง + ค่าขยะ) ในใบเดียว
+/// รองรับกระดาษ A4 จัดหน้าสมส่วนเรียบหรู พร้อมช่องข้อตกลงหน้าล็อบบี้
 /// </summary>
 public class UtilityInvoicePrinter
 {
@@ -17,79 +16,52 @@ public class UtilityInvoicePrinter
 
     public UtilityInvoicePrinter(
         UtilityBill bill,
-        Customer? customer,
-        SystemSettingsDto settings,
-        string staffName = "admin")
+        Customer? customer = null,
+        SystemSettingsDto? settings = null,
+        string staffName = "พนักงานหน้าเคาน์เตอร์")
     {
         _bill = bill;
         _customer = customer;
-        _settings = settings;
+        _settings = settings ?? new SystemSettingsDto();
         _staffName = staffName;
     }
 
-    public void ShowPrintPreview()
+    public void Print(string printerName = "")
     {
-        using var printDoc = CreatePrintDocument();
-        using var previewDlg = new PrintPreviewDialog
-        {
-            Document = printDoc,
-            Width = 900,
-            Height = 800,
-            StartPosition = FormStartPosition.CenterScreen,
-            Text = $"ใบแจ้งหนี้ประจำเดือน — ห้อง {_bill.RoomNumber} ({_bill.BillingMonth})"
-        };
+        using var printDoc = new PrintDocument();
 
-        if (previewDlg.Controls.OfType<Form>().FirstOrDefault() is Form previewForm)
+        if (!string.IsNullOrWhiteSpace(printerName))
         {
-            previewForm.WindowState = FormWindowState.Maximized;
+            printDoc.PrinterSettings.PrinterName = printerName;
         }
 
-        previewDlg.ShowDialog();
-    }
-
-    public void PrintDirect()
-    {
-        using var printDoc = CreatePrintDocument();
-        
-        if (!string.IsNullOrWhiteSpace(_settings.PrinterName))
-        {
-            printDoc.PrinterSettings.PrinterName = _settings.PrinterName;
-        }
-
-        using var printDlg = new PrintDialog
-        {
-            Document = printDoc,
-            UseEXDialog = true
-        };
-
-        if (printDlg.ShowDialog() == DialogResult.OK)
-        {
-            printDoc.Print();
-        }
-    }
-
-    private PrintDocument CreatePrintDocument()
-    {
-        var printDoc = new PrintDocument();
-
-        if (_settings.PaperType == "80mm")
-        {
-            printDoc.DefaultPageSettings.PaperSize = new System.Drawing.Printing.PaperSize("80mm", 315, 1200);
-            printDoc.DefaultPageSettings.Margins = new Margins(10, 10, 10, 10);
-        }
-        else if (_settings.PaperType == "58mm")
-        {
-            printDoc.DefaultPageSettings.PaperSize = new System.Drawing.Printing.PaperSize("58mm", 228, 1200);
-            printDoc.DefaultPageSettings.Margins = new Margins(5, 5, 5, 5);
-        }
-        else
+        if (_settings.PaperType == "A4")
         {
             printDoc.DefaultPageSettings.PaperSize = new System.Drawing.Printing.PaperSize("A4", 827, 1169);
             printDoc.DefaultPageSettings.Margins = new Margins(40, 40, 40, 40);
         }
 
         printDoc.PrintPage += PrintDoc_PrintPage;
-        return printDoc;
+        printDoc.Print();
+    }
+
+    public void ShowPrintPreview()
+    {
+        using var printDoc = new PrintDocument();
+        printDoc.DefaultPageSettings.PaperSize = new System.Drawing.Printing.PaperSize("A4", 827, 1169);
+        printDoc.DefaultPageSettings.Margins = new Margins(40, 40, 40, 40);
+
+        printDoc.PrintPage += PrintDoc_PrintPage;
+
+        using var previewDlg = new PrintPreviewDialog
+        {
+            Document = printDoc,
+            Width = 960,
+            Height = 720,
+            StartPosition = FormStartPosition.CenterScreen,
+            Text = $"ตัวอย่างก่อนพิมพ์ - ใบแจ้งหนี้ประจำเดือน {_bill.BillingMonth} (A4)"
+        };
+        previewDlg.ShowDialog();
     }
 
     private void PrintDoc_PrintPage(object sender, PrintPageEventArgs e)
@@ -139,71 +111,71 @@ public class UtilityInvoicePrinter
         g.DrawString(shopName, fontTitle, brushDark, logoOffsetX, currentY);
         currentY += 32;
 
-        string shopDetails = $"ที่อยู่: {(_settings.ShopAddress ?? "-")} | โทร: {(_settings.ShopPhone ?? "-")}";
+        string shopDetails = $"ที่อยู่: {(_settings.ShopAddress ?? "-")} | โทร: {(_settings.ShopPhone ?? "-")} | เลขภาษี: {(_settings.ShopTaxId ?? "-")}";
         g.DrawString(shopDetails, fontSmall, Brushes.DimGray, logoOffsetX, currentY);
-        currentY += 25;
+        currentY += 28;
 
         g.DrawLine(penDark, leftMargin, currentY, rightMargin, currentY);
-        currentY += 12;
+        currentY += 15;
 
         // 2. Title Box: ใบแจ้งหนี้ประจำเดือน (บิลรวม)
-        var rectHeaderBox = new RectangleF(leftMargin, currentY, contentWidth, 38);
+        var rectHeaderBox = new RectangleF(leftMargin, currentY, contentWidth, 40);
         g.FillRectangle(brushHeaderBg, rectHeaderBox);
         g.DrawRectangle(penLight, rectHeaderBox.X, rectHeaderBox.Y, rectHeaderBox.Width, rectHeaderBox.Height);
 
-        g.DrawString("ใบแจ้งหนี้ค่าเช่าและค่าบริการ (MONTHLY INVOICE)", fontSubtitle, brushDark, leftMargin + 12, currentY + 8);
+        g.DrawString("ใบแจ้งหนี้ค่าเช่าและค่าบริการประจำเดือน (MONTHLY INVOICE)", fontSubtitle, brushDark, leftMargin + 12, currentY + 8);
         g.DrawString($"เลขที่บิล: {_bill.BillCode}", fontBodyBold, brushDark, rightMargin - 220, currentY + 10);
-        currentY += 48;
+        currentY += 55;
 
         // 3. Info Table (Room & Tenant Details)
         float halfWidth = (contentWidth - 15) / 2;
 
-        // Tenant Info
-        var guestRect = new RectangleF(leftMargin, currentY, halfWidth, 90);
+        // Tenant Info Box
+        var guestRect = new RectangleF(leftMargin, currentY, halfWidth, 105);
         g.DrawRectangle(penLight, guestRect.X, guestRect.Y, guestRect.Width, guestRect.Height);
-        g.FillRectangle(brushHeaderBg, leftMargin, currentY, halfWidth, 24);
-        g.DrawRectangle(penLight, leftMargin, currentY, halfWidth, 24);
-        g.DrawString("ข้อมูลผู้เช่า / Tenant Details", fontHeader, brushDark, leftMargin + 8, currentY + 3);
+        g.FillRectangle(brushHeaderBg, leftMargin, currentY, halfWidth, 26);
+        g.DrawRectangle(penLight, leftMargin, currentY, halfWidth, 26);
+        g.DrawString("ข้อมูลผู้เช่า / Tenant Details", fontHeader, brushDark, leftMargin + 8, currentY + 4);
 
-        float guestY = currentY + 30;
-        g.DrawString($"ชื่อผู้เช่า: {(_customer?.FullName ?? "ไม่ระบุ")}", fontBody, Brushes.Black, leftMargin + 8, guestY);
-        guestY += 20;
+        float guestY = currentY + 34;
+        g.DrawString($"ชื่อผู้เช่า: {(_customer?.FullName ?? "ผู้เช่าทั่วไป")}", fontBody, Brushes.Black, leftMargin + 8, guestY);
+        guestY += 25;
         g.DrawString($"เบอร์โทรศัพท์: {(_customer?.Phone ?? "-")}", fontBody, Brushes.Black, leftMargin + 8, guestY);
 
-        // Bill Info
+        // Bill Info Box
         float billInfoX = leftMargin + halfWidth + 15;
-        var billRect = new RectangleF(billInfoX, currentY, halfWidth, 90);
+        var billRect = new RectangleF(billInfoX, currentY, halfWidth, 105);
         g.DrawRectangle(penLight, billRect.X, billRect.Y, billRect.Width, billRect.Height);
-        g.FillRectangle(brushHeaderBg, billInfoX, currentY, halfWidth, 24);
-        g.DrawRectangle(penLight, billInfoX, currentY, halfWidth, 24);
-        g.DrawString("รายละเอียดรอบบิล / Billing Info", fontHeader, brushDark, billInfoX + 8, currentY + 3);
+        g.FillRectangle(brushHeaderBg, billInfoX, currentY, halfWidth, 26);
+        g.DrawRectangle(penLight, billInfoX, currentY, halfWidth, 26);
+        g.DrawString("รายละเอียดรอบบิล / Billing Details", fontHeader, brushDark, billInfoX + 8, currentY + 4);
 
-        float billY = currentY + 30;
+        float billY = currentY + 34;
         g.DrawString($"ห้องพัก: {_bill.RoomNumber}", fontBodyBold, Brushes.Black, billInfoX + 8, billY);
         g.DrawString($"ประจำเดือน: {_bill.BillingMonth}", fontBodyBold, Brushes.DarkBlue, billInfoX + 150, billY);
-        billY += 20;
-        g.DrawString($"สถานะ: {(_bill.IsPaid ? "✅ ชำระแล้ว" : "❌ ยังไม่ชำระ")}", fontBodyBold, _bill.IsPaid ? Brushes.DarkGreen : Brushes.DarkRed, billInfoX + 8, billY);
+        billY += 25;
+        g.DrawString($"สถานะการชำระ: {(_bill.IsPaid ? "ชำระแล้ว" : "ยังไม่ชำระ")}", fontBodyBold, _bill.IsPaid ? Brushes.DarkGreen : Brushes.DarkRed, billInfoX + 8, billY);
 
-        currentY += 105;
+        currentY += 125;
 
-        // 4. Combined Financial Items Table (บิลรวมใบเดียว)
+        // 4. Financial Items Table (บิลรวมใบเดียว)
         float col1X = leftMargin;
-        float col2X = leftMargin + 220;
-        float col3X = leftMargin + 320;
-        float col4X = leftMargin + 420;
-        float col5X = rightMargin - 120;
+        float col2X = leftMargin + 240;
+        float col3X = leftMargin + 340;
+        float col4X = leftMargin + 440;
+        float col5X = rightMargin - 130;
 
-        var tableHeaderRect = new RectangleF(leftMargin, currentY, contentWidth, 28);
+        var tableHeaderRect = new RectangleF(leftMargin, currentY, contentWidth, 30);
         g.FillRectangle(brushHeaderBg, tableHeaderRect);
         g.DrawRectangle(penLight, tableHeaderRect.X, tableHeaderRect.Y, tableHeaderRect.Width, tableHeaderRect.Height);
 
-        g.DrawString("รายการค่าใช้จ่าย", fontHeader, brushDark, col1X + 8, currentY + 4);
-        g.DrawString("เลขก่อน", fontHeader, brushDark, col2X, currentY + 4);
-        g.DrawString("เลขหลัง", fontHeader, brushDark, col3X, currentY + 4);
-        g.DrawString("หน่วย/จำนวน", fontHeader, brushDark, col4X, currentY + 4);
-        g.DrawString("จำนวนเงิน (฿)", fontHeader, brushDark, col5X, currentY + 4);
+        g.DrawString("รายการค่าใช้จ่าย", fontHeader, brushDark, col1X + 8, currentY + 5);
+        g.DrawString("เลขก่อน", fontHeader, brushDark, col2X, currentY + 5);
+        g.DrawString("เลขหลัง", fontHeader, brushDark, col3X, currentY + 5);
+        g.DrawString("หน่วย/จำนวน", fontHeader, brushDark, col4X, currentY + 5);
+        g.DrawString("จำนวนเงิน (บาท)", fontHeader, brushDark, col5X, currentY + 5);
 
-        currentY += 32;
+        currentY += 36;
 
         // 1) ค่าเช่าห้อง
         g.DrawString("ค่าเช่าห้องพักรายเดือน", fontBodyBold, Brushes.Black, col1X + 8, currentY);
@@ -211,7 +183,7 @@ public class UtilityInvoicePrinter
         g.DrawString("-", fontBody, Brushes.Gray, col3X, currentY);
         g.DrawString("1 เดือน", fontBody, Brushes.Black, col4X, currentY);
         g.DrawString($"{_bill.RoomCharge:N2}", fontBodyBold, Brushes.Black, col5X, currentY);
-        currentY += 26;
+        currentY += 28;
 
         // 2) ค่าไฟ (ตามมิเตอร์)
         if (_bill.ElectricUnits > 0 || _bill.ElectricAmount > 0)
@@ -221,7 +193,7 @@ public class UtilityInvoicePrinter
             g.DrawString($"{_bill.ElectricCurr:N0}", fontBody, Brushes.Black, col3X, currentY);
             g.DrawString($"{_bill.ElectricUnits:N0} หน่วย", fontBody, Brushes.Black, col4X, currentY);
             g.DrawString($"{_bill.ElectricAmount:N2}", fontBody, Brushes.Black, col5X, currentY);
-            currentY += 26;
+            currentY += 28;
         }
 
         // 3) ค่าน้ำ (ตามมิเตอร์ หรือ เหมาจ่าย)
@@ -232,7 +204,7 @@ public class UtilityInvoicePrinter
             g.DrawString("-", fontBody, Brushes.Gray, col3X, currentY);
             g.DrawString($"{_bill.WaterPersonCount} คน", fontBody, Brushes.Black, col4X, currentY);
             g.DrawString($"{_bill.WaterAmount:N2}", fontBody, Brushes.Black, col5X, currentY);
-            currentY += 26;
+            currentY += 28;
         }
         else if (_bill.WaterUnits > 0 || _bill.WaterAmount > 0)
         {
@@ -241,7 +213,7 @@ public class UtilityInvoicePrinter
             g.DrawString($"{_bill.WaterCurr:N0}", fontBody, Brushes.Black, col3X, currentY);
             g.DrawString($"{_bill.WaterUnits:N0} หน่วย", fontBody, Brushes.Black, col4X, currentY);
             g.DrawString($"{_bill.WaterAmount:N2}", fontBody, Brushes.Black, col5X, currentY);
-            currentY += 26;
+            currentY += 28;
         }
 
         // 4) ค่าบริการ/ส่วนกลาง (ถ้ามี)
@@ -252,7 +224,7 @@ public class UtilityInvoicePrinter
             g.DrawString("-", fontBody, Brushes.Gray, col3X, currentY);
             g.DrawString("1 เดือน", fontBody, Brushes.Black, col4X, currentY);
             g.DrawString($"{_bill.CommonAreaFee:N2}", fontBody, Brushes.Black, col5X, currentY);
-            currentY += 26;
+            currentY += 28;
         }
 
         // 5) ค่าขยะ (ถ้ามี)
@@ -263,7 +235,7 @@ public class UtilityInvoicePrinter
             g.DrawString("-", fontBody, Brushes.Gray, col3X, currentY);
             g.DrawString("1 เดือน", fontBody, Brushes.Black, col4X, currentY);
             g.DrawString($"{_bill.GarbageFee:N2}", fontBody, Brushes.Black, col5X, currentY);
-            currentY += 26;
+            currentY += 28;
         }
 
         // 6) ค่าอื่นๆ (ถ้ามี)
@@ -274,7 +246,7 @@ public class UtilityInvoicePrinter
             g.DrawString("-", fontBody, Brushes.Gray, col3X, currentY);
             g.DrawString("-", fontBody, Brushes.Gray, col4X, currentY);
             g.DrawString($"{_bill.ExtraCharges:N2}", fontBody, Brushes.Black, col5X, currentY);
-            currentY += 26;
+            currentY += 28;
         }
 
         // 7) ส่วนลด (ถ้ามี)
@@ -285,13 +257,13 @@ public class UtilityInvoicePrinter
             g.DrawString("-", fontBody, Brushes.Gray, col3X, currentY);
             g.DrawString("-", fontBody, Brushes.Gray, col4X, currentY);
             g.DrawString($"-{_bill.DiscountAmount:N2}", fontBody, Brushes.DarkRed, col5X, currentY);
-            currentY += 26;
+            currentY += 28;
         }
 
         g.DrawLine(penDark, leftMargin, currentY, rightMargin, currentY);
         currentY += 12;
 
-        // Total Box (รวมสุทธิ)
+        // Total Box (Large Green Callout Box)
         var totalRect = new RectangleF(rightMargin - 320, currentY, 320, 42);
         g.FillRectangle(new SolidBrush(Color.FromArgb(240, 253, 244)), totalRect);
         g.DrawRectangle(new Pen(Color.ForestGreen, 1.5F), totalRect.X, totalRect.Y, totalRect.Width, totalRect.Height);
@@ -301,7 +273,23 @@ public class UtilityInvoicePrinter
 
         currentY += 60;
 
-        // Payment QR Code (if configured)
+        // 5. Lobby Terms & Special Agreements Section (ข้อตกลงและเงื่อนไขหน้าเคาน์เตอร์/ล็อบบี้)
+        if (!string.IsNullOrWhiteSpace(_settings.LobbyTerms))
+        {
+            var termsRect = new RectangleF(leftMargin, currentY, contentWidth, 90);
+            g.FillRectangle(new SolidBrush(Color.FromArgb(248, 250, 252)), termsRect);
+            g.DrawRectangle(penLight, termsRect.X, termsRect.Y, termsRect.Width, termsRect.Height);
+
+            g.DrawString("ข้อตกลงและเงื่อนไขหน้าล็อบบี้ / Lobby Terms & Conditions", fontHeader, brushDark, leftMargin + 10, currentY + 6);
+
+            var sf = new StringFormat { Alignment = StringAlignment.Near, LineAlignment = StringAlignment.Near };
+            g.DrawString(_settings.LobbyTerms, fontSmall, Brushes.DarkSlateGray,
+                new RectangleF(leftMargin + 12, currentY + 30, contentWidth - 24, 55), sf);
+
+            currentY += 105;
+        }
+
+        // 6. QR Code & Signatures Container
         if (!string.IsNullOrEmpty(_settings.QrCodeImagePath) && File.Exists(_settings.QrCodeImagePath))
         {
             try
@@ -311,34 +299,45 @@ public class UtilityInvoicePrinter
                 float drawW = qrImg.Width * scale;
                 float drawH = qrImg.Height * scale;
                 g.DrawImage(qrImg, leftMargin + 10, currentY, drawW, drawH);
-                g.DrawString("สแกนจ่ายเงินผ่าน PromptPay", fontSmall, Brushes.DimGray, leftMargin + 10, currentY + drawH + 4);
+                g.DrawString("สแกนชำระเงิน PromptPay", fontSmall, Brushes.DimGray, leftMargin + 10, currentY + drawH + 4);
             }
             catch { }
         }
 
-        // Signatures
-        float sigBoxWidth = (contentWidth - 140) / 2;
+        bool showSignature = _settings.ShowSignatureBox;
+        if (showSignature)
+        {
+            float sigBoxWidth = (contentWidth - 140) / 2;
 
-        float sig1X = leftMargin + 120;
-        var sig1Rect = new RectangleF(sig1X, currentY, sigBoxWidth, 110);
-        g.DrawRectangle(penLight, sig1Rect.X, sig1Rect.Y, sig1Rect.Width, sig1Rect.Height);
-        g.DrawString("ผู้รับใบแจ้งหนี้ (ผู้เช่า)", fontHeader, brushDark, sig1X + 10, currentY + 6);
-        g.DrawLine(penLight, sig1X + 15, currentY + 65, sig1X + sigBoxWidth - 15, currentY + 65);
-        g.DrawString($"({(_customer?.FullName ?? "_________________________")})", fontSmall, Brushes.DimGray, sig1X + 15, currentY + 72);
-        g.DrawString("วันที่: _____ / _____ / ________", fontSmall, Brushes.DimGray, sig1X + 15, currentY + 88);
+            // Left Signature Box (Tenant)
+            float sig1X = leftMargin + 130;
+            var sig1Rect = new RectangleF(sig1X, currentY, sigBoxWidth, 115);
+            g.DrawRectangle(penLight, sig1Rect.X, sig1Rect.Y, sig1Rect.Width, sig1Rect.Height);
 
-        float sig2X = sig1X + sigBoxWidth + 15;
-        var sig2Rect = new RectangleF(sig2X, currentY, sigBoxWidth, 110);
-        g.DrawRectangle(penLight, sig2Rect.X, sig2Rect.Y, sig2Rect.Width, sig2Rect.Height);
-        g.DrawString("ผู้ออกใบแจ้งหนี้ (เจ้าของ/เจ้าหน้าที่)", fontHeader, brushDark, sig2X + 10, currentY + 6);
-        g.DrawLine(penLight, sig2X + 15, currentY + 65, sig2X + sigBoxWidth - 15, currentY + 65);
-        g.DrawString($"({_staffName})", fontSmall, Brushes.DimGray, sig2X + 50, currentY + 72);
-        g.DrawString("วันที่: _____ / _____ / ________", fontSmall, Brushes.DimGray, sig2X + 15, currentY + 88);
+            g.DrawString("ลงลายมือชื่อผู้เช่า / Tenant Signature", fontHeader, brushDark, sig1X + 10, currentY + 8);
+            g.DrawLine(penLight, sig1X + 15, currentY + 68, sig1X + sigBoxWidth - 15, currentY + 68);
+            g.DrawString($"({(_customer?.FullName ?? "_________________________")})", fontSmall, Brushes.DimGray, sig1X + 20, currentY + 75);
+            g.DrawString("วันที่ / Date: _____ / _____ / ________", fontSmall, Brushes.DimGray, sig1X + 20, currentY + 93);
 
-        currentY += 125;
+            // Right Signature Box (Staff)
+            float sig2X = sig1X + sigBoxWidth + 15;
+            var sig2Rect = new RectangleF(sig2X, currentY, sigBoxWidth, 115);
+            g.DrawRectangle(penLight, sig2Rect.X, sig2Rect.Y, sig2Rect.Width, sig2Rect.Height);
 
-        // Footer Note
-        string footerMsg = !string.IsNullOrWhiteSpace(_settings.BillFooter) ? _settings.BillFooter : "กรุณาชำระเงินภายในวันที่ 5 ของทุกเดือน ขอบคุณครับ";
-        g.DrawString(footerMsg, new Font("Segoe UI", 9.5F, FontStyle.Bold), Brushes.DarkSlateBlue, leftMargin + (contentWidth / 2) - 160, currentY);
+            g.DrawString("ลงลายมือชื่อผู้รับเงิน / Receiver Signature", fontHeader, brushDark, sig2X + 10, currentY + 8);
+            g.DrawLine(penLight, sig2X + 15, currentY + 68, sig2X + sigBoxWidth - 15, currentY + 68);
+            g.DrawString($"({_staffName})", fontSmall, Brushes.DimGray, sig2X + 45, currentY + 75);
+            g.DrawString("วันที่ / Date: _____ / _____ / ________", fontSmall, Brushes.DimGray, sig2X + 20, currentY + 93);
+
+            currentY += 130;
+        }
+        else
+        {
+            currentY += 20;
+        }
+
+        // 7. Footer Note
+        string footerMsg = !string.IsNullOrWhiteSpace(_settings.BillFooter) ? _settings.BillFooter : "ขอบคุณที่ใช้บริการ / Thank you for staying with us";
+        g.DrawString(footerMsg, new Font("Segoe UI", 10F, FontStyle.Bold), Brushes.DarkSlateBlue, leftMargin + (contentWidth / 2) - 150, currentY);
     }
 }

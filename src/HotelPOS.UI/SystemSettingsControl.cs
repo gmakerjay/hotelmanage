@@ -15,6 +15,7 @@ public class SystemSettingsControl : UserControl
     private TextBox _txtShopTaxId = null!;
     private TextBox _txtBillHeader = null!;
     private TextBox _txtBillFooter = null!;
+    private TextBox _txtLobbyTerms = null!;
 
     // Logo & QR Images
     private PictureBox _picLogo = null!;
@@ -201,12 +202,15 @@ public class SystemSettingsControl : UserControl
         var lblFooterMsg = new Label { Text = "ข้อความขอบคุณท้ายบิล:", Location = new Point(20, 230), AutoSize = true, Font = new Font("Segoe UI", 10F, FontStyle.Bold) };
         _txtBillFooter = new TextBox { Location = new Point(180, 226), Width = 680, Font = new Font("Segoe UI", 10F) };
 
+        var lblLobbyTerms = new Label { Text = "ข้อตกลงหน้าล็อบบี้/ใบเสร็จ:", Location = new Point(20, 268), AutoSize = true, Font = new Font("Segoe UI", 10F, FontStyle.Bold) };
+        _txtLobbyTerms = new TextBox { Location = new Point(180, 264), Width = 680, Height = 65, Multiline = true, ScrollBars = ScrollBars.Vertical, Font = new Font("Segoe UI", 9.5F) };
+
         // Logo & QR Code Image Upload Box
-        var lblLogoHeader = new Label { Text = "รูปโลโก้โรงแรม (Logo):", Location = new Point(20, 272), AutoSize = true, Font = new Font("Segoe UI", 10F, FontStyle.Bold) };
+        var lblLogoHeader = new Label { Text = "รูปโลโก้โรงแรม (Logo):", Location = new Point(20, 345), AutoSize = true, Font = new Font("Segoe UI", 10F, FontStyle.Bold) };
         _picLogo = new PictureBox
         {
-            Location = new Point(180, 268),
-            Size = new Size(130, 90),
+            Location = new Point(180, 341),
+            Size = new Size(130, 85),
             BorderStyle = BorderStyle.FixedSingle,
             SizeMode = PictureBoxSizeMode.Zoom,
             BackColor = Color.FromArgb(248, 250, 252)
@@ -215,7 +219,7 @@ public class SystemSettingsControl : UserControl
         var btnUploadLogo = new Button
         {
             Text = "เลือกรูปโลโก้",
-            Location = new Point(180, 365),
+            Location = new Point(180, 432),
             Size = new Size(100, 32),
             Font = new Font("Segoe UI", 9F, FontStyle.Bold)
         };
@@ -224,17 +228,17 @@ public class SystemSettingsControl : UserControl
         var btnClearLogo = new Button
         {
             Text = "ลบรูป",
-            Location = new Point(285, 365),
+            Location = new Point(285, 432),
             Size = new Size(60, 32),
             Font = new Font("Segoe UI", 9F)
         };
         btnClearLogo.Click += (s, e) => ClearImage(true);
 
-        var lblQrHeader = new Label { Text = "รูป PromptPay QR Code:", Location = new Point(480, 272), AutoSize = true, Font = new Font("Segoe UI", 10F, FontStyle.Bold) };
+        var lblQrHeader = new Label { Text = "รูป PromptPay QR Code:", Location = new Point(480, 345), AutoSize = true, Font = new Font("Segoe UI", 10F, FontStyle.Bold) };
         _picQrCode = new PictureBox
         {
-            Location = new Point(650, 268),
-            Size = new Size(130, 90),
+            Location = new Point(650, 341),
+            Size = new Size(130, 85),
             BorderStyle = BorderStyle.FixedSingle,
             SizeMode = PictureBoxSizeMode.Zoom,
             BackColor = Color.FromArgb(248, 250, 252)
@@ -243,7 +247,7 @@ public class SystemSettingsControl : UserControl
         var btnUploadQr = new Button
         {
             Text = "เลือกรูป QR Code",
-            Location = new Point(650, 365),
+            Location = new Point(650, 432),
             Size = new Size(120, 32),
             Font = new Font("Segoe UI", 9F, FontStyle.Bold)
         };
@@ -252,7 +256,7 @@ public class SystemSettingsControl : UserControl
         var btnClearQr = new Button
         {
             Text = "ลบรูป",
-            Location = new Point(775, 365),
+            Location = new Point(775, 432),
             Size = new Size(60, 32),
             Font = new Font("Segoe UI", 9F)
         };
@@ -261,7 +265,7 @@ public class SystemSettingsControl : UserControl
         var lblInfoNote = new Label
         {
             Text = "* รูปโลโก้และ QR Code จะถูกคำนวณย่อ/ขยาย (Auto-Resize) ให้เข้ากับขนาดกระดาษ A4 / 80mm โดยไม่เสียอัตราส่วน",
-            Location = new Point(20, 408),
+            Location = new Point(20, 472),
             AutoSize = true,
             Font = new Font("Segoe UI", 9.5F, FontStyle.Italic),
             ForeColor = Color.DarkSlateGray
@@ -272,6 +276,7 @@ public class SystemSettingsControl : UserControl
             lblName, _txtShopName, lblTaxId, _txtShopTaxId,
             lblPhone, _txtShopPhone, lblAddr, _txtShopAddress,
             lblHeaderMsg, _txtBillHeader, lblFooterMsg, _txtBillFooter,
+            lblLobbyTerms, _txtLobbyTerms,
             lblLogoHeader, _picLogo, btnUploadLogo, btnClearLogo,
             lblQrHeader, _picQrCode, btnUploadQr, btnClearQr, lblInfoNote
         });
@@ -473,6 +478,7 @@ public class SystemSettingsControl : UserControl
             _txtShopTaxId.Text = dto.ShopTaxId;
             _txtBillHeader.Text = dto.BillHeader;
             _txtBillFooter.Text = dto.BillFooter;
+            _txtLobbyTerms.Text = dto.LobbyTerms;
 
             _logoPath = dto.LogoImagePath;
             if (!string.IsNullOrEmpty(_logoPath) && File.Exists(_logoPath))
@@ -533,6 +539,7 @@ public class SystemSettingsControl : UserControl
                 ShopTaxId = _txtShopTaxId.Text.Trim(),
                 BillHeader = _txtBillHeader.Text.Trim(),
                 BillFooter = _txtBillFooter.Text.Trim(),
+                LobbyTerms = _txtLobbyTerms.Text.Trim(),
 
                 LogoImagePath = _logoPath,
                 QrCodeImagePath = _qrCodePath,
