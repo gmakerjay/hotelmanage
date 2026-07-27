@@ -1,36 +1,41 @@
 using HotelPOS.Common;
 using HotelPOS.Common.Models;
 using HotelPOS.Core.Services;
+using HotelPOS.Printing;
 
 namespace HotelPOS.UI;
 
 /// <summary>
-/// ฟอร์มดูรายการใบแจ้งหนี้รายเดือน แยกสถานะชำระ/ยังไม่ชำระ
+/// ฟอร์มดูประวัติใบแจ้งหนี้และสถิติค่าน้ำค่าไฟรายห้อง / รายเดือน ย้อนหลังได้ตลอดเวลา
 /// </summary>
 public class UtilityBillHistoryForm : Form
 {
     private readonly IUtilityBillService _utilityBillService;
     private readonly string _billingMonth;
+    private readonly ISettingsService? _settingsService;
 
     private DataGridView _dgvBills = null!;
     private Label _lblSummary = null!;
     private ComboBox _cmbFilter = null!;
+    private Button _btnPrintSelected = null!;
 
     private List<UtilityBill> _allBills = new();
+    private SystemSettingsDto? _settings;
 
-    public UtilityBillHistoryForm(IUtilityBillService utilityBillService, string billingMonth)
+    public UtilityBillHistoryForm(IUtilityBillService utilityBillService, string billingMonth, ISettingsService? settingsService = null)
     {
         _utilityBillService = utilityBillService;
         _billingMonth = billingMonth;
+        _settingsService = settingsService;
 
         InitializeComponents();
     }
 
     private void InitializeComponents()
     {
-        Text = $"📋 ใบแจ้งหนี้ค่าสาธารณูปโภค - เดือน {_billingMonth}";
-        Width = 1100;
-        Height = 650;
+        Text = $"📋 ประวัติใบแจ้งหนี้รายเดือน — รอบบิล {_billingMonth}";
+        Width = 1180;
+        Height = 680;
         StartPosition = FormStartPosition.CenterParent;
         Font = new Font("Segoe UI", 10.5F);
         BackColor = Color.FromArgb(245, 247, 250);
@@ -40,18 +45,18 @@ public class UtilityBillHistoryForm : Form
 
         var lblTitle = new Label
         {
-            Text = $"📋 รายการใบแจ้งหนี้ - {_billingMonth}",
+            Text = $"📋 ประวัติใบแจ้งหนี้ประจำเดือน {_billingMonth}",
             Font = new Font("Segoe UI", 14F, FontStyle.Bold),
             ForeColor = Color.FromArgb(15, 23, 42),
-            Location = new Point(15, 8),
+            Location = new Point(15, 12),
             AutoSize = true
         };
 
         var lblFilter = new Label
         {
-            Text = "กรอง:",
+            Text = "กรองสถานะ:",
             Font = new Font("Segoe UI", 10.5F, FontStyle.Bold),
-            Location = new Point(600, 14),
+            Location = new Point(520, 18),
             AutoSize = true
         };
 
@@ -59,12 +64,26 @@ public class UtilityBillHistoryForm : Form
         {
             Items = { "ทั้งหมด", "✅ ชำระแล้ว", "❌ ยังไม่ชำระ" },
             SelectedIndex = 0,
-            Location = new Point(650, 10),
-            Width = 180,
+            Location = new Point(610, 14),
+            Width = 150,
             DropDownStyle = ComboBoxStyle.DropDownList,
             Font = new Font("Segoe UI", 10.5F)
         };
         _cmbFilter.SelectedIndexChanged += (s, e) => ApplyFilter();
+
+        _btnPrintSelected = new Button
+        {
+            Text = "🖨️ พิมพ์บิลใบนี้",
+            Font = new Font("Segoe UI", 10F, FontStyle.Bold),
+            ForeColor = Color.White,
+            BackColor = Color.FromArgb(37, 99, 235),
+            FlatStyle = FlatStyle.Flat,
+            Size = new Size(130, 36),
+            Location = new Point(780, 12),
+            Cursor = Cursors.Hand
+        };
+        _btnPrintSelected.FlatAppearance.BorderSize = 0;
+        _btnPrintSelected.Click += async (s, e) => await PrintSelectedBillAsync();
 
         var btnMarkPaid = new Button
         {
@@ -73,14 +92,14 @@ public class UtilityBillHistoryForm : Form
             ForeColor = Color.White,
             BackColor = Color.FromArgb(22, 163, 74),
             FlatStyle = FlatStyle.Flat,
-            Size = new Size(150, 36),
-            Location = new Point(860, 8),
+            Size = new Size(130, 36),
+            Location = new Point(920, 12),
             Cursor = Cursors.Hand
         };
         btnMarkPaid.FlatAppearance.BorderSize = 0;
         btnMarkPaid.Click += async (s, e) => await MarkSelectedAsPaidAsync();
 
-        headerPanel.Controls.AddRange(new Control[] { lblTitle, lblFilter, _cmbFilter, btnMarkPaid });
+        headerPanel.Controls.AddRange(new Control[] { lblTitle, lblFilter, _cmbFilter, _btnPrintSelected, btnMarkPaid });
 
         // === DataGridView ===
         _dgvBills = new DataGridView
@@ -109,31 +128,35 @@ public class UtilityBillHistoryForm : Form
                 Alignment = DataGridViewContentAlignment.MiddleCenter
             },
             EnableHeadersVisualStyles = false,
-            ColumnHeadersHeight = 40,
-            RowTemplate = { Height = 38 },
+            ColumnHeadersHeight = 42,
+            RowTemplate = { Height = 40 },
             GridColor = Color.FromArgb(226, 232, 240)
         };
 
         _dgvBills.Columns.AddRange(new DataGridViewColumn[]
         {
             new DataGridViewTextBoxColumn { Name = "BillId", HeaderText = "ID", Visible = false },
-            new DataGridViewTextBoxColumn { Name = "BillCode", HeaderText = "เลขที่บิล", FillWeight = 100 },
-            new DataGridViewTextBoxColumn { Name = "RoomNumber", HeaderText = "ห้อง", FillWeight = 50,
+            new DataGridViewTextBoxColumn { Name = "BillCode", HeaderText = "เลขที่บิล", FillWeight = 85 },
+            new DataGridViewTextBoxColumn { Name = "RoomNumber", HeaderText = "ห้อง", FillWeight = 45,
                 DefaultCellStyle = new DataGridViewCellStyle { Alignment = DataGridViewContentAlignment.MiddleCenter, Font = new Font("Segoe UI", 10.5F, FontStyle.Bold) } },
-            new DataGridViewTextBoxColumn { Name = "RoomCharge", HeaderText = "ค่าห้อง", FillWeight = 70,
+            new DataGridViewTextBoxColumn { Name = "RoomCharge", HeaderText = "ค่าห้อง", FillWeight = 65,
                 DefaultCellStyle = new DataGridViewCellStyle { Alignment = DataGridViewContentAlignment.MiddleRight, Format = "N2" } },
-            new DataGridViewTextBoxColumn { Name = "ElectricAmt", HeaderText = "ค่าไฟ", FillWeight = 70,
-                DefaultCellStyle = new DataGridViewCellStyle { Alignment = DataGridViewContentAlignment.MiddleRight, Format = "N2", ForeColor = Color.FromArgb(234, 88, 12) } },
-            new DataGridViewTextBoxColumn { Name = "WaterAmt", HeaderText = "ค่าน้ำ", FillWeight = 70,
-                DefaultCellStyle = new DataGridViewCellStyle { Alignment = DataGridViewContentAlignment.MiddleRight, Format = "N2", ForeColor = Color.FromArgb(14, 116, 144) } },
-            new DataGridViewTextBoxColumn { Name = "ServiceFees", HeaderText = "ค่าบริการ+ขยะ", FillWeight = 80,
+            new DataGridViewTextBoxColumn { Name = "ElecDetails", HeaderText = "⚡ รายละเอียดไฟ (ก่อน→หลัง / หน่วย)", FillWeight = 115,
+                DefaultCellStyle = new DataGridViewCellStyle { Alignment = DataGridViewContentAlignment.MiddleCenter, ForeColor = Color.FromArgb(234, 88, 12) } },
+            new DataGridViewTextBoxColumn { Name = "ElectricAmt", HeaderText = "ค่าไฟ (฿)", FillWeight = 65,
+                DefaultCellStyle = new DataGridViewCellStyle { Alignment = DataGridViewContentAlignment.MiddleRight, Format = "N2", ForeColor = Color.FromArgb(234, 88, 12), Font = new Font("Segoe UI", 10F, FontStyle.Bold) } },
+            new DataGridViewTextBoxColumn { Name = "WaterDetails", HeaderText = "💧 รายละเอียดน้ำ (ก่อน→หลัง / หน่วย)", FillWeight = 115,
+                DefaultCellStyle = new DataGridViewCellStyle { Alignment = DataGridViewContentAlignment.MiddleCenter, ForeColor = Color.FromArgb(14, 116, 144) } },
+            new DataGridViewTextBoxColumn { Name = "WaterAmt", HeaderText = "ค่าน้ำ (฿)", FillWeight = 65,
+                DefaultCellStyle = new DataGridViewCellStyle { Alignment = DataGridViewContentAlignment.MiddleRight, Format = "N2", ForeColor = Color.FromArgb(14, 116, 144), Font = new Font("Segoe UI", 10F, FontStyle.Bold) } },
+            new DataGridViewTextBoxColumn { Name = "ServiceFees", HeaderText = "ค่าบริการ+ขยะ", FillWeight = 65,
                 DefaultCellStyle = new DataGridViewCellStyle { Alignment = DataGridViewContentAlignment.MiddleRight, Format = "N2" } },
-            new DataGridViewTextBoxColumn { Name = "TotalAmount", HeaderText = "รวมทั้งหมด", FillWeight = 85,
+            new DataGridViewTextBoxColumn { Name = "TotalAmount", HeaderText = "รวมสุทธิ (฿)", FillWeight = 80,
                 DefaultCellStyle = new DataGridViewCellStyle { Alignment = DataGridViewContentAlignment.MiddleRight, Format = "N2",
                     Font = new Font("Segoe UI", 10.5F, FontStyle.Bold), ForeColor = Color.FromArgb(30, 41, 59) } },
-            new DataGridViewTextBoxColumn { Name = "Status", HeaderText = "สถานะ", FillWeight = 80,
+            new DataGridViewTextBoxColumn { Name = "Status", HeaderText = "สถานะ", FillWeight = 75,
                 DefaultCellStyle = new DataGridViewCellStyle { Alignment = DataGridViewContentAlignment.MiddleCenter } },
-            new DataGridViewTextBoxColumn { Name = "Notes", HeaderText = "หมายเหตุ", FillWeight = 80 }
+            new DataGridViewTextBoxColumn { Name = "Notes", HeaderText = "หมายเหตุ", FillWeight = 75 }
         });
 
         // === Footer ===
@@ -156,6 +179,11 @@ public class UtilityBillHistoryForm : Form
 
     private async Task LoadBillsAsync()
     {
+        if (_settingsService != null)
+        {
+            _settings = await _settingsService.GetAllSettingsAsync();
+        }
+
         _allBills = (await _utilityBillService.GetBillsByMonthAsync(_billingMonth)).ToList();
         ApplyFilter();
     }
@@ -176,12 +204,21 @@ public class UtilityBillHistoryForm : Form
             string status = bill.IsPaid ? "✅ ชำระแล้ว" : "❌ ยังไม่ชำระ";
             decimal serviceFees = bill.CommonAreaFee + bill.GarbageFee;
 
+            string elecDetails = bill.ElectricUnits > 0
+                ? $"{bill.ElectricPrev:N0} → {bill.ElectricCurr:N0} ({bill.ElectricUnits:N0} หน่วย)"
+                : "-";
+
+            string waterDetails = bill.WaterBillingMode == "FLAT"
+                ? $"เหมาจ่าย ({bill.WaterPersonCount} คน)"
+                : (bill.WaterUnits > 0 ? $"{bill.WaterPrev:N0} → {bill.WaterCurr:N0} ({bill.WaterUnits:N0} หน่วย)" : "-");
+
             int rowIndex = _dgvBills.Rows.Add(
                 bill.Id, bill.BillCode, bill.RoomNumber,
-                bill.RoomCharge, bill.ElectricAmount, bill.WaterAmount,
+                bill.RoomCharge,
+                elecDetails, bill.ElectricAmount,
+                waterDetails, bill.WaterAmount,
                 serviceFees, bill.TotalAmount, status, bill.Notes ?? "");
 
-            // Color coding for payment status
             if (bill.IsPaid)
             {
                 _dgvBills.Rows[rowIndex].DefaultCellStyle.BackColor = Color.FromArgb(240, 253, 244);
@@ -192,13 +229,29 @@ public class UtilityBillHistoryForm : Form
             }
         }
 
-        // Summary
         decimal totalPaid = _allBills.Where(b => b.IsPaid).Sum(b => b.TotalAmount);
         decimal totalUnpaid = _allBills.Where(b => !b.IsPaid).Sum(b => b.TotalAmount);
         int paidCount = _allBills.Count(b => b.IsPaid);
         int unpaidCount = _allBills.Count(b => !b.IsPaid);
 
         _lblSummary.Text = $"ทั้งหมด {_allBills.Count} ห้อง | ✅ ชำระแล้ว {paidCount} ห้อง (฿{totalPaid:N2}) | ❌ ยังไม่ชำระ {unpaidCount} ห้อง (฿{totalUnpaid:N2})";
+    }
+
+    private async Task PrintSelectedBillAsync()
+    {
+        if (_dgvBills.CurrentRow == null)
+        {
+            MessageBox.Show("กรุณาเลือกรายการที่ต้องการพิมพ์ใบแจ้งหนี้", "⚠️", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return;
+        }
+
+        int billId = Convert.ToInt32(_dgvBills.CurrentRow.Cells["BillId"].Value);
+        var bill = _allBills.FirstOrDefault(b => b.Id == billId);
+        if (bill == null) return;
+
+        var settings = _settings ?? new SystemSettingsDto();
+        var printer = new UtilityInvoicePrinter(bill, null, settings);
+        printer.ShowPrintPreview();
     }
 
     private async Task MarkSelectedAsPaidAsync()

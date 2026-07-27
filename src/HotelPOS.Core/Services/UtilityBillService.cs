@@ -111,8 +111,19 @@ public class UtilityBillService : IUtilityBillService
         bill.RoomId = roomId;
         bill.BillingMonth = billingMonth;
         bill.RoomCharge = roomCharge;
+
+        bill.ElectricPrev = electricReading?.ReadingPrev ?? 0;
+        bill.ElectricCurr = electricReading?.ReadingCurr ?? 0;
+        bill.ElectricUnits = electricReading?.UnitsUsed ?? 0;
+        bill.ElectricRate = electricReading?.RatePerUnit ?? settings.ElectricRatePerUnit;
         bill.ElectricAmount = electricAmount;
+
+        bill.WaterPrev = waterReading?.ReadingPrev ?? 0;
+        bill.WaterCurr = waterReading?.ReadingCurr ?? 0;
+        bill.WaterUnits = waterReading?.UnitsUsed ?? 0;
+        bill.WaterRate = waterReading?.RatePerUnit ?? settings.WaterRatePerUnit;
         bill.WaterAmount = waterAmount;
+
         bill.WaterBillingMode = waterBillingMode;
         bill.WaterPersonCount = waterPersonCount;
         bill.CommonAreaFee = commonAreaFee;

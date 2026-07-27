@@ -214,22 +214,12 @@ public class UtilityInvoicePrinter
         currentY += 26;
 
         // 2) ค่าไฟ (ตามมิเตอร์)
-        if (_bill.ElectricReading != null)
+        if (_bill.ElectricUnits > 0 || _bill.ElectricAmount > 0)
         {
-            var r = _bill.ElectricReading;
-            g.DrawString($"ค่าไฟฟ้า ({r.RatePerUnit:N2} ฿/หน่วย)", fontBody, Brushes.Black, col1X + 8, currentY);
-            g.DrawString($"{r.ReadingPrev:N0}", fontBody, Brushes.Black, col2X, currentY);
-            g.DrawString($"{r.ReadingCurr:N0}", fontBody, Brushes.Black, col3X, currentY);
-            g.DrawString($"{r.UnitsUsed:N0} หน่วย", fontBody, Brushes.Black, col4X, currentY);
-            g.DrawString($"{_bill.ElectricAmount:N2}", fontBody, Brushes.Black, col5X, currentY);
-            currentY += 26;
-        }
-        else if (_bill.ElectricAmount > 0)
-        {
-            g.DrawString("ค่าไฟฟ้า", fontBody, Brushes.Black, col1X + 8, currentY);
-            g.DrawString("-", fontBody, Brushes.Gray, col2X, currentY);
-            g.DrawString("-", fontBody, Brushes.Gray, col3X, currentY);
-            g.DrawString("-", fontBody, Brushes.Gray, col4X, currentY);
+            g.DrawString($"ค่าไฟฟ้า ({_bill.ElectricRate:N2} ฿/หน่วย)", fontBody, Brushes.Black, col1X + 8, currentY);
+            g.DrawString($"{_bill.ElectricPrev:N0}", fontBody, Brushes.Black, col2X, currentY);
+            g.DrawString($"{_bill.ElectricCurr:N0}", fontBody, Brushes.Black, col3X, currentY);
+            g.DrawString($"{_bill.ElectricUnits:N0} หน่วย", fontBody, Brushes.Black, col4X, currentY);
             g.DrawString($"{_bill.ElectricAmount:N2}", fontBody, Brushes.Black, col5X, currentY);
             currentY += 26;
         }
@@ -237,29 +227,19 @@ public class UtilityInvoicePrinter
         // 3) ค่าน้ำ (ตามมิเตอร์ หรือ เหมาจ่าย)
         if (_bill.WaterBillingMode == "FLAT")
         {
-            g.DrawString($"ค่าน้ำประปา (เหมาจ่าย {_settings.WaterFlatRatePerPerson:N2} ฿/คน)", fontBody, Brushes.Black, col1X + 8, currentY);
+            g.DrawString($"ค่าน้ำประปา (เหมาจ่าย {_bill.WaterRate:N2} ฿/คน)", fontBody, Brushes.Black, col1X + 8, currentY);
             g.DrawString("-", fontBody, Brushes.Gray, col2X, currentY);
             g.DrawString("-", fontBody, Brushes.Gray, col3X, currentY);
             g.DrawString($"{_bill.WaterPersonCount} คน", fontBody, Brushes.Black, col4X, currentY);
             g.DrawString($"{_bill.WaterAmount:N2}", fontBody, Brushes.Black, col5X, currentY);
             currentY += 26;
         }
-        else if (_bill.WaterReading != null)
+        else if (_bill.WaterUnits > 0 || _bill.WaterAmount > 0)
         {
-            var r = _bill.WaterReading;
-            g.DrawString($"ค่าน้ำประปา ({r.RatePerUnit:N2} ฿/หน่วย)", fontBody, Brushes.Black, col1X + 8, currentY);
-            g.DrawString($"{r.ReadingPrev:N0}", fontBody, Brushes.Black, col2X, currentY);
-            g.DrawString($"{r.ReadingCurr:N0}", fontBody, Brushes.Black, col3X, currentY);
-            g.DrawString($"{r.UnitsUsed:N0} หน่วย", fontBody, Brushes.Black, col4X, currentY);
-            g.DrawString($"{_bill.WaterAmount:N2}", fontBody, Brushes.Black, col5X, currentY);
-            currentY += 26;
-        }
-        else if (_bill.WaterAmount > 0)
-        {
-            g.DrawString("ค่าน้ำประปา", fontBody, Brushes.Black, col1X + 8, currentY);
-            g.DrawString("-", fontBody, Brushes.Gray, col2X, currentY);
-            g.DrawString("-", fontBody, Brushes.Gray, col3X, currentY);
-            g.DrawString("-", fontBody, Brushes.Gray, col4X, currentY);
+            g.DrawString($"ค่าน้ำประปา ({_bill.WaterRate:N2} ฿/หน่วย)", fontBody, Brushes.Black, col1X + 8, currentY);
+            g.DrawString($"{_bill.WaterPrev:N0}", fontBody, Brushes.Black, col2X, currentY);
+            g.DrawString($"{_bill.WaterCurr:N0}", fontBody, Brushes.Black, col3X, currentY);
+            g.DrawString($"{_bill.WaterUnits:N0} หน่วย", fontBody, Brushes.Black, col4X, currentY);
             g.DrawString($"{_bill.WaterAmount:N2}", fontBody, Brushes.Black, col5X, currentY);
             currentY += 26;
         }

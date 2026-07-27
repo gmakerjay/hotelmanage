@@ -244,10 +244,23 @@ CREATE TABLE IF NOT EXISTS utility_bills (
     room_id             INTEGER NOT NULL REFERENCES rooms(id),
     billing_month       TEXT NOT NULL,               -- 'YYYY-MM'
     room_charge         NUMERIC NOT NULL DEFAULT 0,  -- ค่าเช่าห้อง
-    electric_amount     NUMERIC NOT NULL DEFAULT 0,  -- ค่าไฟ (ตามมิเตอร์)
-    water_amount        NUMERIC NOT NULL DEFAULT 0,  -- ค่าน้ำ
+    
+    -- มิเตอร์ไฟ snapshot
+    electric_prev       NUMERIC NOT NULL DEFAULT 0,  -- เลขไฟก่อน
+    electric_curr       NUMERIC NOT NULL DEFAULT 0,  -- เลขไฟหลัง
+    electric_units      NUMERIC NOT NULL DEFAULT 0,  -- หน่วยไฟที่ใช้
+    electric_rate       NUMERIC NOT NULL DEFAULT 0,  -- อัตราค่าไฟ/หน่วย
+    electric_amount     NUMERIC NOT NULL DEFAULT 0,  -- ค่าไฟรวม
+    
+    -- มิเตอร์น้ำ snapshot
+    water_prev          NUMERIC NOT NULL DEFAULT 0,  -- เลขอ้นก่อน
+    water_curr          NUMERIC NOT NULL DEFAULT 0,  -- เลขอ้นหลัง
+    water_units         NUMERIC NOT NULL DEFAULT 0,  -- หน่วยน้ำที่ใช้
+    water_rate          NUMERIC NOT NULL DEFAULT 0,  -- อัตราค่าน้ำ/หน่วย
+    water_amount        NUMERIC NOT NULL DEFAULT 0,  -- ค่าน้ำรวม
     water_billing_mode  TEXT NOT NULL DEFAULT 'METER', -- METER / FLAT
     water_person_count  INTEGER NOT NULL DEFAULT 1,  -- จำนวนคนในห้อง (ใช้เมื่อ FLAT)
+    
     common_area_fee     NUMERIC NOT NULL DEFAULT 0,  -- ค่าส่วนกลาง/ค่าบริการ
     garbage_fee         NUMERIC NOT NULL DEFAULT 0,  -- ค่าขยะ
     extra_charges       NUMERIC NOT NULL DEFAULT 0,  -- ค่าอื่นๆ เพิ่มเติม
@@ -258,10 +271,12 @@ CREATE TABLE IF NOT EXISTS utility_bills (
     payment_method      INTEGER,                     -- PaymentMethod enum
     created_by          INTEGER REFERENCES users(id),
     created_at          TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
-    notes               TEXT
+    notes               TEXT,
+    UNIQUE(room_id, billing_month)                   -- 1 ห้อง มี 1 บิล ต่อ 1 เดือน
 );
 CREATE INDEX IF NOT EXISTS idx_utility_bills_room ON utility_bills(room_id);
 CREATE INDEX IF NOT EXISTS idx_utility_bills_month ON utility_bills(billing_month);
+CREATE INDEX IF NOT EXISTS idx_utility_bills_room_month ON utility_bills(room_id, billing_month);
 
 -- ---------- ค่าเริ่มต้น (seed) ----------
 INSERT OR IGNORE INTO roles (id, name, permissions_json) VALUES

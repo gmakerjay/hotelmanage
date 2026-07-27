@@ -28,8 +28,20 @@ public class UtilityBill
     public int RoomId { get; set; }
     public string BillingMonth { get; set; } = string.Empty;
     public decimal RoomCharge { get; set; }                  // ค่าเช่าห้อง
-    public decimal ElectricAmount { get; set; }              // ค่าไฟ (ตามมิเตอร์)
-    public decimal WaterAmount { get; set; }                 // ค่าน้ำ (ตามมิเตอร์ หรือ เหมาจ่าย)
+
+    // Snapshot มิเตอร์ไฟ ณ วันที่ออกบิล
+    public decimal ElectricPrev { get; set; }
+    public decimal ElectricCurr { get; set; }
+    public decimal ElectricUnits { get; set; }
+    public decimal ElectricRate { get; set; }
+    public decimal ElectricAmount { get; set; }              // ค่าไฟรวม
+
+    // Snapshot มิเตอร์น้ำ ณ วันที่ออกบิล
+    public decimal WaterPrev { get; set; }
+    public decimal WaterCurr { get; set; }
+    public decimal WaterUnits { get; set; }
+    public decimal WaterRate { get; set; }
+    public decimal WaterAmount { get; set; }                 // ค่าน้ำรวม (ตามมิเตอร์ หรือ เหมาจ่าย)
     public string WaterBillingMode { get; set; } = "METER";  // METER / FLAT
     public int WaterPersonCount { get; set; } = 1;           // จำนวนคนในห้อง (ใช้เมื่อ FLAT)
     public decimal CommonAreaFee { get; set; }               // ค่าส่วนกลาง/ค่าบริการ

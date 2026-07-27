@@ -23,6 +23,7 @@ public class MeterReadingControl : UserControl
     private Button _btnOneClickProcess = null!;
     private Button _btnBatchPrint = null!;
     private Button _btnViewHistory = null!;
+    private Button _btnConfigureRates = null!;
     private Label _lblWaterMode = null!;
 
     private List<Room> _rooms = new();
@@ -276,7 +277,22 @@ public class MeterReadingControl : UserControl
         _btnViewHistory.FlatAppearance.BorderSize = 0;
         _btnViewHistory.Click += (s, e) => ViewBillHistory();
 
+        _btnConfigureRates = new Button
+        {
+            Text = "⚙️ ตั้งค่าอัตราค่าหน่วย",
+            Font = new Font("Segoe UI", 10F, FontStyle.Bold),
+            ForeColor = Color.White,
+            BackColor = Color.FromArgb(71, 85, 105),
+            FlatStyle = FlatStyle.Flat,
+            Size = new Size(160, 44),
+            Anchor = AnchorStyles.Top | AnchorStyles.Right,
+            Cursor = Cursors.Hand
+        };
+        _btnConfigureRates.FlatAppearance.BorderSize = 0;
+        _btnConfigureRates.Click += async (s, e) => await ConfigureRatesWithAdminAuthAsync();
+
         footerPanel.Controls.Add(_lblSummary);
+        footerPanel.Controls.Add(_btnConfigureRates);
         footerPanel.Controls.Add(_btnViewHistory);
         footerPanel.Controls.Add(_btnBatchPrint);
         footerPanel.Controls.Add(_btnOneClickProcess);
@@ -286,6 +302,7 @@ public class MeterReadingControl : UserControl
             _btnOneClickProcess.Location = new Point(footerPanel.Width - _btnOneClickProcess.Width - 10, 10);
             _btnBatchPrint.Location = new Point(_btnOneClickProcess.Left - _btnBatchPrint.Width - 10, 10);
             _btnViewHistory.Location = new Point(_btnBatchPrint.Left - _btnViewHistory.Width - 10, 10);
+            _btnConfigureRates.Location = new Point(_btnViewHistory.Left - _btnConfigureRates.Width - 10, 10);
         };
 
         Controls.Add(_dgvMeterReadings);
@@ -671,8 +688,21 @@ public class MeterReadingControl : UserControl
         if (_cmbBillingMonth.SelectedItem == null) return;
         string billingMonth = ((MonthItem)_cmbBillingMonth.SelectedItem).Value;
 
-        using var historyForm = new UtilityBillHistoryForm(_utilityBillService, billingMonth);
+        using var historyForm = new UtilityBillHistoryForm(_utilityBillService, billingMonth, _settingsService);
         historyForm.ShowDialog();
+    }
+
+    private async Task ConfigureRatesWithAdminAuthAsync()
+    {
+        using var authForm = new AdminAuthForm();
+        if (authForm.ShowDialog() == DialogResult.OK)
+        {
+            using var rateForm = new UtilityRateSettingsForm(_settingsService);
+            if (rateForm.ShowDialog() == DialogResult.OK)
+            {
+                await LoadMeterDataAsync();
+            }
+        }
     }
 }
 
