@@ -31,50 +31,46 @@ public static class LicenseManager
 
         string licenseFilePath = Path.Combine(licenseDirectory, LicenseFileName);
         string currentHardwareId = HardwareIdGenerator.Generate();
+        string currentAppSerial = AppWatermarkManager.GetCurrentAppSerial();
+        DateTime? lastVerifiedAt = GetLastVerifiedAtFromDb(dbPath);
 
-        // 1. อ่านข้อมูล License (ลองอ่านจากไฟล์ และสำรองใน Registry)
-        string? licenseJson = ReadLicenseContent(licenseFilePath);
-        LicenseFile? license = null;
-
-        if (!string.IsNullOrEmpty(licenseJson))
+        // 1. ตรวจสอบ USB Hardware Dongle (หากมี Flash Drive เสียบอยู่)
+        var (dongleLicense, usbInfo, _) = UsbDongleManager.ScanForDongleKey();
+        if (dongleLicense != null && usbInfo != null)
         {
-            license = LicenseFile.FromJson(licenseJson);
-        }
+            // Auto-install: ก๊อปปี้ app.watermark จาก USB มาวางข้าง .exe อัตโนมัติ (ถ้ายังไม่มี หรือ AppSerial ไม่ตรง)
+            AutoInstallWatermarkFromUsb(usbInfo.DriveLetter);
 
-        // 2. หากพบไฟล์ License และต้องการซิงค์ลง Registry หรือกลับกัน
-        SyncLicenseStorage(licenseFilePath, licenseJson);
+            // อ่าน AppSerial ใหม่อีกครั้งหลัง auto-install
+            currentAppSerial = AppWatermarkManager.GetCurrentAppSerial();
 
-        // 3. ตรวจสอบ License
-        if (license != null)
-        {
-            LicenseStatus status = LicenseValidator.Validate(license, currentHardwareId);
+            LicenseStatus dongleStatus = LicenseValidator.ValidateDongle(
+                dongleLicense, usbInfo.UsbHardwareId, currentAppSerial, lastVerifiedAt, licenseDirectory);
 
-            if (status == LicenseStatus.Active)
+            if (dongleStatus == LicenseStatus.Active)
             {
-                int daysRemaining = 99999; // ถาวร
-                if (license.ExpireDate.HasValue)
-                {
-                    daysRemaining = Math.Max(0, (license.ExpireDate.Value.Date - DateTime.Now.Date).Days);
-                }
+                int dongleDaysRemaining = dongleLicense.ExpireDate.HasValue
+                    ? Math.Max(0, (dongleLicense.ExpireDate.Value.Date - DateTime.Now.Date).Days)
+                    : 99999;
 
-                UpdateDbLicenseInfo(dbPath, license.CustomerName, license.HardwareId, license.LicenseType, 
-                    license.IssueDate, license.ExpireDate, license.MaxRooms, 
-                    JsonSerializer.Serialize(license.Features), status);
+                UpdateDbLicenseInfo(dbPath, dongleLicense.CustomerName, dongleLicense.HardwareId, dongleLicense.LicenseType,
+                    dongleLicense.IssueDate, dongleLicense.ExpireDate, dongleLicense.MaxRooms,
+                    JsonSerializer.Serialize(dongleLicense.Features), dongleStatus);
 
-                return (status, license, daysRemaining);
+                return (dongleStatus, dongleLicense, dongleDaysRemaining);
             }
             else
             {
-                // หากพบ License แต่หมดอายุหรือสิทธิ์ไม่ถูกต้อง
-                UpdateDbLicenseInfo(dbPath, license.CustomerName, license.HardwareId, license.LicenseType, 
-                    license.IssueDate, license.ExpireDate, license.MaxRooms, 
-                    JsonSerializer.Serialize(license.Features), status);
+                // หากพบ USB Dongle แต่หมดอายุหรือสิทธิ์ไม่ถูกต้อง
+                UpdateDbLicenseInfo(dbPath, dongleLicense.CustomerName, dongleLicense.HardwareId, dongleLicense.LicenseType,
+                    dongleLicense.IssueDate, dongleLicense.ExpireDate, dongleLicense.MaxRooms,
+                    JsonSerializer.Serialize(dongleLicense.Features), dongleStatus);
 
-                return (status, license, 0);
+                return (dongleStatus, dongleLicense, 0);
             }
         }
 
-        // 4. กรณีไม่มี License เลย -> สลับเข้าโหมดทดลองใช้ 30 วัน (Trial)
+        // 2. กรณีไม่มี USB Dongle เสียบอยู่ -> สลับเข้าโหมดทดลองใช้ 30 วัน (Trial Anti-Reset)
         var trialStatus = TrialManager.GetTrialStatus(dbPath, licenseDirectory);
         LicenseStatus trialLicenseStatus = trialStatus.IsActive ? LicenseStatus.Active : LicenseStatus.Expired;
 
@@ -224,6 +220,39 @@ public static class LicenseManager
     }
     #endregion
 
+    #region Auto-Install Watermark from USB
+    /// <summary>
+    /// ก๊อปปี้ไฟล์ app.watermark จาก USB Flash Drive มาวางข้างโปรแกรม (.exe) อัตโนมัติ
+    /// ทำให้ลูกค้าเพียงเสียบ USB Flash Drive ครั้งแรก โปรแกรมจัดการเองทั้งหมด
+    /// </summary>
+    private static void AutoInstallWatermarkFromUsb(string usbDriveLetter)
+    {
+        try
+        {
+            string usbWatermarkPath = Path.Combine(usbDriveLetter + "\\", AppWatermarkManager.WatermarkFileName);
+            if (!File.Exists(usbWatermarkPath)) return;
+
+            string localWatermarkPath = AppWatermarkManager.GetDefaultWatermarkFilePath();
+
+            // ถ้ายังไม่มีไฟล์ app.watermark ข้าง .exe → ก๊อปปี้จาก USB มาทันที
+            if (!File.Exists(localWatermarkPath))
+            {
+                File.Copy(usbWatermarkPath, localWatermarkPath, overwrite: false);
+                return;
+            }
+
+            // ถ้ามีไฟล์อยู่แล้ว → เปรียบเทียบ AppSerial ถ้าไม่ตรงกับใน USB ให้อัปเดตทับ
+            string currentLocal = AppWatermarkManager.GetCurrentAppSerial();
+            var usbWatermark = AppWatermarkFile.FromJson(File.ReadAllText(usbWatermarkPath));
+            if (usbWatermark != null && usbWatermark.AppSerial != currentLocal)
+            {
+                File.Copy(usbWatermarkPath, localWatermarkPath, overwrite: true);
+            }
+        }
+        catch { }
+    }
+    #endregion
+
     #region DB Sync Helper
     private static void UpdateDbLicenseInfo(
         string dbPath, 
@@ -292,6 +321,27 @@ public static class LicenseManager
         {
             // ละเว้น
         }
+    }
+
+    private static DateTime? GetLastVerifiedAtFromDb(string dbPath)
+    {
+        try
+        {
+            if (!File.Exists(dbPath)) return null;
+
+            using var conn = new SqliteConnection($"Data Source={dbPath};");
+            conn.Open();
+
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = "SELECT last_verified_at FROM license_info ORDER BY id DESC LIMIT 1";
+            var val = cmd.ExecuteScalar()?.ToString();
+            if (!string.IsNullOrEmpty(val) && DateTime.TryParse(val, out var dt))
+            {
+                return dt;
+            }
+        }
+        catch { }
+        return null;
     }
     #endregion
 }

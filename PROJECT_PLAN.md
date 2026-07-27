@@ -146,56 +146,34 @@ HotelPOS.sln
 
 ---
 
-## 6. ระบบ License แบบละเอียด (หัวใจสำคัญของธุรกิจ)
+## 6. ระบบ License แบบละเอียด (USB Hardware Dongle 100%)
 
 ### 6.1 แนวคิดหลัก
-- License ผูกกับ **Hardware ID** ของเครื่องลูกค้า (CPU ID + Disk Serial + MAC Address รวมกันแล้ว hash)
-- ใช้ **Asymmetric Encryption (RSA)**: ฝั่งผู้ขายถือ **Private Key** (เซ็นรับรอง License), โปรแกรมลูกค้าเก็บแค่ **Public Key** (ใช้ตรวจสอบลายเซ็นเท่านั้น) → **คัดลอกไฟล์ License ไปเครื่องอื่นใช้ไม่ได้** เพราะ Hardware ID ไม่ตรง
-- License เก็บเป็นไฟล์เข้ารหัส (`license.dat`) + สำรองอีกชุดฝังใน Windows Registry (กันโดนลบไฟล์แล้วเถื่อนใหม่)
+- License อนุมัติสิทธิ์การใช้งานถาวร/รายปีผ่าน **USB Hardware Dongle (`dongle.key`)**
+- ดึง **Physical Hardware Serial** ระดับชิป USB คอนโทรลเลอร์ (`Win32_DiskDrive WHERE InterfaceType='USB'`) ผูกกับดิจิทัลซิกเนเจอร์ RSA-2048 **ก๊อปปี้ไฟล์ข้าม Flash Drive ไม่ได้ 100%**
+- ใช้ **App Serial Watermark (`app.watermark`)** ลายน้ำประจำตัวชุดโปรแกรม `.exe` ป้องกันการนำ USB Dongle ของลูกค้า A ไปใช้กับแอปของลูกค้า B
+- หากไม่มี USB Dongle เสียบอยู่ จะสลับเข้าโหมด **Trial 30 วัน Anti-Reset** (ฝังวันที่ใน Registry + Hidden file + SQLite DB ยึดวันที่เก่าที่สุดนับถอยหลังต่อเสมอ)
 
-### 6.2 ข้อมูลใน License (เข้ารหัสไว้ในไฟล์)
+### 6.2 ข้อมูลใน Dongle Key (`dongle.key`)
 ```json
 {
   "customer_name": "ชื่อร้าน/ลูกค้า",
-  "hardware_id": "HASH-ของเครื่อง",
+  "usb_hardware_id": "SHA256-ของ-Physical-USB-Serial",
+  "app_serial": "APP-2026-CLIENT-A",
   "license_type": "TRIAL | STANDARD | LIFETIME",
   "issue_date": "2026-07-26",
-  "expire_date": "2026-08-25",   // null = ถาวร
+  "expire_date": null,            // null = ถาวร
   "max_rooms": 50,                // จำกัดจำนวนห้องตามแพ็กเกจ (option)
-  "features": ["POS","BOOKING","REPORT"], // เปิด/ปิดโมดูลตามแพ็กเกจที่ซื้อ
-  "signature": "RSA-SIGNATURE"
+  "features": ["POS","BOOKING","REPORT"],
+  "signature": "RSA-2048-SHA256-DIGITAL-SIGNATURE"
 }
 ```
 
-### 6.3 เวอร์ชันทดลอง (Trial 30 วัน)
-- เมื่อเปิดโปรแกรมครั้งแรกโดยไม่มี License → สร้าง Trial License อัตโนมัติ ผูกกับ Hardware ID เครื่องนั้น อายุ 30 วัน
-- กันการ "ลบแล้วลงใหม่เพื่อรีเซ็ต Trial" ด้วยการฝังวันที่เริ่มต้นไว้ในหลายจุด (Registry + Hidden file + ฐานข้อมูล) แล้วเช็ค cross-reference
-- แจ้งเตือนวันหมดอายุ Trial ล่วงหน้า 7/3/1 วัน พร้อมปุ่ม "ใส่ Key"
-
-### 6.4 เครื่องมือฝั่งผู้ขาย (License Admin Tool — โปรแกรมแยกต่างหาก)
-โปรแกรม `HotelPOS.LicenseAdminTool.exe` ใช้เฉพาะทีมขาย/แอดมิน ทำได้ครบทุกอย่าง:
-
-| ฟังก์ชัน | รายละเอียด |
-|---|---|
-| **Gen Key ใหม่** | กรอก Hardware ID ลูกค้า (ลูกค้าคัดลอกจากหน้าโปรแกรม/ส่งมาให้) → เลือกแพ็กเกจ/จำนวนวัน → ออกไฟล์ license.dat หรือรหัส Activation Code ให้ลูกค้ากรอกเอง |
-| **กำหนดจำนวนวันใช้งาน** | เลือกได้ตั้งแต่ 7 วัน, 15, 30, 90, 180, 365 วัน หรือ **ถาวร (Lifetime)** |
-| **เพิ่ม/ลดวัน (Extend/Reduce)** | แก้ไข License เดิมของลูกค้า เพิ่ม/ลดจำนวนวันได้ทันที (ออก License ใหม่ทับ) |
-| **เปลี่ยนแพ็กเกจ** | อัปเกรด/ดาวน์เกรดฟีเจอร์ที่เปิดใช้งาน (เช่น เพิ่มโมดูลจองห้อง) |
-| **ถอน/ระงับ License (Revoke)** | ยกเลิก License เครื่องใดเครื่องหนึ่งทันที (กรณีลูกค้าเบี้ยวเงิน/ยกเลิกสัญญา) — ต้องมีช่องทาง sync (ผ่านไฟล์ revoke list ที่ผู้ขายส่งให้ หรือเช็ค online ถ้ามีเน็ต) |
-| **ล้างข้อมูล License (Clear/Reset)** | เคลียร์ประวัติ Trial/License ของเครื่องนั้น กรณีลูกค้าเปลี่ยนเครื่อง/ย้ายเครื่อง |
-| **ดูประวัติ Key ทั้งหมด** | รายชื่อลูกค้า, วันออก, วันหมดอายุ, สถานะ (Active/Expired/Revoked) — เก็บเป็นฐานข้อมูลกลางฝั่งผู้ขาย |
-| **Export/Import รายชื่อ Key** | สำรองฐานข้อมูล Key ของผู้ขายเอง |
-
-> **หมายเหตุสำคัญด้านความปลอดภัย:** เครื่องมือนี้ต้องมี Password/2FA ของผู้ขายเอง และ Private Key (RSA) ต้องเก็บแยกออกจากตัวโปรแกรมหลักเด็ดขาด ห้ามฝังไว้ใน .exe ที่แจกให้ลูกค้าโดยเด็ดขาด
-
-### 6.5 การป้องกันการคัดลอก (Anti-Piracy) แบบเต็มรูปแบบ
-1. ผูก Hardware ID (CPU+Disk+MAC hash) — ก็อปไฟล์ไปเครื่องอื่นใช้ไม่ได้
-2. เซ็นลายเซ็นดิจิทัลด้วย RSA Private Key — แก้ไขไฟล์ License เองไม่ได้ (ลายเซ็นจะไม่ตรง)
-3. ตรวจสอบ License ทุกครั้งที่เปิดโปรแกรม + สุ่มตรวจซ้ำระหว่างใช้งาน (ทุก 30-60 นาที) กันแพตช์ข้าม
-4. Obfuscate ตัวโปรแกรม (ConfuserEx/.NET Reactor) กันการแกะโค้ด reverse engineer หา logic license
-5. Anti-tamper: เช็ค checksum ของไฟล์ .exe หลักตอนเปิดโปรแกรม ถ้าถูกแก้ไข (patch) จะไม่ยอมเปิด
-6. ระบบ Revoke List (บล็อกเครื่องที่ถูกยกเลิก) sync ผ่านไฟล์ที่ผู้ขาย push อัปเดต หรือผ่านอินเทอร์เน็ต (ถ้าลูกค้ามีเน็ต)
-7. จำกัดจำนวนเครื่อง 1 License ต่อ 1 เครื่อง (Activation ใหม่ต้อง deactivate เครื่องเก่าก่อน)
+### 6.3 เครื่องมือฝั่งผู้ขาย (License Admin Tool 100% USB Dongle Center)
+โปรแกรม `HotelPOS.LicenseAdminTool.exe` สำหรับทีมขาย/ผู้พัฒนา:
+- Auto-detect USB Flash Drive ที่เสียบอยู่กับคอมพิวเตอร์
+- Gen & Sign ทั้ง `dongle.key` เขียนลง USB Drive และออกไฟล์ `app.watermark` ในคลิกเดียว
+- ปุ่ม **"⚡ ทดสอบปลดล็อก"** สำหรับสอบทานสิทธิ์ USB Dongle บนเครื่องนักพัฒนาทันที
 
 ---
 
@@ -234,16 +212,16 @@ HotelPOS.sln
 
 ## 8. Roadmap การพัฒนา (แบ่งเฟส)
 
-| Phase | เนื้อหา |
-|---|---|
-| **0. Setup** | ตั้งโปรเจค, โครงสร้าง Solution, DB Schema, Logging infra |
-| **1. Core License** | ระบบ License + Trial 30 วัน + License Admin Tool เบื้องต้น |
-| **2. ห้องพัก/จอง** | Room Grid, เช็คอิน/เช็คเอาท์, จองล่วงหน้า |
-| **3. POS/ขายของ** | ขายสินค้าเสริม, Folio, ส่วนลด |
-| **4. บิล/พิมพ์เอกสาร** | Engine พิมพ์ Receipt + A4, เทมเพลต, ตั้งค่าโลโก้/ร้าน |
-| **5. รายงาน/Backup** | รายงานทั้งหมด, Backup/Restore/Reset |
-| **6. Polish** | UI/UX, สิทธิ์ผู้ใช้ (Role), Log Viewer, ทดสอบระบบทั้งหมด |
-| **7. Packaging** | ทำ Installer (Inno Setup), Obfuscate, ทดสอบบนเครื่องเก่าจริง |
+| Phase | เนื้อหา | สถานะ |
+|---|---|---|
+| **0. Setup** | ตั้งโปรเจค, โครงสร้าง Solution, DB Schema, Logging infra | ✅ เสร็จสมบูรณ์ |
+| **1. Core License** | ระบบ USB Hardware Dongle + App Serial Watermark + Trial 30 วัน Anti-Reset + License Admin Tool | ✅ เสร็จสมบูรณ์ (v1.0.0) |
+| **2. ห้องพัก/จอง** | Room Grid, เช็คอิน/เช็คเอาท์, จองล่วงหน้า | ⏳ กำลังพัฒนา |
+| **3. POS/ขายของ** | ขายสินค้าเสริม, Folio, ส่วนลด | ⏳ กำลังพัฒนา |
+| **4. บิล/พิมพ์เอกสาร** | Engine พิมพ์ Receipt + A4, เทมเพลต, ตั้งค่าโลโก้/ร้าน | ⏳ กำลังพัฒนา |
+| **5. รายงาน/Backup** | รายงานทั้งหมด, Backup/Restore/Reset | ⏳ กำลังพัฒนา |
+| **6. Polish** | UI/UX, สิทธิ์ผู้ใช้ (Role), Log Viewer, ทดสอบระบบทั้งหมด | ⏳ กำลังพัฒนา |
+| **7. Packaging** | ทำ Installer (Inno Setup), Obfuscate, ทดสอบบนเครื่องเก่าจริง | ⏳ กำลังพัฒนา |
 
 ---
 
@@ -251,3 +229,12 @@ HotelPOS.sln
 - ใช้ **Inno Setup** ทำตัวติดตั้ง (.exe) แบบมืออาชีพ มีโลโก้ ทางลัดหน้าจอ ถอนการติดตั้งได้
 - แนบ .NET 8 Desktop Runtime ไปกับตัวติดตั้ง (เผื่อเครื่องลูกค้าไม่มี) หรือ build แบบ self-contained (ไฟล์ใหญ่ขึ้นแต่ไม่ต้องพึ่ง runtime)
 - ทดสอบบน Windows 7 SP1 / RAM 2-4GB จริงก่อนขาย
+
+---
+
+## 10. ประวัติการบันทึก Progress (Change Log History — v1.0.0)
+
+| วันที่/เวลา | เวอร์ชัน | รายละเอียดการบันทึกความคืบหน้า (Progress Log) |
+|---|---|---|
+| **2026-07-27** | **v1.0.0** | **เริ่มต้นโปรเจค & พัฒนาระบบ License ทั้งหมดเป็น USB Hardware Dongle 100%:**<br>- พัฒนาคลาส `UsbDongleManager.cs` ดึง Physical Hardware Serial ระดับชิป USB คอนโทรลเลอร์ (`Win32_DiskDrive WHERE InterfaceType='USB'`) ป้องกันการก๊อปปี้ไฟล์ข้าม Flash Drive 100%<br>- พัฒนาคลาส `AppWatermarkManager.cs` จัดการรหัสประจำตัวโปรแกรม (`app.watermark`) ป้องกันการสลับ Dongle ข้ามแอป<br>- พัฒนาคลาส `RevocationManager.cs` จัดการไฟล์บัญชีดำระงับสิทธิ์ (`revoked.dat`) ด้วย RSA Digital Signature<br>- ปรับปรุง `LicenseValidator.cs` และ `LicenseManager.cs` ให้สแกนหา USB Dongle เป็นอันดับแรก หากไม่พบจะสลับเข้าโหมด Trial 30 วัน Anti-Reset (ยึดวันที่เก่าที่สุดใน 3 แหล่ง)<br>- ปรับปรุง `HotelPOS.LicenseAdminTool` ให้รองรับการ Auto-detect USB Drive, Gen & Sign `dongle.key`, Gen `app.watermark` และปุ่มปลดล็อกทดสอบบนเครื่องนักพัฒนา<br>- เพิ่มชุดทดสอบ Unit Tests ผ่าน 25/25 เคส (Passed 100%) และสร้างคู่มือทดสอบ `Docs/USB_DONGLE_TESTING_MANUAL.md` |
+

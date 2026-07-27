@@ -11,6 +11,7 @@
     <ProjectReference Include="..\HotelPOS.Common\HotelPOS.Common.csproj" />
     <ProjectReference Include="..\HotelPOS.Data\HotelPOS.Data.csproj" />
     <ProjectReference Include="..\HotelPOS.Logging\HotelPOS.Logging.csproj" />
+    <ProjectReference Include="..\HotelPOS.Licensing\HotelPOS.Licensing.csproj" />
   </ItemGroup>
 
 </Project>

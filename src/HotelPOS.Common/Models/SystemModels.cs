@@ -53,6 +53,14 @@ public class SystemSettingsDto
 
     public string? LogoImagePath { get; set; }
     public string? QrCodeImagePath { get; set; }
+
+    // --- ค่าสาธารณูปโภค (ค่าน้ำ/ค่าไฟ) ---
+    public decimal ElectricRatePerUnit { get; set; } = 8.00m;       // ค่าไฟต่อหน่วย (บาท)
+    public string WaterBillingMode { get; set; } = "METER";        // โหมดคิดค่าน้ำ: "METER" = ตามมิเตอร์, "FLAT" = เหมาจ่ายรายคน
+    public decimal WaterRatePerUnit { get; set; } = 18.00m;        // ค่าน้ำต่อหน่วย (บาท) - ใช้เมื่อ mode=METER
+    public decimal WaterFlatRatePerPerson { get; set; } = 100.00m; // ค่าน้ำเหมาจ่ายต่อคน (บาท) - ใช้เมื่อ mode=FLAT
+    public decimal CommonAreaFee { get; set; } = 0m;               // ค่าส่วนกลาง/ค่าบริการรายเดือน (บาท)
+    public decimal GarbageFee { get; set; } = 0m;                  // ค่าขยะรายเดือน (บาท)
 }
 
 /// <summary>บันทึกการกระทำของผู้ใช้ในระบบ (Audit Trail) แยกจาก app_logs ที่เป็น log ทางเทคนิค</summary>

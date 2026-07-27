@@ -90,6 +90,14 @@ public class SettingsService : ISettingsService
         dto.ReceiptDocPrefix = await GetAsync("receipt_doc_prefix") ?? dto.ReceiptDocPrefix;
         dto.ReceiptDocRunningNumber = int.TryParse(await GetAsync("receipt_doc_running_number"), out var rn) ? rn : dto.ReceiptDocRunningNumber;
 
+        // ค่าสาธารณูปโภค
+        dto.ElectricRatePerUnit = decimal.TryParse(await GetAsync("electric_rate_per_unit"), out var elec) ? elec : dto.ElectricRatePerUnit;
+        dto.WaterBillingMode = await GetAsync("water_billing_mode") ?? dto.WaterBillingMode;
+        dto.WaterRatePerUnit = decimal.TryParse(await GetAsync("water_rate_per_unit"), out var water) ? water : dto.WaterRatePerUnit;
+        dto.WaterFlatRatePerPerson = decimal.TryParse(await GetAsync("water_flat_rate_per_person"), out var wFlat) ? wFlat : dto.WaterFlatRatePerPerson;
+        dto.CommonAreaFee = decimal.TryParse(await GetAsync("common_area_fee"), out var caf) ? caf : dto.CommonAreaFee;
+        dto.GarbageFee = decimal.TryParse(await GetAsync("garbage_fee"), out var gf) ? gf : dto.GarbageFee;
+
         return dto;
     }
 
@@ -121,6 +129,14 @@ public class SettingsService : ISettingsService
 
             await SetAsync("receipt_doc_prefix", settings.ReceiptDocPrefix);
             await SetAsync("receipt_doc_running_number", settings.ReceiptDocRunningNumber.ToString());
+
+            // ค่าสาธารณูปโภค
+            await SetAsync("electric_rate_per_unit", settings.ElectricRatePerUnit.ToString());
+            await SetAsync("water_billing_mode", settings.WaterBillingMode);
+            await SetAsync("water_rate_per_unit", settings.WaterRatePerUnit.ToString());
+            await SetAsync("water_flat_rate_per_person", settings.WaterFlatRatePerPerson.ToString());
+            await SetAsync("common_area_fee", settings.CommonAreaFee.ToString());
+            await SetAsync("garbage_fee", settings.GarbageFee.ToString());
 
             _logger.Info(LogCategory.System, "บันทึกการตั้งค่าระบบเรียบร้อยแล้ว", correlationId);
         }

@@ -11,23 +11,58 @@ public static class LicenseValidator
     public const string PublicKeyBase64 = "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAxxgC/zkISnEEAtY7wSK57ZgF9Em4P6rWJEZukDdLr2Dl+DLYZbvAA0CuimUlQWMQl2ggOp4aOm0zhqQiZpw2pI9QbTrOp9w/y7zyo+zDGd7AhKr5LVoiZShTTxyrWWzKX1yPm6q8UpAsQQ2xZq5xvz2lPeK0fm1wJbs1284XAh+oBJrSk1MelTPhCPz1SJQnWTI3K5Ezu2j+1AjBRJ05L7ljKbrh6dTZllExMDb6h/QZ5JCHZTyIR6aj3XoLvd2K2g+9ReViBvElN60jv8Lz4B0EzOxwnfMUW3IVCy5LT6xDkRzeiQtWSQZK9UW2nIJByKZYyWsXqdGI//jR6MMpdQIDAQAB";
 
     /// <summary>
-    /// ตรวจสอบความถูกต้องของ License (ความสมบูรณ์ของไฟล์, ลายเซ็นดิจิทัล, ฮาร์ดแวร์ไอดี, และวันหมดอายุ)
+    /// ตรวจสอบความถูกต้องของ License (ความสมบูรณ์ของไฟล์, ลายเซ็นดิจิทัล, ฮาร์ดแวร์ไอดี, วันหมดอายุ, การย้อนเวลา, และ Revocation List)
     /// </summary>
-    public static LicenseStatus Validate(LicenseFile license, string currentHardwareId)
+    public static LicenseStatus Validate(
+        LicenseFile license, 
+        string currentHardwareId, 
+        DateTime? lastVerifiedAt = null, 
+        string? revocationDirectory = null)
     {
-        if (license == null)
+        string appSerial = AppWatermarkManager.GetCurrentAppSerial();
+        return ValidateDongle(license, currentHardwareId, appSerial, lastVerifiedAt, revocationDirectory);
+    }
+
+    /// <summary>
+    /// ตรวจสอบความถูกต้องของ USB Hardware Dongle (ตรวจสอบ Physical USB Serial, App Serial Watermark, Signature, Expiration, Revocation)
+    /// </summary>
+    public static LicenseStatus ValidateDongle(
+        LicenseFile dongleLicense,
+        string currentUsbHardwareId,
+        string currentAppSerial,
+        DateTime? lastVerifiedAt = null,
+        string? revocationDirectory = null)
+    {
+        if (dongleLicense == null)
             return LicenseStatus.Invalid;
 
-        // 1. ตรวจสอบความถูกต้องของ Signature ดิจิทัล
-        if (!VerifySignature(license))
+        // 1. ตรวจสอบ Revocation Blacklist
+        if (RevocationManager.IsRevoked(currentUsbHardwareId, dongleLicense.CustomerName, revocationDirectory))
+            return LicenseStatus.Revoked;
+
+        // 2. ตรวจสอบ Digital Signature
+        if (!VerifySignature(dongleLicense))
             return LicenseStatus.Invalid;
 
-        // 2. ตรวจสอบว่า Hardware ID ตรงกับเครื่องปัจจุบันหรือไม่
-        if (license.HardwareId != currentHardwareId)
+        // 3. ตรวจสอบ Physical USB Hardware Serial ระดับชิป (ป้องกันการก๊อปปี้ไป Flash Drive อีกอัน)
+        if (!string.IsNullOrEmpty(dongleLicense.UsbHardwareId) && dongleLicense.UsbHardwareId != currentUsbHardwareId)
             return LicenseStatus.Invalid;
 
-        // 3. ตรวจสอบวันหมดอายุ
-        if (license.ExpireDate.HasValue && DateTime.Now.Date > license.ExpireDate.Value.Date)
+        // 4. ตรวจสอบ App Serial Watermark ประจำตัวชุดโปรแกรม .exe (ป้องกันการนำ Dongle ไปใช้ข้ามชุดโปรแกรม)
+        if (!string.IsNullOrEmpty(dongleLicense.AppSerial) && dongleLicense.AppSerial != currentAppSerial)
+            return LicenseStatus.Invalid;
+
+        // 5. ตรวจสอบการย้อนเวลาเครื่อง (Clock Rollback Detection)
+        if (dongleLicense.ExpireDate.HasValue && lastVerifiedAt.HasValue)
+        {
+            if (DateTime.Now < lastVerifiedAt.Value)
+            {
+                return LicenseStatus.Invalid;
+            }
+        }
+
+        // 6. ตรวจสอบวันหมดอายุ
+        if (dongleLicense.ExpireDate.HasValue && DateTime.Now.Date > dongleLicense.ExpireDate.Value.Date)
             return LicenseStatus.Expired;
 
         return LicenseStatus.Active;

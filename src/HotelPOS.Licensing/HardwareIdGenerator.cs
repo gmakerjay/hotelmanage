@@ -13,9 +13,11 @@ public static class HardwareIdGenerator
         string cpuId = GetCpuId().Trim();
         string diskSerial = GetDiskSerial().Trim();
         string macAddress = GetMacAddress().Trim();
+        string boardSerial = GetBoardSerial().Trim();
+        string biosSerial = GetBiosSerial().Trim();
 
         // รวมค่าทั้งหมดเพื่อระบุเอกลักษณ์เครื่อง
-        string combined = $"CPU:{cpuId}|DISK:{diskSerial}|MAC:{macAddress}";
+        string combined = $"CPU:{cpuId}|DISK:{diskSerial}|MAC:{macAddress}|BOARD:{boardSerial}|BIOS:{biosSerial}";
 
         // ทำ SHA256 Hash
         byte[] bytes = SHA256.HashData(Encoding.UTF8.GetBytes(combined));
@@ -79,5 +81,43 @@ public static class HardwareIdGenerator
             // Fallback
         }
         return "GENERIC-MAC";
+    }
+
+    private static string GetBoardSerial()
+    {
+        try
+        {
+            using var searcher = new ManagementObjectSearcher("SELECT SerialNumber FROM Win32_BaseBoard");
+            using var collection = searcher.Get();
+            foreach (var obj in collection)
+            {
+                var val = obj["SerialNumber"]?.ToString();
+                if (!string.IsNullOrWhiteSpace(val)) return val;
+            }
+        }
+        catch
+        {
+            // Fallback
+        }
+        return "GENERIC-BOARD";
+    }
+
+    private static string GetBiosSerial()
+    {
+        try
+        {
+            using var searcher = new ManagementObjectSearcher("SELECT SerialNumber FROM Win32_BIOS");
+            using var collection = searcher.Get();
+            foreach (var obj in collection)
+            {
+                var val = obj["SerialNumber"]?.ToString();
+                if (!string.IsNullOrWhiteSpace(val)) return val;
+            }
+        }
+        catch
+        {
+            // Fallback
+        }
+        return "GENERIC-BIOS";
     }
 }

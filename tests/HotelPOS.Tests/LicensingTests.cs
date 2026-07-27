@@ -168,6 +168,152 @@ public class LicensingTests : IDisposable
         Assert.Equal(20, daysRemaining);
     }
 
+    [Fact]
+    public void LicenseValidation_ย้อนเวลาเครื่องก่อนหน้า_lastVerifiedAt_ควรได้สถานะ_Invalid()
+    {
+        var hwId = HardwareIdGenerator.Generate();
+        var license = new LicenseFile
+        {
+            CustomerName = "ลูกค้าแบบรายปี",
+            HardwareId = hwId,
+            LicenseType = LicenseType.Standard,
+            IssueDate = DateTime.Today.AddDays(-10),
+            ExpireDate = DateTime.Today.AddDays(30)
+        };
+
+        SignLicense(license);
+
+        // จำลอง lastVerifiedAt เป็นวันพรุ่งนี้ (พยายามหมุนเวลาคอมย้อนหลังกลับมาวันนี้)
+        var futureVerifiedAt = DateTime.Now.AddDays(1);
+        var result = LicenseValidator.Validate(license, hwId, futureVerifiedAt, _tempFolder);
+
+        Assert.Equal(LicenseStatus.Invalid, result);
+    }
+
+    [Fact]
+    public void LicenseValidation_อยู่ในรายการถอนสิทธิ์_Revoked_ควรได้สถานะ_Revoked()
+    {
+        var hwId = HardwareIdGenerator.Generate();
+        var license = new LicenseFile
+        {
+            CustomerName = "ลูกค้าโดนระงับสิทธิ์",
+            HardwareId = hwId,
+            LicenseType = LicenseType.Standard,
+            IssueDate = DateTime.Today,
+            ExpireDate = DateTime.Today.AddDays(30)
+        };
+
+        SignLicense(license);
+
+        // สร้างไฟล์ revoked.dat จำลองใน _tempFolder
+        var revokedFile = new RevocationListFile
+        {
+            IssuedAt = DateTime.Now,
+            RevokedHardwareIds = new List<string> { hwId }
+        };
+
+        string signableData = revokedFile.GetSignableData();
+        byte[] dataBytes = Encoding.UTF8.GetBytes(signableData);
+        using var rsa = RSA.Create();
+        rsa.ImportPkcs8PrivateKey(Convert.FromBase64String(PrivateKeyBase64), out _);
+        byte[] signatureBytes = rsa.SignData(dataBytes, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
+        revokedFile.Signature = Convert.ToBase64String(signatureBytes);
+
+        File.WriteAllText(Path.Combine(_tempFolder, RevocationManager.RevocationFileName), revokedFile.ToJson());
+
+        var result = LicenseValidator.Validate(license, hwId, null, _tempFolder);
+        Assert.Equal(LicenseStatus.Revoked, result);
+    }
+
+    [Fact]
+    public void LicenseMonitorService_สุ่มตรวจสถานะเบื้องหลัง_ควรทำงานสำเร็จ()
+    {
+        using var monitor = new HotelPOS.Core.Services.LicenseMonitorService(_tempDbPath, _tempFolder);
+        var (status, license, days) = monitor.CheckNow();
+
+        Assert.NotNull(license);
+        Assert.True(days >= 0);
+    }
+
+    [Fact]
+    public void UsbDongle_PhysicalSerial_ควรคำนวณHashได้สมบูรณ์()
+    {
+        string rawSerial = "KINGSTON-DT100G3-0014D15370C1";
+        string hash = UsbDongleManager.HashUsbSerial(rawSerial);
+
+        Assert.NotNull(hash);
+        Assert.Equal(64, hash.Length);
+    }
+
+    [Fact]
+    public void UsbDongle_นำไฟล์ก๊อปปี้ไปFlashDriveอันอื่น_ควรได้สถานะ_Invalid()
+    {
+        string usbA_HwId = UsbDongleManager.HashUsbSerial("FLASH-DRIVE-USB-A");
+        string usbB_HwId = UsbDongleManager.HashUsbSerial("FLASH-DRIVE-USB-B");
+        string appSerial = "APP-TEST-001";
+
+        var dongleLicense = new LicenseFile
+        {
+            CustomerName = "ลูกค้าใช้งาน USB Dongle A",
+            UsbHardwareId = usbA_HwId,
+            AppSerial = appSerial,
+            LicenseType = LicenseType.Standard,
+            IssueDate = DateTime.Today,
+            ExpireDate = DateTime.Today.AddDays(365)
+        };
+
+        SignLicense(dongleLicense);
+
+        // ตรวจสอบเมื่อนำไฟล์ไปเสียบบน USB B
+        var statusOnUsbB = LicenseValidator.ValidateDongle(dongleLicense, usbB_HwId, appSerial);
+        Assert.Equal(LicenseStatus.Invalid, statusOnUsbB);
+    }
+
+    [Fact]
+    public void UsbDongle_นำDongleของAppAไปใช้กับAppB_ควรได้สถานะ_Invalid()
+    {
+        string usbHwId = UsbDongleManager.HashUsbSerial("FLASH-DRIVE-USB-A");
+        string appSerialA = "APP-CLIENT-A";
+        string appSerialB = "APP-CLIENT-B";
+
+        var dongleLicense = new LicenseFile
+        {
+            CustomerName = "ลูกค้า A",
+            UsbHardwareId = usbHwId,
+            AppSerial = appSerialA,
+            LicenseType = LicenseType.Standard,
+            IssueDate = DateTime.Today,
+            ExpireDate = DateTime.Today.AddDays(365)
+        };
+
+        SignLicense(dongleLicense);
+
+        // นำไปใช้กับโปรแกรมที่มี App Serial B
+        var result = LicenseValidator.ValidateDongle(dongleLicense, usbHwId, appSerialB);
+        Assert.Equal(LicenseStatus.Invalid, result);
+    }
+
+    [Fact]
+    public void UsbDongle_ข้อมูลถูกต้องและAppSerialตรง_ควรได้สถานะ_Active()
+    {
+        string usbHwId = UsbDongleManager.HashUsbSerial("FLASH-DRIVE-VALID");
+        string appSerial = "APP-CLIENT-MATCH";
+
+        var dongleLicense = new LicenseFile
+        {
+            CustomerName = "ลูกค้าเปิดใช้งานถูกต้อง",
+            UsbHardwareId = usbHwId,
+            AppSerial = appSerial,
+            LicenseType = LicenseType.Lifetime,
+            IssueDate = DateTime.Today
+        };
+
+        SignLicense(dongleLicense);
+
+        var result = LicenseValidator.ValidateDongle(dongleLicense, usbHwId, appSerial);
+        Assert.Equal(LicenseStatus.Active, result);
+    }
+
     private void SignLicense(LicenseFile license)
     {
         string signableData = license.GetSignableData();

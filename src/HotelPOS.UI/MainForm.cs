@@ -14,6 +14,7 @@ public class MainForm : Form
     private readonly IRoomService _roomService;
     private readonly IBookingService _bookingService;
     private readonly ICustomerService _customerService;
+    private readonly IUtilityBillService _utilityBillService;
     private readonly IAppLogger _logger;
 
     private LicenseStatus _licenseStatus;
@@ -30,6 +31,7 @@ public class MainForm : Form
     private BookingListControl _bookingListControl = null!;
     private RoomManagementControl _roomManagementControl = null!;
     private CustomerManagementControl _customerManagementControl = null!;
+    private MeterReadingControl _meterReadingControl = null!;
     private AuditLogControl _auditLogControl = null!;
     private SystemBackupControl _backupControl = null!;
     private SystemSettingsControl _systemSettingsControl = null!;
@@ -65,6 +67,11 @@ public class MainForm : Form
         var backupService = new BackupService(connectionFactory, auditService, _logger);
         var exportImportService = new ExportImportService(_customerService, _roomService, auditService);
 
+        // Utility Billing Services
+        IMeterReadingRepository meterRepo = new MeterReadingRepository(connectionFactory, _logger);
+        IUtilityBillRepository utilityBillRepo = new UtilityBillRepository(connectionFactory, _logger);
+        _utilityBillService = new UtilityBillService(meterRepo, utilityBillRepo, _settingsService, roomRepo, _logger);
+
         Text = "โปรแกรมจัดการห้องพัก PSOFT";
         Width = 1280;
         Height = 850;
@@ -82,6 +89,7 @@ public class MainForm : Form
         _bookingListControl = new BookingListControl(_bookingService, _roomService, _customerService) { Dock = DockStyle.Fill };
         _roomManagementControl = new RoomManagementControl(_roomService) { Dock = DockStyle.Fill };
         _customerManagementControl = new CustomerManagementControl(_customerService) { Dock = DockStyle.Fill };
+        _meterReadingControl = new MeterReadingControl(_utilityBillService, _roomService, _settingsService) { Dock = DockStyle.Fill };
         _auditLogControl = new AuditLogControl(auditService) { Dock = DockStyle.Fill };
         _backupControl = new SystemBackupControl(backupService, exportImportService) { Dock = DockStyle.Fill };
         _systemSettingsControl = new SystemSettingsControl(_settingsService) { Dock = DockStyle.Fill };
@@ -194,6 +202,7 @@ public class MainForm : Form
             ("รายการจอง", _bookingListControl, async () => await _bookingListControl.LoadBookingsAsync()),
             ("การจัดการห้องพัก", _roomManagementControl, null),
             ("ข้อมูลลูกค้า", _customerManagementControl, null),
+            ("ค่าน้ำ / ค่าไฟ", _meterReadingControl, async () => await _meterReadingControl.LoadMeterDataAsync()),
             ("ประวัติระบบ (Audit Log)", _auditLogControl, async () => await _auditLogControl.LoadLogsAsync()),
             ("สำรอง/คืนค่าข้อมูล", _backupControl, null),
             ("ตั้งค่าระบบ", _systemSettingsControl, null)

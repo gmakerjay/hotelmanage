@@ -12,569 +12,662 @@ namespace HotelPOS.LicenseAdminTool;
 
 public class AdminMainForm : Form
 {
-    // Default Private Key (สอดคล้องกับคีย์สาธารณะในฝั่งไคลเอนต์สำหรับการรันทันที)
+    // Default Private Key (คีย์พัฒนาสำหรับการรันสอบทานสิทธิ์ร่วมกับ Public Key ฝั่ง Client)
     private const string DefaultPrivateKeyBase64 = "MIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQDHGAL/OQhKcQQC1jvBIrntmAX0Sbg/qtYkRm6QN0uvYOX4Mthlu8ADQK6KZSVBYxCXaCA6nho6bTOGpCJmnDakj1BtOs6n3D/LvPKj7MMZ3sCEqvktWiJlKFNPHKtZbMpfXI+bqrxSkCxBDbFmrnG/PaU94rR+bXAluzXbzhcCH6gEmtKTUx6VM+EI/PVIlCdZMjcrkTO7aP7UCMFEnTkvuWMpuuHp1NmWUTEwNvqH9BnkkIdlPIhHpqPdegu93YraD71F5WIG8SU3rSO/wvPgHQTM7HCd8xRbchULLktPrEORHN6JC1ZJBkr1RbacgkHIpljJaxep0Yj/+NHowyl1AgMBAAECggEBAIIY7bRrR0ClszJLXcap84cPZSypk41/C+muYIc6qulST1QtnXx1AFbfyG5FA+BDZM8bSpwjPg5Z12avEI+umoJT6AFIgUvtP37Z3FBD4YWhKnpG4wbAtGMXw8CZglqwHVnNOUZGfkMRVOm5kegAK/IEzVqwLrPCvZraR6p3dE98yseuQdKwy/KNuA0PbCOA8Md8Le+hng36DAAdcn8kHKksi9W8gBqS9qB5LKnla4kXNKeYPGDBKhjaCf45k2aJtnBHMd74/P1y+VkeJMlSjH8elx9rDbzkn+CvmSBY/BDLLlpuD2nftPSuZ8yWNp/krG5lufUdFsFa8kHoqJnH+W0CgYEA15L4D2ZFC7stFenwPLGjbh0SFtQZACzM48xMX3I2Ecuro+qONrdHgZ7Q0wm6b1W1dUkUeNSZ4wMiux/lhhaHYbBqMbjRpIagPGsN6+62KPOsK+L90OqPz5N49BYdF0NuBTQSif1xGP39cv7LX2JwUEYaoSs7lTYVGJ73yQMnU5MCgYEA7G3gIjYt7PTJBWNtVt1dUJ1TNdIz6B6UM/sMWw0t3qCMR4oQBJz7E8NmZLIUeS0TT7McDaaCymnn2/JKBdXWWu8dM8KGjm9tzq6CPPd5Lvt2aUWkijFfwtVg6SYSmwp786SfStsNjXKED7xiqU03GwT8nLf8TewgCB7lV6uBw9cCgYEAlVEVRQVfedqyReV+I2wfeVvlda5/iqF9YaPWmp3vWbArOSR0UO3uN5gbqLGqUweY4p418ePAm39GhTp4rsHYEBAz3jDX9Q/S2UaFpA/6WK8/aD6X9CckaXEKbHcMu1pXUH9a//1uYxM6hHZ7w5vZk6CbPVtGr/l/70fc9XybtsUCgYAtaJDyoStC5mSxZz45v7xLXlv760pS24SlUyM1XZugtX8bwlV/PVMvoYjJ8DXkbBbYaNMLgB6Al8STRr6WzlIkFuap6UOEmbwiRPv4j6MztdIxN9H5RLBasDazsL9EDchurAB4FQhOUV8x0oG0eIML6nJF+0Q3BxHD3YM4ylTa8wKBgB+UjpKeSIcMuG1Em5wbXbLbzNwxjuPX6TwyZKHmzOZZRfZq/4ppJaV66h8pngQC1ZZOBMDI/IWIKorM40hFqHGXmnp+Z7dFwsjoRWoC77/Y6plkb4qq/Od5ZnCVLbBN8uTK3hYdAUd2OfYQ/m6E5CNkSA/xUGGgm8Zhzlf58ezI";
 
-    private RadioButton _rbDefaultKey;
-    private RadioButton _rbCustomKey;
-    private TextBox _tbPrivateKeyPath;
-    private Button _btnBrowseKey;
-    private Button _btnGenerateNewKeys;
+    private List<UsbDriveInfo> _connectedDrives = new();
 
-    private TextBox _tbCustomerName;
-    private TextBox _tbHardwareId;
-    private Button _btnGetCurrentHardwareId;
-    private ComboBox _cbLicenseType;
-    private DateTimePicker _dtpExpireDate;
-    private CheckBox _chkLimitRooms;
-    private NumericUpDown _nudMaxRooms;
+    private ComboBox _cbUsbDrives = null!;
+    private Button _btnRefreshDrives = null!;
+    private Label _lblDriveDetail = null!;
 
-    private CheckedListBox _clbFeatures;
+    private TextBox _tbAppSerial = null!;
+    private Button _btnSaveWatermark = null!;
 
-    private TextBox _tbGeneratedLicense;
-    private Button _btnGenerateLicense;
-    private Button _btnSaveLicense;
-    private Button _btnCopyLicense;
+    private ComboBox _cbLicenseType = null!;
+    private DateTimePicker _dtpExpireDate = null!;
+    private Label _lblExpire = null!;
+
+    private CheckBox _chkFormatUsb = null!;
+    private ComboBox _cbFileSystem = null!;
+    private TextBox _tbVolumeLabel = null!;
+
+    private Button _btnGenKey = null!;
+    private Button _btnEditKey = null!;
+    private Button _btnTestUnlock = null!;
+    private Button _btnViewPayload = null!;
+
+    private ProgressBar _progressBar = null!;
+    private Label _lblStatus = null!;
 
     public AdminMainForm()
     {
-        Text = "HotelPOS TH - เครื่องมือจัดการลิขสิทธิ์ระบบฝั่งผู้ขาย (License Admin Tool)";
-        Width = 1000;
-        Height = 670;
-        FormBorderStyle = FormBorderStyle.FixedSingle; // ล็อกขนาดไม่ให้เพี้ยน
+        Text = "HotelPOS TH - เครื่องมือจัดการกุญแจ USB Dongle (สำหรับผู้พัฒนาเท่านั้น)";
+        Width = 600;
+        Height = 630;
+        FormBorderStyle = FormBorderStyle.FixedDialog;
         MaximizeBox = false;
         StartPosition = FormStartPosition.CenterScreen;
-        Font = new Font("Segoe UI", 9.5F); // เปลี่ยนฟอนต์ให้อ่านง่ายขึ้น
+        Font = new Font("Segoe UI", 9.5F);
+        BackColor = Color.FromArgb(245, 247, 250);
+
         try { Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath); } catch { }
 
         InitializeLayout();
-        LoadDefaultSettings();
+        RefreshUsbDrives();
     }
 
     private void InitializeLayout()
     {
-        // กำหนดพื้นหลังแบบซอฟต์คล้ายหน้าแอปหลัก
-        BackColor = Color.FromArgb(248, 249, 250);
-
-        var labelFont = new Font("Segoe UI", 9.5F, FontStyle.Regular);
+        var labelFont = new Font("Segoe UI", 9.5F, FontStyle.Bold);
+        var subFont = new Font("Segoe UI", 9.0F, FontStyle.Regular);
         var inputFont = new Font("Segoe UI", 9.5F, FontStyle.Regular);
-        var consoleFont = new Font("Consolas", 9.5F);
 
-        // ==================== [กรอบซ้าย] ตั้งค่าใบอนุญาต (License Info) ====================
-        var gbLicenseInfo = new GroupBox
+        // ==================== [ส่วนที่ 1] เลือกแฟลชไดรฟ์ ====================
+        var gbDrive = new GroupBox
         {
-            Text = " ข้อมูลใบอนุญาตลิขสิทธิ์ (License Info) ",
-            Font = new Font("Segoe UI", 9.5F, FontStyle.Bold),
-            ForeColor = Color.FromArgb(108, 117, 125),
-            Location = new Point(15, 15),
-            Size = new Size(450, 600),
+            Text = " 💾 1. เลือก USB Flash Drive ที่เสียบอยู่ ",
+            Font = labelFont,
+            ForeColor = Color.FromArgb(30, 41, 59),
+            Location = new Point(18, 15),
+            Size = new Size(548, 115),
             FlatStyle = FlatStyle.Flat
         };
 
-        // ชื่อลูกค้า
-        var lblCustomer = new Label
-        {
-            Text = "ชื่อลูกค้า / โรงแรมที่พัก:",
-            Font = labelFont,
-            ForeColor = Color.FromArgb(43, 45, 66),
-            Location = new Point(20, 30),
-            Size = new Size(410, 20)
-        };
-        _tbCustomerName = new TextBox
+        var lblDrive = new Label { Text = "แฟลชไดรฟ์เป้าหมาย:", Font = subFont, Location = new Point(20, 28), AutoSize = true };
+        _cbUsbDrives = new ComboBox
         {
             Font = inputFont,
-            Location = new Point(20, 52),
-            Width = 410,
-            BorderStyle = BorderStyle.FixedSingle
+            Location = new Point(20, 50),
+            Width = 400,
+            DropDownStyle = ComboBoxStyle.DropDownList
         };
+        _cbUsbDrives.SelectedIndexChanged += UsbDrives_SelectedIndexChanged;
 
-        // Hardware ID ของลูกค้า
-        var lblHw = new Label
+        _btnRefreshDrives = new Button
         {
-            Text = "Hardware ID ของลูกค้า (ระบุระบุได้ 64 อักขระ):",
-            Font = labelFont,
-            ForeColor = Color.FromArgb(43, 45, 66),
-            Location = new Point(20, 92),
-            Size = new Size(410, 20)
-        };
-        _tbHardwareId = new TextBox
-        {
-            Font = consoleFont,
-            Location = new Point(20, 114),
-            Width = 270,
-            BorderStyle = BorderStyle.FixedSingle
-        };
-        _btnGetCurrentHardwareId = new Button
-        {
-            Text = "ใช้ ID เครื่องนี้",
-            Font = new Font("Segoe UI", 9F, FontStyle.Bold),
-            BackColor = Color.FromArgb(108, 117, 125),
+            Text = "🔄 รีเฟรช",
+            Font = new Font("Segoe UI", 9.0F, FontStyle.Bold),
+            BackColor = Color.FromArgb(71, 85, 105),
             ForeColor = Color.White,
             FlatStyle = FlatStyle.Flat,
-            Location = new Point(300, 113),
-            Width = 130,
+            Location = new Point(430, 49),
+            Width = 98,
+            Height = 28
+        };
+        _btnRefreshDrives.FlatAppearance.BorderSize = 0;
+        _btnRefreshDrives.Click += (s, e) => RefreshUsbDrives();
+
+        _lblDriveDetail = new Label
+        {
+            Text = "รายละเอียดไดรฟ์: กรุณาเลือกแฟลชไดรฟ์",
+            Font = new Font("Segoe UI", 8.5F, FontStyle.Italic),
+            ForeColor = Color.FromArgb(100, 116, 139),
+            Location = new Point(20, 84),
+            Size = new Size(508, 20)
+        };
+
+        gbDrive.Controls.Add(lblDrive);
+        gbDrive.Controls.Add(_cbUsbDrives);
+        gbDrive.Controls.Add(_btnRefreshDrives);
+        gbDrive.Controls.Add(_lblDriveDetail);
+
+        // ==================== [ส่วนที่ 2] การตั้งค่าสิทธิ์ (License Config) ====================
+        var gbConfig = new GroupBox
+        {
+            Text = " 🔑 2. ตั้งค่าคีย์และ App Serial Watermark ",
+            Font = labelFont,
+            ForeColor = Color.FromArgb(30, 41, 59),
+            Location = new Point(18, 140),
+            Size = new Size(548, 135),
+            FlatStyle = FlatStyle.Flat
+        };
+
+        // App Serial Watermark
+        var lblSerial = new Label { Text = "App Serial Watermark (รหัสลายน้ำโปรแกรม):", Font = subFont, Location = new Point(20, 26), AutoSize = true };
+        _tbAppSerial = new TextBox
+        {
+            Text = "APP-2026-CLIENT-A",
+            Font = new Font("Consolas", 9.5F),
+            Location = new Point(20, 46),
+            Width = 150,
+            BorderStyle = BorderStyle.FixedSingle
+        };
+
+        _btnSaveWatermark = new Button
+        {
+            Text = "🏷️ เซฟ app.watermark",
+            Font = new Font("Segoe UI", 8.5F, FontStyle.Bold),
+            BackColor = Color.FromArgb(72, 149, 239),
+            ForeColor = Color.White,
+            FlatStyle = FlatStyle.Flat,
+            Location = new Point(175, 45),
+            Width = 95,
             Height = 26
         };
-        _btnGetCurrentHardwareId.FlatAppearance.BorderSize = 0;
-        _btnGetCurrentHardwareId.Click += (s, e) => _tbHardwareId.Text = HardwareIdGenerator.Generate();
+        _btnSaveWatermark.FlatAppearance.BorderSize = 0;
+        _btnSaveWatermark.Click += SaveWatermark_Click;
 
         // ประเภทสิทธิ์
-        var lblType = new Label
-        {
-            Text = "ประเภทใบอนุญาตใช้งาน:",
-            Font = labelFont,
-            ForeColor = Color.FromArgb(43, 45, 66),
-            Location = new Point(20, 155),
-            Size = new Size(410, 20)
-        };
+        var lblType = new Label { Text = "ประเภทสิทธิ์ใช้งาน:", Font = subFont, Location = new Point(280, 26), AutoSize = true };
         _cbLicenseType = new ComboBox
         {
             Font = inputFont,
-            Location = new Point(20, 177),
-            Width = 410,
+            Location = new Point(280, 46),
+            Width = 248,
             DropDownStyle = ComboBoxStyle.DropDownList
         };
-        _cbLicenseType.Items.Add("Trial (ทดลองใช้งาน)");
-        _cbLicenseType.Items.Add("Standard (รายปี/จำกัดเวลา)");
         _cbLicenseType.Items.Add("Lifetime (ใช้งานถาวร)");
-        _cbLicenseType.SelectedIndex = 1;
-        _cbLicenseType.SelectedIndexChanged += LicenseType_Changed;
+        _cbLicenseType.Items.Add("Standard (รายปี / กำหนดวัน)");
+        _cbLicenseType.Items.Add("Trial (ทดลองใช้งาน 30 วัน)");
+        _cbLicenseType.SelectedIndex = 0; // Default Lifetime
+        _cbLicenseType.SelectedIndexChanged += LicenseType_SelectedIndexChanged;
 
         // วันหมดอายุ
-        var lblExpire = new Label
-        {
-            Text = "วันที่หมดอายุสิทธิ์การใช้งาน (Standard / Trial):",
-            Font = labelFont,
-            ForeColor = Color.FromArgb(43, 45, 66),
-            Location = new Point(20, 218),
-            Size = new Size(410, 20)
-        };
+        _lblExpire = new Label { Text = "วันหมดอายุสิทธิ์:", Font = subFont, Location = new Point(280, 80), AutoSize = true, Visible = false };
         _dtpExpireDate = new DateTimePicker
         {
             Font = inputFont,
-            Location = new Point(20, 240),
-            Width = 410,
+            Location = new Point(375, 78),
+            Width = 153,
             Format = DateTimePickerFormat.Short,
-            Value = DateTime.Today.AddYears(1)
+            Value = DateTime.Today.AddYears(1),
+            Visible = false
         };
 
-        // จำกัดห้องพัก
-        _chkLimitRooms = new CheckBox
+        var lblNote = new Label
         {
-            Text = "จำกัดจำนวนห้องพักสูงสุด:",
-            Font = labelFont,
-            ForeColor = Color.FromArgb(43, 45, 66),
-            Location = new Point(20, 290),
-            Size = new Size(200, 25),
-            Checked = false
-        };
-        _chkLimitRooms.CheckedChanged += (s, e) => _nudMaxRooms.Enabled = _chkLimitRooms.Checked;
-        _nudMaxRooms = new NumericUpDown
-        {
-            Font = inputFont,
-            Location = new Point(230, 290),
-            Width = 120,
-            Minimum = 1,
-            Maximum = 9999,
-            Value = 50,
-            Enabled = false
+            Text = "ℹ️ ผูกสิทธิ์กับ Physical USB Serial ระดับชิป ป้องกันการคัดลอกไฟล์ข้ามไดรฟ์ 100%",
+            Font = new Font("Segoe UI", 8.5F, FontStyle.Italic),
+            ForeColor = Color.FromArgb(71, 85, 105),
+            Location = new Point(20, 104),
+            Size = new Size(508, 20)
         };
 
-        // ฟีเจอร์แพ็กเกจ
-        var lblFeatures = new Label
+        gbConfig.Controls.Add(lblSerial);
+        gbConfig.Controls.Add(_tbAppSerial);
+        gbConfig.Controls.Add(_btnSaveWatermark);
+        gbConfig.Controls.Add(lblType);
+        gbConfig.Controls.Add(_cbLicenseType);
+        gbConfig.Controls.Add(_lblExpire);
+        gbConfig.Controls.Add(_dtpExpireDate);
+        gbConfig.Controls.Add(lblNote);
+
+        // ==================== [ส่วนที่ 3] ตัวเลือกการฟอร์แมต ====================
+        var gbFormat = new GroupBox
         {
-            Text = "โมดูลที่เปิดใช้งานในระบบ (Features):",
+            Text = " 🛠️ 3. ตัวเลือกการฟอร์แมตก่อนเขียนคีย์ ",
             Font = labelFont,
-            ForeColor = Color.FromArgb(43, 45, 66),
-            Location = new Point(20, 335),
-            Size = new Size(410, 20)
+            ForeColor = Color.FromArgb(30, 41, 59),
+            Location = new Point(18, 285),
+            Size = new Size(548, 110),
+            FlatStyle = FlatStyle.Flat
         };
-        _clbFeatures = new CheckedListBox
+
+        _chkFormatUsb = new CheckBox
+        {
+            Text = "ฟอร์แมต USB Drive (Quick Format) ก่อนเขียนคีย์ใหม่",
+            Font = new Font("Segoe UI", 9.5F, FontStyle.Bold),
+            ForeColor = Color.FromArgb(185, 28, 28),
+            Location = new Point(20, 25),
+            Size = new Size(508, 25),
+            Checked = true
+        };
+        _chkFormatUsb.CheckedChanged += (s, e) =>
+        {
+            _cbFileSystem.Enabled = _chkFormatUsb.Checked;
+            _tbVolumeLabel.Enabled = _chkFormatUsb.Checked;
+        };
+
+        var lblFs = new Label { Text = "ระบบไฟล์:", Font = subFont, Location = new Point(40, 60), AutoSize = true };
+        _cbFileSystem = new ComboBox
         {
             Font = inputFont,
-            Location = new Point(20, 357),
-            Width = 410,
-            Height = 110,
+            Location = new Point(110, 57),
+            Width = 100,
+            DropDownStyle = ComboBoxStyle.DropDownList
+        };
+        _cbFileSystem.Items.Add("FAT32");
+        _cbFileSystem.Items.Add("NTFS");
+        _cbFileSystem.SelectedIndex = 0; // Default FAT32 (Recommended)
+
+        var lblVol = new Label { Text = "ชื่อไดรฟ์:", Font = subFont, Location = new Point(230, 60), AutoSize = true };
+        _tbVolumeLabel = new TextBox
+        {
+            Text = "HOTELPOS_KEY",
+            Font = inputFont,
+            Location = new Point(290, 57),
+            Width = 238,
             BorderStyle = BorderStyle.FixedSingle
         };
-        _clbFeatures.Items.Add("BOOKING (ระบบจองและผังเช็คอินห้องพัก)", true);
-        _clbFeatures.Items.Add("POS (ระบบขายมินิบาร์สินค้าหน้าร้าน)", true);
-        _clbFeatures.Items.Add("REPORT (รายงานวิเคราะห์สถิติยอดขาย)", true);
 
-        // ปุ่มคำนวณออกรหัสสิทธิ์
-        _btnGenerateLicense = new Button
+        gbFormat.Controls.Add(_chkFormatUsb);
+        gbFormat.Controls.Add(lblFs);
+        gbFormat.Controls.Add(_cbFileSystem);
+        gbFormat.Controls.Add(lblVol);
+        gbFormat.Controls.Add(_tbVolumeLabel);
+
+        // ==================== [ส่วนที่ 4] ปุ่มGen Key & แก้ไขคีย์ ====================
+        _btnGenKey = new Button
         {
-            Text = "สร้างไฟล์และดิจิทัลซิกเนเจอร์ (Generate)",
+            Text = "🔑 Gen Key (สร้างคีย์ใหม่ลง USB)",
             Font = new Font("Segoe UI", 10.5F, FontStyle.Bold),
-            BackColor = Color.FromArgb(61, 90, 128), // Premium Steel Blue
+            BackColor = Color.FromArgb(16, 185, 129), // Emerald Green
             ForeColor = Color.White,
             FlatStyle = FlatStyle.Flat,
-            Location = new Point(20, 520),
-            Width = 410,
+            Location = new Point(18, 408),
+            Width = 268,
             Height = 45
         };
-        _btnGenerateLicense.FlatAppearance.BorderSize = 0;
-        _btnGenerateLicense.Click += GenerateLicense_Click;
+        _btnGenKey.FlatAppearance.BorderSize = 0;
+        _btnGenKey.Click += (s, e) => SaveOrUpdateKey(isFormatAndNew: true);
 
-        gbLicenseInfo.Controls.Add(lblCustomer);
-        gbLicenseInfo.Controls.Add(_tbCustomerName);
-        gbLicenseInfo.Controls.Add(lblHw);
-        gbLicenseInfo.Controls.Add(_tbHardwareId);
-        gbLicenseInfo.Controls.Add(_btnGetCurrentHardwareId);
-        gbLicenseInfo.Controls.Add(lblType);
-        gbLicenseInfo.Controls.Add(_cbLicenseType);
-        gbLicenseInfo.Controls.Add(lblExpire);
-        gbLicenseInfo.Controls.Add(_dtpExpireDate);
-        gbLicenseInfo.Controls.Add(_chkLimitRooms);
-        gbLicenseInfo.Controls.Add(_nudMaxRooms);
-        gbLicenseInfo.Controls.Add(lblFeatures);
-        gbLicenseInfo.Controls.Add(_clbFeatures);
-        gbLicenseInfo.Controls.Add(_btnGenerateLicense);
-
-
-        // ==================== [กรอบขวาบน] คีย์ลายเซ็น (RSA Cryptography) ====================
-        var gbKeys = new GroupBox
+        _btnEditKey = new Button
         {
-            Text = " กุญแจและลายเซ็นดิจิทัล (RSA Cryptography) ",
-            Font = new Font("Segoe UI", 9.5F, FontStyle.Bold),
-            ForeColor = Color.FromArgb(108, 117, 125),
-            Location = new Point(485, 15),
-            Size = new Size(480, 185),
-            FlatStyle = FlatStyle.Flat
-        };
-
-        _rbDefaultKey = new RadioButton
-        {
-            Text = "ใช้ Default Private Key (คีย์ร่วมสำหรับการทดสอบระบบ)",
-            Font = labelFont,
-            ForeColor = Color.FromArgb(43, 45, 66),
-            Checked = true,
-            Location = new Point(20, 25),
-            Size = new Size(440, 24)
-        };
-        _rbDefaultKey.CheckedChanged += (s, e) => ToggleKeyPathControls();
-
-        _rbCustomKey = new RadioButton
-        {
-            Text = "ใช้ Custom Private Key (คู่คีย์เฉพาะกรณีจำหน่ายจริง)",
-            Font = labelFont,
-            ForeColor = Color.FromArgb(43, 45, 66),
-            Checked = false,
-            Location = new Point(20, 52),
-            Size = new Size(440, 24)
-        };
-
-        var lblKeyFile = new Label
-        {
-            Text = "ตำแหน่งไฟล์กุญแจสำคัญส่วนตัว (Private Key File):",
-            Font = labelFont,
-            ForeColor = Color.FromArgb(43, 45, 66),
-            Location = new Point(20, 85),
-            Size = new Size(440, 18)
-        };
-
-        _tbPrivateKeyPath = new TextBox
-        {
-            Font = inputFont,
-            Location = new Point(20, 106),
-            Width = 270,
-            Enabled = false,
-            BorderStyle = BorderStyle.FixedSingle
-        };
-
-        _btnBrowseKey = new Button
-        {
-            Text = "เลือก...",
-            Font = new Font("Segoe UI", 9F, FontStyle.Bold),
-            BackColor = Color.FromArgb(108, 117, 125),
+            Text = "✏️ แก้ไขคีย์ (อัปเดตคีย์เดิมใน USB)",
+            Font = new Font("Segoe UI", 10.5F, FontStyle.Bold),
+            BackColor = Color.FromArgb(37, 99, 235), // Royal Blue
             ForeColor = Color.White,
             FlatStyle = FlatStyle.Flat,
-            Location = new Point(300, 105),
-            Width = 60,
-            Height = 26,
-            Enabled = false
+            Location = new Point(298, 408),
+            Width = 268,
+            Height = 45
         };
-        _btnBrowseKey.FlatAppearance.BorderSize = 0;
-        _btnBrowseKey.Click += BrowsePrivateKey_Click;
+        _btnEditKey.FlatAppearance.BorderSize = 0;
+        _btnEditKey.Click += (s, e) => SaveOrUpdateKey(isFormatAndNew: false);
 
-        _btnGenerateNewKeys = new Button
+        _btnTestUnlock = new Button
         {
-            Text = "สร้างคีย์ใหม่",
-            Font = new Font("Segoe UI", 9F, FontStyle.Bold),
-            BackColor = Color.FromArgb(108, 117, 125),
+            Text = "⚡ ทดสอบปลดล็อก (Validate)",
+            Font = new Font("Segoe UI", 9.0F, FontStyle.Bold),
+            BackColor = Color.FromArgb(245, 158, 11), // Amber
             ForeColor = Color.White,
             FlatStyle = FlatStyle.Flat,
-            Location = new Point(370, 105),
-            Width = 90,
-            Height = 26,
-            Enabled = false
+            Location = new Point(18, 462),
+            Width = 268,
+            Height = 35
         };
-        _btnGenerateNewKeys.FlatAppearance.BorderSize = 0;
-        _btnGenerateNewKeys.Click += GenerateNewKeys_Click;
+        _btnTestUnlock.FlatAppearance.BorderSize = 0;
+        _btnTestUnlock.Click += TestUnlock_Click;
 
-        var lblKeyWarn = new Label
+        _btnViewPayload = new Button
         {
-            Text = "ℹ️ เมื่อใช้ Custom Key ต้องแก้ PublicKeyBase64 ในแอปลูกค้าให้ตรงกัน",
-            Font = new Font("Segoe UI", 8.5F, FontStyle.Italic),
-            ForeColor = Color.FromArgb(108, 117, 125),
-            Location = new Point(20, 145),
-            Size = new Size(440, 25)
-        };
-
-        gbKeys.Controls.Add(_rbDefaultKey);
-        gbKeys.Controls.Add(_rbCustomKey);
-        gbKeys.Controls.Add(lblKeyFile);
-        gbKeys.Controls.Add(_tbPrivateKeyPath);
-        gbKeys.Controls.Add(_btnBrowseKey);
-        gbKeys.Controls.Add(_btnGenerateNewKeys);
-        gbKeys.Controls.Add(lblKeyWarn);
-
-
-        // ==================== [กรอบขวาล่าง] รหัสผลลัพธ์ (license.dat) ====================
-        var gbOutput = new GroupBox
-        {
-            Text = " รหัสลิขสิทธิ์ผลลัพธ์ (license.dat Output) ",
-            Font = new Font("Segoe UI", 9.5F, FontStyle.Bold),
-            ForeColor = Color.FromArgb(108, 117, 125),
-            Location = new Point(485, 215),
-            Size = new Size(480, 400),
-            FlatStyle = FlatStyle.Flat
-        };
-
-        _tbGeneratedLicense = new TextBox
-        {
-            Multiline = true,
-            ScrollBars = ScrollBars.Vertical,
-            Font = consoleFont,
-            Location = new Point(20, 28),
-            Width = 440,
-            Height = 290,
-            ReadOnly = true,
-            BorderStyle = BorderStyle.FixedSingle
-        };
-
-        _btnCopyLicense = new Button
-        {
-            Text = "คัดลอกข้อความ (Copy)",
-            Font = new Font("Segoe UI", 9.5F, FontStyle.Bold),
-            BackColor = Color.FromArgb(108, 117, 125),
+            Text = "📋 ดูข้อมูลคีย์ JSON Payload",
+            Font = new Font("Segoe UI", 9.0F, FontStyle.Bold),
+            BackColor = Color.FromArgb(100, 116, 139), // Slate
             ForeColor = Color.White,
             FlatStyle = FlatStyle.Flat,
-            Location = new Point(20, 335),
-            Width = 210,
-            Height = 42
+            Location = new Point(298, 462),
+            Width = 268,
+            Height = 35
         };
-        _btnCopyLicense.FlatAppearance.BorderSize = 0;
-        _btnCopyLicense.Click += (s, e) =>
+        _btnViewPayload.FlatAppearance.BorderSize = 0;
+        _btnViewPayload.Click += ViewPayload_Click;
+
+        // Progress Bar & Status
+        _progressBar = new ProgressBar
         {
-            if (!string.IsNullOrEmpty(_tbGeneratedLicense.Text))
-            {
-                Clipboard.SetText(_tbGeneratedLicense.Text);
-                MessageBox.Show("คัดลอกรหัสข้อมูลลิขสิทธิ์ลงคลิปบอร์ดสำเร็จ", "คัดลอกแล้ว", MessageBoxButtons.OK, MessageBoxIcon.Information);
-            }
+            Location = new Point(18, 508),
+            Size = new Size(548, 12),
+            Style = ProgressBarStyle.Blocks,
+            Value = 0
         };
 
-        _btnSaveLicense = new Button
+        _lblStatus = new Label
         {
-            Text = "บันทึกเป็นไฟล์... (Save)",
-            Font = new Font("Segoe UI", 9.5F, FontStyle.Bold),
-            BackColor = Color.FromArgb(108, 117, 125),
-            ForeColor = Color.White,
-            FlatStyle = FlatStyle.Flat,
-            Location = new Point(250, 335),
-            Width = 210,
-            Height = 42
+            Text = "สถานะ: พร้อมใช้งาน",
+            Font = new Font("Segoe UI", 9.0F, FontStyle.Regular),
+            ForeColor = Color.FromArgb(51, 65, 85),
+            Location = new Point(18, 526),
+            Size = new Size(548, 22)
         };
-        _btnSaveLicense.FlatAppearance.BorderSize = 0;
-        _btnSaveLicense.Click += SaveLicense_Click;
 
-        gbOutput.Controls.Add(_tbGeneratedLicense);
-        gbOutput.Controls.Add(_btnCopyLicense);
-        gbOutput.Controls.Add(_btnSaveLicense);
-
-        // นำเข้ามาประกอบร่างลง Form
-        Controls.Add(gbLicenseInfo);
-        Controls.Add(gbKeys);
-        Controls.Add(gbOutput);
+        // นำองค์ประกอบทั้งหมดใส่ Form
+        Controls.Add(gbDrive);
+        Controls.Add(gbConfig);
+        Controls.Add(gbFormat);
+        Controls.Add(_btnGenKey);
+        Controls.Add(_btnEditKey);
+        Controls.Add(_btnTestUnlock);
+        Controls.Add(_btnViewPayload);
+        Controls.Add(_progressBar);
+        Controls.Add(_lblStatus);
     }
 
-    private void LoadDefaultSettings()
+    private void SaveWatermark_Click(object? sender, EventArgs e)
     {
-        _tbCustomerName.Text = "โรงแรมตัวอย่าง แสนสุขสบาย";
-        _tbHardwareId.Text = string.Empty;
-        
-        var customKeyPath = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "HotelPOSAdmin", "private_key.txt");
-        _tbPrivateKeyPath.Text = customKeyPath;
-    }
-
-    private void ToggleKeyPathControls()
-    {
-        bool custom = _rbCustomKey.Checked;
-        _tbPrivateKeyPath.Enabled = custom;
-        _btnBrowseKey.Enabled = custom;
-        _btnGenerateNewKeys.Enabled = custom;
-    }
-
-    private void LicenseType_Changed(object? sender, EventArgs e)
-    {
-        int index = _cbLicenseType.SelectedIndex;
-        if (index == 2) // Lifetime
+        string appSerial = _tbAppSerial.Text.Trim();
+        if (string.IsNullOrEmpty(appSerial))
         {
-            _dtpExpireDate.Enabled = false;
-        }
-        else
-        {
-            _dtpExpireDate.Enabled = true;
-            if (index == 0) // Trial
-            {
-                _dtpExpireDate.Value = DateTime.Today.AddDays(30);
-            }
-        }
-    }
-
-    private void BrowsePrivateKey_Click(object? sender, EventArgs e)
-    {
-        using var ofd = new OpenFileDialog
-        {
-            Filter = "Text Files (*.txt)|*.txt|All Files (*.*)|*.*",
-            Title = "เลือกไฟล์ Private Key"
-        };
-        if (ofd.ShowDialog() == DialogResult.OK)
-        {
-            _tbPrivateKeyPath.Text = ofd.FileName;
-        }
-    }
-
-    private void GenerateNewKeys_Click(object? sender, EventArgs e)
-    {
-        try
-        {
-            using var rsa = RSA.Create(2048);
-            var pubKey = Convert.ToBase64String(rsa.ExportSubjectPublicKeyInfo());
-            var privKey = Convert.ToBase64String(rsa.ExportPkcs8PrivateKey());
-
-            var folder = Path.GetDirectoryName(_tbPrivateKeyPath.Text);
-            if (!string.IsNullOrEmpty(folder) && !Directory.Exists(folder))
-            {
-                Directory.CreateDirectory(folder);
-            }
-
-            File.WriteAllText(_tbPrivateKeyPath.Text, privKey);
-
-            var pubKeyPath = Path.Combine(folder ?? "", "public_key_to_paste_in_client.txt");
-            File.WriteAllText(pubKeyPath, pubKey);
-
-            var msg = $"สร้างคู่กุญแจ RSA ใหม่สำเร็จ!\n\n" +
-                      $"1. บันทึก Private Key ไปยัง:\n{_tbPrivateKeyPath.Text}\n\n" +
-                      $"2. บันทึก Public Key (สำหรับไปวางแทนค่าเดิมใน LicenseValidator.cs) ไปยัง:\n{pubKeyPath}\n\n" +
-                      $"กรุณานำคีย์สาธารณะในข้อ 2 ไปอัปเดตลงในซอร์สโค้ดไฟล์ LicenseValidator.cs";
-
-            MessageBox.Show(msg, "สร้างคู่กุญแจสำเร็จ", MessageBoxButtons.OK, MessageBoxIcon.Information);
-        }
-        catch (Exception ex)
-        {
-            MessageBox.Show($"เกิดข้อผิดพลาด: {ex.Message}", "ข้อผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Error);
-        }
-    }
-
-    private void GenerateLicense_Click(object? sender, EventArgs e)
-    {
-        try
-        {
-            if (string.IsNullOrWhiteSpace(_tbCustomerName.Text))
-            {
-                MessageBox.Show("กรุณากรอกชื่อลูกค้า", "ข้อผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                return;
-            }
-            if (string.IsNullOrWhiteSpace(_tbHardwareId.Text) || _tbHardwareId.Text.Trim().Length < 10)
-            {
-                MessageBox.Show("กรุณากรอก Hardware ID ของเครื่องลูกค้าที่ถูกต้อง", "ข้อผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                return;
-            }
-
-            // 1. โหลด Private Key
-            string privateKeyBase64 = "";
-            if (_rbDefaultKey.Checked)
-            {
-                privateKeyBase64 = DefaultPrivateKeyBase64;
-            }
-            else
-            {
-                if (!File.Exists(_tbPrivateKeyPath.Text))
-                {
-                    MessageBox.Show("ไม่พบไฟล์คีย์ส่วนตัว! กรุณากดปุ่มสร้างคีย์คู่ใหม่ก่อน", "ข้อผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                    return;
-                }
-                privateKeyBase64 = File.ReadAllText(_tbPrivateKeyPath.Text).Trim();
-            }
-
-            // 2. สร้างโครงข้อมูล LicenseFile
-            var license = new LicenseFile
-            {
-                CustomerName = _tbCustomerName.Text.Trim(),
-                HardwareId = _tbHardwareId.Text.Trim(),
-                LicenseType = (LicenseType)_cbLicenseType.SelectedIndex,
-                IssueDate = DateTime.Today,
-                ExpireDate = _cbLicenseType.SelectedIndex == 2 ? null : _dtpExpireDate.Value.Date,
-                MaxRooms = _chkLimitRooms.Checked ? (int)_nudMaxRooms.Value : null
-            };
-
-            // กรองฟีเจอร์ที่ติ๊กเลือก
-            foreach (var item in _clbFeatures.CheckedItems)
-            {
-                string text = item.ToString() ?? "";
-                if (text.Contains("BOOKING")) license.Features.Add("BOOKING");
-                if (text.Contains("POS")) license.Features.Add("POS");
-                if (text.Contains("REPORT")) license.Features.Add("REPORT");
-            }
-
-            // 3. คำนวณค่าแฮชและเซ็นลายเซ็นดิจิทัล
-            string signableData = license.GetSignableData();
-            byte[] dataBytes = Encoding.UTF8.GetBytes(signableData);
-
-            using var rsa = RSA.Create();
-            rsa.ImportPkcs8PrivateKey(Convert.FromBase64String(privateKeyBase64), out _);
-            byte[] signatureBytes = rsa.SignData(dataBytes, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
-            
-            license.Signature = Convert.ToBase64String(signatureBytes);
-
-            // 4. แปลงโครงสิทธิ์เป็น JSON และนำเสนอ
-            _tbGeneratedLicense.Text = license.ToJson();
-        }
-        catch (Exception ex)
-        {
-            MessageBox.Show($"เกิดข้อผิดพลาดในการสร้างสิทธิ์ลิขสิทธิ์: {ex.Message}", "ข้อผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Error);
-        }
-    }
-
-    private void SaveLicense_Click(object? sender, EventArgs e)
-    {
-        if (string.IsNullOrEmpty(_tbGeneratedLicense.Text))
-        {
-            MessageBox.Show("ไม่มีข้อมูลรหัสลิขสิทธิ์ที่จะบันทึก กรุณากดปุ่มสร้างลิขสิทธิ์ก่อน", "ข้อผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            MessageBox.Show("กรุณากรอก App Serial Watermark", "ข้อผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             return;
         }
 
         using var sfd = new SaveFileDialog
         {
-            Filter = "License Data (*.dat)|*.dat|All Files (*.*)|*.*",
-            FileName = "license.dat",
-            Title = "บันทึกไฟล์ลิขสิทธิ์ออกใบอนุญาต"
+            Filter = "Watermark File (*.watermark)|*.watermark|All Files (*.*)|*.*",
+            FileName = "app.watermark",
+            Title = "บันทึกไฟล์ app.watermark สำหรับวางข้าง HotelPOS.UI.exe"
         };
 
         if (sfd.ShowDialog() == DialogResult.OK)
         {
             try
             {
-                File.WriteAllText(sfd.FileName, _tbGeneratedLicense.Text);
-                MessageBox.Show("บันทึกไฟล์ลิขสิทธิ์สำเร็จแล้ว!", "สำเร็จ", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                var watermark = new AppWatermarkFile
+                {
+                    AppSerial = appSerial,
+                    IssuedTo = "HotelPOS-CLIENT",
+                    IssuedDate = DateTime.Today
+                };
+
+                string watermarkSignable = watermark.GetSignableData();
+                using (var rsaW = RSA.Create())
+                {
+                    rsaW.ImportPkcs8PrivateKey(Convert.FromBase64String(DefaultPrivateKeyBase64), out _);
+                    byte[] wSig = rsaW.SignData(Encoding.UTF8.GetBytes(watermarkSignable), HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
+                    watermark.Signature = Convert.ToBase64String(wSig);
+                }
+
+                File.WriteAllText(sfd.FileName, watermark.ToJson());
+                MessageBox.Show($"บันทึกไฟล์ app.watermark (AppSerial: {appSerial}) สำเร็จเรียบร้อย!\n\nกรุณานำไฟล์นี้ไปวางในโฟลเดอร์เดียวกับโปรแกรม HotelPOS.UI.exe ของลูกค้า", "สำเร็จ", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
             catch (Exception ex)
             {
                 MessageBox.Show($"ไม่สามารถบันทึกไฟล์ได้: {ex.Message}", "ข้อผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
+    }
+
+    private void RefreshUsbDrives()
+    {
+        _cbUsbDrives.Items.Clear();
+        _connectedDrives = UsbDongleManager.GetConnectedUsbDrives();
+
+        if (_connectedDrives.Count > 0)
+        {
+            foreach (var drive in _connectedDrives)
+            {
+                string label = string.IsNullOrWhiteSpace(drive.VolumeLabel) ? "NO LABEL" : drive.VolumeLabel;
+                _cbUsbDrives.Items.Add($"{drive.DriveLetter}\\ ({label}) - HWID:{drive.UsbHardwareId.Substring(0, 12)}...");
+            }
+            _cbUsbDrives.SelectedIndex = 0;
+            _btnGenKey.Enabled = true;
+            _btnEditKey.Enabled = true;
+            _btnTestUnlock.Enabled = true;
+        }
+        else
+        {
+            _cbUsbDrives.Items.Add("⚠️ ไม่พบ USB Flash Drive (กรุณาเสียบแฟลชไดรฟ์แล้วกดรีเฟรช)");
+            _cbUsbDrives.SelectedIndex = 0;
+            _lblDriveDetail.Text = "รายละเอียดไดรฟ์: ไม่พบแฟลชไดรฟ์";
+            _btnGenKey.Enabled = false;
+            _btnEditKey.Enabled = false;
+            _btnTestUnlock.Enabled = false;
+        }
+    }
+
+    private void UsbDrives_SelectedIndexChanged(object? sender, EventArgs e)
+    {
+        if (_connectedDrives.Count > 0 && _cbUsbDrives.SelectedIndex >= 0 && _cbUsbDrives.SelectedIndex < _connectedDrives.Count)
+        {
+            var drive = _connectedDrives[_cbUsbDrives.SelectedIndex];
+            _lblDriveDetail.Text = $"รายละเอียดไดรฟ์: ไดรฟ์ {drive.DriveLetter}\\ | Serial: {drive.PhysicalSerial} | HWID: {drive.UsbHardwareId}";
+            _lblStatus.Text = $"เลือกไดรฟ์ {drive.DriveLetter}\\ พร้อมเปิดใช้งาน";
+
+            // ลอง Auto-load คีย์เดิมที่มีใน USB Drive (ถ้ามี) สำหรับปุ่มแก้ไข
+            LoadExistingKeyFromUsb(drive);
+        }
+    }
+
+    private void LoadExistingKeyFromUsb(UsbDriveInfo drive)
+    {
+        try
+        {
+            string donglePath = Path.Combine(drive.DriveLetter + "\\", UsbDongleManager.DongleFileName);
+            if (File.Exists(donglePath))
+            {
+                string json = File.ReadAllText(donglePath);
+                var license = LicenseFile.FromJson(json);
+                if (license != null)
+                {
+                    if (!string.IsNullOrEmpty(license.AppSerial))
+                        _tbAppSerial.Text = license.AppSerial;
+
+                    _cbLicenseType.SelectedIndex = license.LicenseType switch
+                    {
+                        LicenseType.Lifetime => 0,
+                        LicenseType.Standard => 1,
+                        _ => 2
+                    };
+
+                    if (license.ExpireDate.HasValue)
+                        _dtpExpireDate.Value = license.ExpireDate.Value;
+
+                    _lblStatus.Text = $"พบไฟล์ dongle.key เดิมในไดรฟ์ {drive.DriveLetter}\\ (โหลดข้อมูลสำเร็จ สามารถปรับแก้ไขได้เลย)";
+                }
+            }
+        }
+        catch { }
+    }
+
+    private void LicenseType_SelectedIndexChanged(object? sender, EventArgs e)
+    {
+        bool isStandard = _cbLicenseType.SelectedIndex == 1;
+        _lblExpire.Visible = isStandard;
+        _dtpExpireDate.Visible = isStandard;
+    }
+
+    private async void SaveOrUpdateKey(bool isFormatAndNew)
+    {
+        if (_connectedDrives.Count == 0 || _cbUsbDrives.SelectedIndex < 0 || _cbUsbDrives.SelectedIndex >= _connectedDrives.Count)
+        {
+            MessageBox.Show("กรุณาเลือก USB Flash Drive ก่อนทำรายการ", "คำเตือน", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return;
+        }
+
+        var drive = _connectedDrives[_cbUsbDrives.SelectedIndex];
+        string appSerial = _tbAppSerial.Text.Trim();
+
+        if (string.IsNullOrWhiteSpace(appSerial))
+        {
+            MessageBox.Show("กรุณากรอก App Serial Watermark", "คำเตือน", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return;
+        }
+
+        // หากเป็นการ Gen Key ใหม่ และเลือกติ๊กฟอร์แมต ให้แสดงกล่องถามยืนยันก่อน
+        if (isFormatAndNew && _chkFormatUsb.Checked)
+        {
+            string confirmMsg = $"⚠️ คำเตือนการฟอร์แมตข้อมูล (Formatting Warning):\n\n" +
+                                $"ข้อมูลทั้งหมดใน USB Flash Drive ไดรฟ์ [{drive.DriveLetter}\\] ({drive.VolumeLabel}) จะถูกลบอย่างถาวร!\n\n" +
+                                $"ระบบกำลังจะ Quick Format เป็นระบบไฟล์ {_cbFileSystem.SelectedItem} และตั้งชื่อเป็น '{_tbVolumeLabel.Text.Trim()}'\n\n" +
+                                $"คุณแน่ใจหรือไม่ว่าต้องการฟอร์แมตและสร้าง USB Dongle Key ใหม่?";
+
+            var confirmResult = MessageBox.Show(confirmMsg, "ยืนยันการฟอร์แมต USB Drive", MessageBoxButtons.YesNo, MessageBoxIcon.Warning, MessageBoxDefaultButton.Button2);
+            if (confirmResult != DialogResult.Yes)
+            {
+                _lblStatus.Text = "ยกเลิกการทำรายการโดยผู้ใช้";
+                return;
+            }
+        }
+
+        try
+        {
+            _btnGenKey.Enabled = false;
+            _btnEditKey.Enabled = false;
+            _btnRefreshDrives.Enabled = false;
+            _progressBar.Value = 10;
+
+            string actionText = isFormatAndNew ? "กำลัง Gen Key และสร้างกุญแจใหม่..." : "กำลังอัปเดต/แก้ไขข้อมูลคีย์เดิม...";
+            _lblStatus.Text = actionText;
+
+            // 1. ฟอร์แมต (กรณี Gen Key ใหม่และติ๊กเลือกไว้)
+            if (isFormatAndNew && _chkFormatUsb.Checked)
+            {
+                _progressBar.Value = 30;
+                _lblStatus.Text = $"กำลังฟอร์แมต USB Drive [{drive.DriveLetter}\\]...";
+
+                bool formatSuccess = await System.Threading.Tasks.Task.Run(() =>
+                    UsbDongleManager.FormatUsbDrive(drive.DriveLetter, _cbFileSystem.SelectedItem?.ToString() ?? "FAT32", _tbVolumeLabel.Text.Trim()));
+
+                if (!formatSuccess)
+                {
+                    MessageBox.Show($"ไม่สามารถฟอร์แมตไดรฟ์ {drive.DriveLetter}\\ ได้ กรุณาตรวจสอบว่าไม่มีโปรแกรมอื่นเปิดไดรฟ์นี้อยู่", "ข้อผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    _lblStatus.Text = "ฟอร์แมตไม่สำเร็จ";
+                    ResetUIState();
+                    return;
+                }
+            }
+
+            // 2. สร้าง License Object (ใช้ชื่อระบบทั่วไป ไม่ต้องพึ่งชื่อโรงแรม)
+            var license = new LicenseFile
+            {
+                CustomerName = "HotelPOS-CLIENT",
+                UsbHardwareId = drive.UsbHardwareId,
+                AppSerial = appSerial,
+                LicenseType = _cbLicenseType.SelectedIndex switch
+                {
+                    0 => LicenseType.Lifetime,
+                    1 => LicenseType.Standard,
+                    _ => LicenseType.Trial
+                },
+                IssueDate = DateTime.Today,
+                ExpireDate = _cbLicenseType.SelectedIndex == 1 ? _dtpExpireDate.Value.Date : null,
+                Features = new List<string> { "BOOKING", "POS", "REPORT" }
+            };
+
+            // 3. ลงลายเซ็นดิจิทัล RSA-2048
+            _progressBar.Value = 70;
+            _lblStatus.Text = "กำลังลงลายเซ็นดิจิทัล RSA-2048...";
+
+            string signableData = license.GetSignableData();
+            byte[] dataBytes = Encoding.UTF8.GetBytes(signableData);
+
+            using (var rsa = RSA.Create())
+            {
+                rsa.ImportPkcs8PrivateKey(Convert.FromBase64String(DefaultPrivateKeyBase64), out _);
+                byte[] signatureBytes = rsa.SignData(dataBytes, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
+                license.Signature = Convert.ToBase64String(signatureBytes);
+            }
+
+            // 4. เขียน dongle.key และ app.watermark ลงใน USB Drive
+            _progressBar.Value = 90;
+            _lblStatus.Text = "กำลังบันทึกไฟล์ dongle.key ลง USB Drive...";
+
+            string donglePath = Path.Combine(drive.DriveLetter + "\\", UsbDongleManager.DongleFileName);
+            File.WriteAllText(donglePath, license.ToJson());
+
+            // Gen app.watermark คู่กัน
+            var watermark = new AppWatermarkFile
+            {
+                AppSerial = appSerial,
+                IssuedTo = "HotelPOS-CLIENT",
+                IssuedDate = DateTime.Today
+            };
+            string watermarkSignable = watermark.GetSignableData();
+            using (var rsaW = RSA.Create())
+            {
+                rsaW.ImportPkcs8PrivateKey(Convert.FromBase64String(DefaultPrivateKeyBase64), out _);
+                byte[] wSig = rsaW.SignData(Encoding.UTF8.GetBytes(watermarkSignable), HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
+                watermark.Signature = Convert.ToBase64String(wSig);
+            }
+
+            string watermarkPath = Path.Combine(drive.DriveLetter + "\\", AppWatermarkManager.WatermarkFileName);
+            File.WriteAllText(watermarkPath, watermark.ToJson());
+
+            _progressBar.Value = 100;
+            string statusMsg = isFormatAndNew ? "Gen Key และเขียนคีย์ลง USB Drive สำเร็จเรียบร้อย!" : "แก้ไข/อัปเดตคีย์ใน USB Drive สำเร็จเรียบร้อย!";
+            _lblStatus.Text = $"✅ {statusMsg}";
+
+            MessageBox.Show($"🎉 {statusMsg}\n\n" +
+                            $"• ไดรฟ์: {drive.DriveLetter}\\\n" +
+                            $"• App Serial: {appSerial}\n" +
+                            $"• ประเภทสิทธิ์: {license.LicenseType}\n" +
+                            $"• Physical Serial: {drive.PhysicalSerial}\n\n" +
+                            $"คีย์ถูกบันทึกเรียบร้อย สามารถนำ USB Dongle ไปเสียบใช้งานได้ทันที", "สำเร็จ", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"เกิดข้อผิดพลาด: {ex.Message}", "ข้อผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            _lblStatus.Text = "เกิดข้อผิดพลาดในการบันทึกคีย์";
+        }
+        finally
+        {
+            ResetUIState();
+            RefreshUsbDrives();
+        }
+    }
+
+    private void TestUnlock_Click(object? sender, EventArgs e)
+    {
+        try
+        {
+            var (dongleLicense, driveInfo, rawContent) = UsbDongleManager.ScanForDongleKey();
+            if (dongleLicense == null || driveInfo == null)
+            {
+                MessageBox.Show("ไม่พบไฟล์ dongle.key ใน USB Flash Drive ที่เสียบอยู่", "ไม่พบคีย์", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            var currentAppSerial = _tbAppSerial.Text.Trim();
+            var status = LicenseValidator.ValidateDongle(dongleLicense, driveInfo.UsbHardwareId, currentAppSerial);
+
+            if (status == LicenseStatus.Active)
+            {
+                MessageBox.Show($"✅ ตรวจสอบ Dongle สำเร็จ 100%!\n\n" +
+                                $"• ไดรฟ์: {driveInfo.DriveLetter}\\\n" +
+                                $"• App Serial: {dongleLicense.AppSerial}\n" +
+                                $"• Physical Serial: {driveInfo.PhysicalSerial}\n" +
+                                $"• ประเภทสิทธิ์: {dongleLicense.LicenseType}\n" +
+                                $"• สถานะ: ACTIVE (ปลดล็อกระบบสมบูรณ์)", "ตรวจสอบสำเร็จ", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+            else
+            {
+                MessageBox.Show($"❌ ตรวจสอบ Dongle ไม่ผ่าน! สถานะ: {status}\n(คีย์ถูกก๊อปปี้ข้าม Flash Drive หรือ App Serial ไม่ตรง)", "ตรวจสอบล้มเหลว", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"เกิดข้อผิดพลาดในการตรวจสอบ: {ex.Message}", "ข้อผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+    }
+
+    private void ViewPayload_Click(object? sender, EventArgs e)
+    {
+        var (dongleLicense, driveInfo, rawContent) = UsbDongleManager.ScanForDongleKey();
+        if (dongleLicense != null && rawContent != null)
+        {
+            using var dlg = new Form
+            {
+                Text = "ข้อมูล dongle.key Payload (JSON)",
+                Width = 500,
+                Height = 400,
+                StartPosition = FormStartPosition.CenterParent,
+                FormBorderStyle = FormBorderStyle.SizableToolWindow
+            };
+            var tb = new TextBox
+            {
+                Multiline = true,
+                ScrollBars = ScrollBars.Vertical,
+                Dock = DockStyle.Fill,
+                Text = rawContent,
+                Font = new Font("Consolas", 9.5F),
+                ReadOnly = true
+            };
+            dlg.Controls.Add(tb);
+            dlg.ShowDialog(this);
+        }
+        else
+        {
+            MessageBox.Show("ไม่พบไฟล์ dongle.key ใน USB Flash Drive ที่เสียบอยู่", "ไม่พบข้อมูล", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+        }
+    }
+
+    private void ResetUIState()
+    {
+        _btnGenKey.Enabled = true;
+        _btnEditKey.Enabled = true;
+        _btnRefreshDrives.Enabled = true;
+        _progressBar.Value = 0;
     }
 }

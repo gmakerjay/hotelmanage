@@ -8,12 +8,20 @@ namespace HotelPOS.Licensing;
 public class LicenseFile
 {
     public string CustomerName { get; set; } = string.Empty;
-    public string HardwareId { get; set; } = string.Empty;
+    public string UsbHardwareId { get; set; } = string.Empty;
+    public string AppSerial { get; set; } = string.Empty;
     public LicenseType LicenseType { get; set; }
     public DateTime IssueDate { get; set; }
     public DateTime? ExpireDate { get; set; }
     public int? MaxRooms { get; set; }
     public List<string> Features { get; set; } = new();
+
+    // Alias เพื่อความเข้ากันได้ย้อนหลัง
+    public string HardwareId
+    {
+        get => UsbHardwareId;
+        set => UsbHardwareId = value;
+    }
     
     // Digital Signature ในรูปแบบ Base64
     public string Signature { get; set; } = string.Empty;
@@ -29,7 +37,7 @@ public class LicenseFile
         featuresCopy.Sort(); // เรียงลำดับเพื่อให้คงที่แน่นอน
         var featuresStr = string.Join(",", featuresCopy);
 
-        return $"{CustomerName}|{HardwareId}|{(int)LicenseType}|{IssueDate:yyyy-MM-dd}|{expireStr}|{maxRoomsStr}|{featuresStr}";
+        return $"{CustomerName}|{UsbHardwareId}|{AppSerial}|{(int)LicenseType}|{IssueDate:yyyy-MM-dd}|{expireStr}|{maxRoomsStr}|{featuresStr}";
     }
 
     public string ToJson()

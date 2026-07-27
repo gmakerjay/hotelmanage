@@ -1,0 +1,170 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Management;
+using System.Security.Cryptography;
+using System.Text;
+
+namespace HotelPOS.Licensing;
+
+public class UsbDriveInfo
+{
+    public string DriveLetter { get; set; } = string.Empty;
+    public string VolumeLabel { get; set; } = string.Empty;
+    public string PhysicalSerial { get; set; } = string.Empty;
+    public string UsbHardwareId { get; set; } = string.Empty;
+}
+
+public static class UsbDongleManager
+{
+    public const string DongleFileName = "dongle.key";
+
+    /// <summary>
+    /// ดึงรายการ USB Removable Drives ที่เชื่อมต่ออยู่ทั้งหมด พร้อม Physical Hardware Serial ระดับชิป USB
+    /// </summary>
+    public static List<UsbDriveInfo> GetConnectedUsbDrives()
+    {
+        var list = new List<UsbDriveInfo>();
+        try
+        {
+            foreach (var drive in DriveInfo.GetDrives())
+            {
+                if (drive.IsReady && drive.DriveType == DriveType.Removable)
+                {
+                    string driveLetter = drive.Name.TrimEnd('\\');
+                    string serial = GetPhysicalUsbSerial(driveLetter);
+                    string usbHwId = HashUsbSerial(serial);
+
+                    list.Add(new UsbDriveInfo
+                    {
+                        DriveLetter = driveLetter,
+                        VolumeLabel = drive.VolumeLabel,
+                        PhysicalSerial = serial,
+                        UsbHardwareId = usbHwId
+                    });
+                }
+            }
+        }
+        catch { }
+
+        return list;
+    }
+
+    /// <summary>
+    /// สแกนหาไฟล์ dongle.key หรือ license.dat ใน USB Flash Drives ทั้งหมดที่เสียบอยู่
+    /// </summary>
+    public static (LicenseFile? DongleLicense, UsbDriveInfo? DriveInfo, string? RawContent) ScanForDongleKey()
+    {
+        var usbDrives = GetConnectedUsbDrives();
+        foreach (var usb in usbDrives)
+        {
+            string donglePath = Path.Combine(usb.DriveLetter + "\\", DongleFileName);
+            string licensePath = Path.Combine(usb.DriveLetter + "\\", LicenseManager.LicenseFileName);
+
+            string? targetPath = File.Exists(donglePath) ? donglePath : (File.Exists(licensePath) ? licensePath : null);
+
+            if (targetPath != null)
+            {
+                try
+                {
+                    string json = File.ReadAllText(targetPath).Trim();
+                    var license = LicenseFile.FromJson(json);
+                    if (license != null)
+                    {
+                        return (license, usb, json);
+                    }
+                }
+                catch { }
+            }
+        }
+
+        return (null, null, null);
+    }
+
+    /// <summary>
+    /// อ่านค่า Physical Hardware Serial จาก WMI สำหรับ USB Drive ระดับชิปคอนโทรลเลอร์
+    /// </summary>
+    public static string GetPhysicalUsbSerial(string driveLetter)
+    {
+        string cleanLetter = driveLetter.TrimEnd('\\').ToUpperInvariant();
+        try
+        {
+            // ดึงข้อมูละดับ Physical Disk ผ่าน WMI Win32_DiskDrive
+            using var searcher = new ManagementObjectSearcher("SELECT DeviceID, PNPDeviceID, SerialNumber, InterfaceType FROM Win32_DiskDrive WHERE InterfaceType = 'USB'");
+            using var collection = searcher.Get();
+
+            foreach (var drive in collection)
+            {
+                var pnpId = drive["PNPDeviceID"]?.ToString() ?? "";
+                var serial = drive["SerialNumber"]?.ToString() ?? "";
+
+                // หากมี SerialNumber ระดับชิปโดยตรง
+                if (!string.IsNullOrWhiteSpace(serial) && serial.Length >= 5)
+                {
+                    return serial.Trim();
+                }
+
+                // หากไม่มี SerialNumber ให้อ่านจาก PNPDeviceID
+                if (!string.IsNullOrWhiteSpace(pnpId))
+                {
+                    // PNPDeviceID มักอยู่ในรูป USBSTOR\DISK&VEN_...\[SERIAL_NUMBER]
+                    var parts = pnpId.Split('\\');
+                    if (parts.Length > 0)
+                    {
+                        var lastPart = parts[parts.Length - 1];
+                        if (lastPart.Contains("&"))
+                        {
+                            var subParts = lastPart.Split('&');
+                            lastPart = subParts[0];
+                        }
+                        if (!string.IsNullOrWhiteSpace(lastPart))
+                        {
+                            return lastPart.Trim();
+                        }
+                    }
+                    return pnpId.Trim();
+                }
+            }
+        }
+        catch { }
+
+        // Fallback กรณี WMI อ่านไม่ได้ ให้ใช้ Drive Volume Label + Letter
+        return $"GENERIC-USB-{cleanLetter}";
+    }
+
+    public static string HashUsbSerial(string rawSerial)
+    {
+        string combined = $"USB_CHIP_SERIAL:{rawSerial.Trim().ToUpperInvariant()}";
+        byte[] bytes = SHA256.HashData(Encoding.UTF8.GetBytes(combined));
+        return Convert.ToHexString(bytes).ToLowerInvariant();
+    }
+
+    /// <summary>
+    /// ฟอร์แมต USB Flash Drive (Quick Format) เป็นระบบไฟล์ FAT32 หรือ NTFS พร้อมตั้งชื่อ Volume Label
+    /// </summary>
+    public static bool FormatUsbDrive(string driveLetter, string fileSystem = "FAT32", string volumeLabel = "HOTELPOS_KEY")
+    {
+        try
+        {
+            string cleanLetter = driveLetter.TrimEnd('\\').Replace(":", "").Trim();
+            if (string.IsNullOrEmpty(cleanLetter)) return false;
+
+            // ใช้ PowerShell Format-Volume เพื่อ Quick Format ไดรฟ์ USB โดยไม่ต้องพึ่ง exe ภายนอก
+            var psi = new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = "powershell.exe",
+                Arguments = $"-NoProfile -ExecutionPolicy Bypass -Command \"Format-Volume -DriveLetter '{cleanLetter}' -FileSystem {fileSystem} -NewFileSystemLabel '{volumeLabel}' -Confirm:$false -Force\"",
+                CreateNoWindow = true,
+                UseShellExecute = false
+            };
+
+            using var proc = System.Diagnostics.Process.Start(psi);
+            proc?.WaitForExit(40000);
+            return proc?.ExitCode == 0;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+}

@@ -73,6 +73,13 @@ public enum LicenseStatus
     NotActivated = 4
 }
 
+/// <summary>ประเภทสาธารณูปโภค (มิเตอร์ไฟ/น้ำ)</summary>
+public enum UtilityType
+{
+    Electric = 0,   // ค่าไฟฟ้า
+    Water = 1       // ค่าน้ำประปา
+}
+
 /// <summary>ระดับความรุนแรงของ Log (สอดคล้องกับ Serilog LogEventLevel)</summary>
 public enum LogCategory
 {
@@ -85,5 +92,6 @@ public enum LogCategory
     Backup,
     Auth,
     Audit,
-    System
+    System,
+    Utility     // ระบบค่าน้ำค่าไฟ
 }
