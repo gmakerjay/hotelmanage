@@ -1,24 +1,27 @@
 using HotelPOS.Common;
 using HotelPOS.Common.Models;
 using HotelPOS.Core.Services;
+using HotelPOS.Printing;
 
 namespace HotelPOS.UI;
 
 /// <summary>
-/// หน้าจอบันทึกเลขมิเตอร์ค่าน้ำค่าไฟ รายห้อง รายเดือน
-/// เจ้าของหอพักเดินเช็คมิเตอร์ → กลับมากรอกเลข → ระบบคำนวณให้อัตโนมัติ
+/// หน้าจอบันทึกเลขมิเตอร์ค่าน้ำค่าไฟและออกใบแจ้งหนี้รายเดือน (บิลรวมใบเดียว)
+/// เน้นความง่ายที่สุด: 1-Click บันทึก+ออกบิลทั้งหมด หรือพิมพ์บิลเดียวรายห้องได้ทันทีจากตาราง
 /// </summary>
 public class MeterReadingControl : UserControl
 {
     private readonly IUtilityBillService _utilityBillService;
     private readonly IRoomService _roomService;
     private readonly ISettingsService _settingsService;
+    private readonly IBookingService? _bookingService;
+    private readonly ICustomerService? _customerService;
 
     private ComboBox _cmbBillingMonth = null!;
     private DataGridView _dgvMeterReadings = null!;
     private Label _lblSummary = null!;
-    private Button _btnSave = null!;
-    private Button _btnGenerateBills = null!;
+    private Button _btnOneClickProcess = null!;
+    private Button _btnBatchPrint = null!;
     private Button _btnViewHistory = null!;
     private Label _lblWaterMode = null!;
 
@@ -28,11 +31,15 @@ public class MeterReadingControl : UserControl
     public MeterReadingControl(
         IUtilityBillService utilityBillService,
         IRoomService roomService,
-        ISettingsService settingsService)
+        ISettingsService settingsService,
+        IBookingService? bookingService = null,
+        ICustomerService? customerService = null)
     {
         _utilityBillService = utilityBillService;
         _roomService = roomService;
         _settingsService = settingsService;
+        _bookingService = bookingService;
+        _customerService = customerService;
 
         InitializeComponents();
     }
@@ -46,13 +53,13 @@ public class MeterReadingControl : UserControl
         var headerPanel = new Panel
         {
             Dock = DockStyle.Top,
-            Height = 110,
+            Height = 115,
             Padding = new Padding(5)
         };
 
         var lblTitle = new Label
         {
-            Text = "📊 บันทึกเลขมิเตอร์ค่าน้ำค่าไฟ",
+            Text = "📊 ระบบคำนวณค่าน้ำค่าไฟ & ออกใบแจ้งหนี้ (บิลเดียว)",
             Font = new Font("Segoe UI", 16F, FontStyle.Bold),
             ForeColor = Color.FromArgb(15, 23, 42),
             Location = new Point(5, 5),
@@ -61,7 +68,7 @@ public class MeterReadingControl : UserControl
 
         var lblSubtitle = new Label
         {
-            Text = "เดินเช็คมิเตอร์รายเดือน → กรอกเลข → ระบบคำนวณอัตโนมัติ",
+            Text = "กรอกเลขมิเตอร์ → ระบบคำนวณให้อัตโนมัติ → พิมพ์ใบแจ้งหนี้รวม (ค่าห้อง + ค่าไฟ + ค่าน้ำ + ค่าขยะ) ในใบเดียว",
             Font = new Font("Segoe UI", 10F, FontStyle.Regular),
             ForeColor = Color.FromArgb(100, 116, 139),
             Location = new Point(5, 38),
@@ -74,14 +81,14 @@ public class MeterReadingControl : UserControl
             Text = "รอบบิลเดือน:",
             Font = new Font("Segoe UI", 10.5F, FontStyle.Bold),
             ForeColor = Color.FromArgb(30, 41, 59),
-            Location = new Point(5, 72),
+            Location = new Point(5, 74),
             AutoSize = true
         };
 
         _cmbBillingMonth = new ComboBox
         {
-            Location = new Point(130, 68),
-            Width = 200,
+            Location = new Point(110, 70),
+            Width = 190,
             Font = new Font("Segoe UI", 11F),
             DropDownStyle = ComboBoxStyle.DropDownList,
             BackColor = Color.White
@@ -92,7 +99,7 @@ public class MeterReadingControl : UserControl
         {
             Font = new Font("Segoe UI", 9.5F, FontStyle.Bold),
             ForeColor = Color.FromArgb(37, 99, 235),
-            Location = new Point(350, 72),
+            Location = new Point(315, 74),
             AutoSize = true
         };
 
@@ -104,7 +111,6 @@ public class MeterReadingControl : UserControl
             string monthDisplay = date.ToString("MMMM yyyy", new System.Globalization.CultureInfo("th-TH"));
             _cmbBillingMonth.Items.Add(new MonthItem(monthKey, monthDisplay));
         }
-        // Select current month
         for (int i = 0; i < _cmbBillingMonth.Items.Count; i++)
         {
             if (((MonthItem)_cmbBillingMonth.Items[i]).Value == DateTime.Now.ToString("yyyy-MM"))
@@ -131,8 +137,8 @@ public class MeterReadingControl : UserControl
             SelectionMode = DataGridViewSelectionMode.CellSelect,
             DefaultCellStyle = new DataGridViewCellStyle
             {
-                Font = new Font("Segoe UI", 11F),
-                Padding = new Padding(6, 4, 6, 4),
+                Font = new Font("Segoe UI", 10.5F),
+                Padding = new Padding(4, 2, 4, 2),
                 BackColor = Color.White,
                 ForeColor = Color.FromArgb(15, 23, 42),
                 SelectionBackColor = Color.FromArgb(224, 231, 255),
@@ -156,30 +162,48 @@ public class MeterReadingControl : UserControl
         _dgvMeterReadings.Columns.AddRange(new DataGridViewColumn[]
         {
             new DataGridViewTextBoxColumn { Name = "RoomId", HeaderText = "ID", Visible = false },
-            new DataGridViewTextBoxColumn { Name = "RoomNumber", HeaderText = "ห้อง", ReadOnly = true, FillWeight = 60,
+            new DataGridViewTextBoxColumn { Name = "RoomNumber", HeaderText = "ห้อง", ReadOnly = true, FillWeight = 50,
                 DefaultCellStyle = new DataGridViewCellStyle { Font = new Font("Segoe UI", 11F, FontStyle.Bold), Alignment = DataGridViewContentAlignment.MiddleCenter } },
-            new DataGridViewTextBoxColumn { Name = "ElecPrev", HeaderText = "⚡ ไฟ-ก่อน", FillWeight = 80,
+            new DataGridViewTextBoxColumn { Name = "TenantName", HeaderText = "ผู้เช่า", ReadOnly = true, FillWeight = 85,
+                DefaultCellStyle = new DataGridViewCellStyle { Font = new Font("Segoe UI", 10F), ForeColor = Color.FromArgb(71, 85, 105) } },
+            
+            // ไฟฟ้า
+            new DataGridViewTextBoxColumn { Name = "ElecPrev", HeaderText = "⚡ ไฟ-ก่อน", FillWeight = 65,
                 DefaultCellStyle = new DataGridViewCellStyle { Alignment = DataGridViewContentAlignment.MiddleRight, Format = "N0" } },
-            new DataGridViewTextBoxColumn { Name = "ElecCurr", HeaderText = "⚡ ไฟ-หลัง", FillWeight = 80,
+            new DataGridViewTextBoxColumn { Name = "ElecCurr", HeaderText = "⚡ ไฟ-หลัง", FillWeight = 65,
                 DefaultCellStyle = new DataGridViewCellStyle { Alignment = DataGridViewContentAlignment.MiddleRight, Format = "N0", BackColor = Color.FromArgb(255, 251, 235) } },
-            new DataGridViewTextBoxColumn { Name = "ElecUnits", HeaderText = "หน่วยไฟ", ReadOnly = true, FillWeight = 70,
+            new DataGridViewTextBoxColumn { Name = "ElecUnits", HeaderText = "หน่วยไฟ", ReadOnly = true, FillWeight = 55,
                 DefaultCellStyle = new DataGridViewCellStyle { Alignment = DataGridViewContentAlignment.MiddleRight, Format = "N0", ForeColor = Color.FromArgb(234, 88, 12) } },
-            new DataGridViewTextBoxColumn { Name = "ElecAmount", HeaderText = "ค่าไฟ (฿)", ReadOnly = true, FillWeight = 85,
-                DefaultCellStyle = new DataGridViewCellStyle { Alignment = DataGridViewContentAlignment.MiddleRight, Format = "N2", Font = new Font("Segoe UI", 11F, FontStyle.Bold), ForeColor = Color.FromArgb(234, 88, 12) } },
-            new DataGridViewTextBoxColumn { Name = "WaterPrev", HeaderText = "💧 น้ำ-ก่อน", FillWeight = 80,
+            new DataGridViewTextBoxColumn { Name = "ElecAmount", HeaderText = "ค่าไฟ (฿)", ReadOnly = true, FillWeight = 70,
+                DefaultCellStyle = new DataGridViewCellStyle { Alignment = DataGridViewContentAlignment.MiddleRight, Format = "N2", Font = new Font("Segoe UI", 10F, FontStyle.Bold), ForeColor = Color.FromArgb(234, 88, 12) } },
+            
+            // ประปา
+            new DataGridViewTextBoxColumn { Name = "WaterPrev", HeaderText = "💧 น้ำ-ก่อน", FillWeight = 65,
                 DefaultCellStyle = new DataGridViewCellStyle { Alignment = DataGridViewContentAlignment.MiddleRight, Format = "N0" } },
-            new DataGridViewTextBoxColumn { Name = "WaterCurr", HeaderText = "💧 น้ำ-หลัง", FillWeight = 80,
+            new DataGridViewTextBoxColumn { Name = "WaterCurr", HeaderText = "💧 น้ำ-หลัง", FillWeight = 65,
                 DefaultCellStyle = new DataGridViewCellStyle { Alignment = DataGridViewContentAlignment.MiddleRight, Format = "N0", BackColor = Color.FromArgb(236, 253, 245) } },
-            new DataGridViewTextBoxColumn { Name = "WaterUnits", HeaderText = "หน่วยน้ำ", ReadOnly = true, FillWeight = 70,
+            new DataGridViewTextBoxColumn { Name = "WaterUnits", HeaderText = "หน่วยน้ำ", ReadOnly = true, FillWeight = 55,
                 DefaultCellStyle = new DataGridViewCellStyle { Alignment = DataGridViewContentAlignment.MiddleRight, Format = "N0", ForeColor = Color.FromArgb(14, 116, 144) } },
-            new DataGridViewTextBoxColumn { Name = "WaterAmount", HeaderText = "ค่าน้ำ (฿)", ReadOnly = true, FillWeight = 85,
-                DefaultCellStyle = new DataGridViewCellStyle { Alignment = DataGridViewContentAlignment.MiddleRight, Format = "N2", Font = new Font("Segoe UI", 11F, FontStyle.Bold), ForeColor = Color.FromArgb(14, 116, 144) } },
-            new DataGridViewTextBoxColumn { Name = "WaterPersons", HeaderText = "จำนวนคน", FillWeight = 65,
+            new DataGridViewTextBoxColumn { Name = "WaterAmount", HeaderText = "ค่าน้ำ (฿)", ReadOnly = true, FillWeight = 70,
+                DefaultCellStyle = new DataGridViewCellStyle { Alignment = DataGridViewContentAlignment.MiddleRight, Format = "N2", Font = new Font("Segoe UI", 10F, FontStyle.Bold), ForeColor = Color.FromArgb(14, 116, 144) } },
+            new DataGridViewTextBoxColumn { Name = "WaterPersons", HeaderText = "จำนวนคน", FillWeight = 55,
                 DefaultCellStyle = new DataGridViewCellStyle { Alignment = DataGridViewContentAlignment.MiddleCenter, Format = "N0" } },
-            new DataGridViewTextBoxColumn { Name = "Notes", HeaderText = "หมายเหตุ", FillWeight = 100 }
+            
+            // ยอดบิลรวมสุทธิ
+            new DataGridViewTextBoxColumn { Name = "TotalBillAmount", HeaderText = "💰 รวมสุทธิ (฿)", ReadOnly = true, FillWeight = 85,
+                DefaultCellStyle = new DataGridViewCellStyle { Alignment = DataGridViewContentAlignment.MiddleRight, Format = "N2", Font = new Font("Segoe UI", 11F, FontStyle.Bold), ForeColor = Color.FromArgb(15, 23, 42) } },
+            
+            // ปุ่มดำเนินการตรงในตาราง (ทำให้ใช้งานง่ายที่สุด!)
+            new DataGridViewButtonColumn { Name = "BtnStatus", HeaderText = "สถานะชำระ", FillWeight = 80,
+                Text = "❌ ชำระเงิน", UseColumnTextForButtonValue = false },
+            new DataGridViewButtonColumn { Name = "BtnPrint", HeaderText = "ออกบิล", FillWeight = 85,
+                Text = "📄 พิมพ์บิลเดียว", UseColumnTextForButtonValue = true },
+            
+            new DataGridViewTextBoxColumn { Name = "Notes", HeaderText = "หมายเหตุ", FillWeight = 80 }
         });
 
         _dgvMeterReadings.CellValueChanged += DgvMeterReadings_CellValueChanged;
+        _dgvMeterReadings.CellContentClick += async (s, e) => await DgvMeterReadings_CellContentClick(s, e);
         _dgvMeterReadings.CellEndEdit += (s, e) => _dgvMeterReadings.InvalidateRow(e.RowIndex);
 
         // Alternating row color
@@ -196,55 +220,56 @@ public class MeterReadingControl : UserControl
         var footerPanel = new Panel
         {
             Dock = DockStyle.Bottom,
-            Height = 60,
+            Height = 65,
             Padding = new Padding(5, 10, 5, 5)
         };
 
         _lblSummary = new Label
         {
-            Text = "รวม: 0 ห้อง | ค่าไฟรวม: ฿0 | ค่าน้ำรวม: ฿0",
+            Text = "รวม: 0 ห้อง | ค่าไฟรวม: ฿0 | ค่าน้ำรวม: ฿0 | รวมบิลทั้งหมด: ฿0",
             Font = new Font("Segoe UI", 11F, FontStyle.Bold),
             ForeColor = Color.FromArgb(30, 41, 59),
-            Location = new Point(5, 16),
+            Location = new Point(5, 18),
             AutoSize = true
         };
 
-        _btnSave = new Button
+        // Big 1-Click Master Button
+        _btnOneClickProcess = new Button
         {
-            Text = "💾 บันทึกทั้งหมด",
+            Text = "⚡ 1-Click บันทึกและออกบิลรวมทั้งหมด",
             Font = new Font("Segoe UI", 11F, FontStyle.Bold),
             ForeColor = Color.White,
             BackColor = Color.FromArgb(22, 163, 74),
             FlatStyle = FlatStyle.Flat,
-            Size = new Size(180, 40),
+            Size = new Size(270, 44),
             Anchor = AnchorStyles.Top | AnchorStyles.Right,
             Cursor = Cursors.Hand
         };
-        _btnSave.FlatAppearance.BorderSize = 0;
-        _btnSave.Click += async (s, e) => await SaveAllReadingsAsync();
+        _btnOneClickProcess.FlatAppearance.BorderSize = 0;
+        _btnOneClickProcess.Click += async (s, e) => await ProcessOneClickSaveAndGenerateAsync();
 
-        _btnGenerateBills = new Button
+        _btnBatchPrint = new Button
         {
-            Text = "📄 สร้างใบแจ้งหนี้",
-            Font = new Font("Segoe UI", 11F, FontStyle.Bold),
+            Text = "🖨️ พิมพ์บิลทุกห้อง",
+            Font = new Font("Segoe UI", 10.5F, FontStyle.Bold),
             ForeColor = Color.White,
             BackColor = Color.FromArgb(37, 99, 235),
             FlatStyle = FlatStyle.Flat,
-            Size = new Size(180, 40),
+            Size = new Size(160, 44),
             Anchor = AnchorStyles.Top | AnchorStyles.Right,
             Cursor = Cursors.Hand
         };
-        _btnGenerateBills.FlatAppearance.BorderSize = 0;
-        _btnGenerateBills.Click += async (s, e) => await GenerateAllBillsAsync();
+        _btnBatchPrint.FlatAppearance.BorderSize = 0;
+        _btnBatchPrint.Click += async (s, e) => await PrintBatchInvoicesAsync();
 
         _btnViewHistory = new Button
         {
-            Text = "📋 ดูย้อนหลัง",
-            Font = new Font("Segoe UI", 11F, FontStyle.Bold),
+            Text = "📋 ดูประวัติ / รายงาน",
+            Font = new Font("Segoe UI", 10.5F, FontStyle.Bold),
             ForeColor = Color.White,
             BackColor = Color.FromArgb(100, 116, 139),
             FlatStyle = FlatStyle.Flat,
-            Size = new Size(150, 40),
+            Size = new Size(150, 44),
             Anchor = AnchorStyles.Top | AnchorStyles.Right,
             Cursor = Cursors.Hand
         };
@@ -253,15 +278,14 @@ public class MeterReadingControl : UserControl
 
         footerPanel.Controls.Add(_lblSummary);
         footerPanel.Controls.Add(_btnViewHistory);
-        footerPanel.Controls.Add(_btnGenerateBills);
-        footerPanel.Controls.Add(_btnSave);
+        footerPanel.Controls.Add(_btnBatchPrint);
+        footerPanel.Controls.Add(_btnOneClickProcess);
 
-        // Position buttons (right-aligned)
         footerPanel.Resize += (s, e) =>
         {
-            _btnSave.Location = new Point(footerPanel.Width - _btnSave.Width - 10, 10);
-            _btnGenerateBills.Location = new Point(_btnSave.Left - _btnGenerateBills.Width - 10, 10);
-            _btnViewHistory.Location = new Point(_btnGenerateBills.Left - _btnViewHistory.Width - 10, 10);
+            _btnOneClickProcess.Location = new Point(footerPanel.Width - _btnOneClickProcess.Width - 10, 10);
+            _btnBatchPrint.Location = new Point(_btnOneClickProcess.Left - _btnBatchPrint.Width - 10, 10);
+            _btnViewHistory.Location = new Point(_btnBatchPrint.Left - _btnViewHistory.Width - 10, 10);
         };
 
         Controls.Add(_dgvMeterReadings);
@@ -277,13 +301,11 @@ public class MeterReadingControl : UserControl
         _settings = await _settingsService.GetAllSettingsAsync();
         _rooms = (await _roomService.GetRoomsAsync()).ToList();
 
-        // Update water mode indicator
         bool isWaterMeter = _settings.WaterBillingMode == "METER";
         _lblWaterMode.Text = isWaterMeter
-            ? $"💧 น้ำ: ตามมิเตอร์ ({_settings.WaterRatePerUnit:N2} ฿/หน่วย)"
-            : $"💧 น้ำ: เหมาจ่าย ({_settings.WaterFlatRatePerPerson:N2} ฿/คน)";
+            ? $"💧 น้ำ: ตามมิเตอร์ ({_settings.WaterRatePerUnit:N2} ฿/หน่วย) | ⚡ ไฟ: {_settings.ElectricRatePerUnit:N2} ฿/หน่วย | 🗑️ ขยะ: {_settings.GarbageFee:N0} ฿"
+            : $"💧 น้ำ: เหมาจ่าย ({_settings.WaterFlatRatePerPerson:N2} ฿/คน) | ⚡ ไฟ: {_settings.ElectricRatePerUnit:N2} ฿/หน่วย | 🗑️ ขยะ: {_settings.GarbageFee:N0} ฿";
 
-        // Show/hide water meter columns based on mode
         _dgvMeterReadings.Columns["WaterPrev"]!.Visible = isWaterMeter;
         _dgvMeterReadings.Columns["WaterCurr"]!.Visible = isWaterMeter;
         _dgvMeterReadings.Columns["WaterUnits"]!.Visible = isWaterMeter;
@@ -291,15 +313,38 @@ public class MeterReadingControl : UserControl
 
         _dgvMeterReadings.Rows.Clear();
 
+        // ดึงใบแจ้งหนี้ที่มีอยู่แล้วในระบบของเดือนนี้
+        var existingBills = (await _utilityBillService.GetBillsByMonthAsync(billingMonth)).ToDictionary(b => b.RoomId);
+        var readingsMap = (await _utilityBillService.GetMeterReadingsByMonthAsync(billingMonth))
+            .GroupBy(r => r.RoomId).ToDictionary(g => g.Key, g => g.ToList());
+
         foreach (var room in _rooms)
         {
+            // ดึงชื่อผู้เช่าปัจจุบัน (ถ้ามี)
+            string tenantName = "ผู้เช่าทั่วไป";
+            if (_bookingService != null && _customerService != null)
+            {
+                try
+                {
+                    var activeBooking = await _bookingService.GetActiveBookingByRoomIdAsync(room.Id);
+                    if (activeBooking != null)
+                    {
+                        var cust = await _customerService.GetCustomerByIdAsync(activeBooking.CustomerId);
+                        if (cust != null) tenantName = cust.FullName;
+                    }
+                }
+                catch { }
+            }
+
+            decimal roomRate = room.RoomType?.MonthlyRate ?? 3500m;
+
             // ดึงเลขมิเตอร์เดือนก่อนหน้าอัตโนมัติ
             decimal elecPrev = await _utilityBillService.GetPreviousMeterValueAsync(room.Id, UtilityType.Electric, billingMonth);
             decimal waterPrev = await _utilityBillService.GetPreviousMeterValueAsync(room.Id, UtilityType.Water, billingMonth);
 
-            // ดึงข้อมูลที่เคยบันทึกแล้ว (ถ้ามี)
-            var readings = (await _utilityBillService.GetMeterReadingsByMonthAsync(billingMonth))
-                .Where(r => r.RoomId == room.Id).ToList();
+            readingsMap.TryGetValue(room.Id, out var readings);
+            readings ??= new List<MeterReading>();
+
             var elecReading = readings.FirstOrDefault(r => r.UtilityType == UtilityType.Electric);
             var waterReading = readings.FirstOrDefault(r => r.UtilityType == UtilityType.Water);
 
@@ -308,24 +353,26 @@ public class MeterReadingControl : UserControl
             decimal elecUnits = elecReading?.UnitsUsed ?? 0;
             decimal waterUnits = waterReading?.UnitsUsed ?? 0;
             decimal elecAmount = elecReading?.TotalAmount ?? 0;
-            decimal waterAmount;
+            decimal waterAmount = isWaterMeter ? (waterReading?.TotalAmount ?? 0) : _settings.WaterFlatRatePerPerson;
 
-            if (isWaterMeter)
-            {
-                waterAmount = waterReading?.TotalAmount ?? 0;
-            }
-            else
-            {
-                waterAmount = _settings.WaterFlatRatePerPerson; // default 1 person
-            }
-
-            // ถ้ามีข้อมูลเดิม ใช้ค่าเดิม, ถ้าไม่มีใช้ค่า prev ที่ดึงมา
             if (elecReading != null) elecPrev = elecReading.ReadingPrev;
             if (waterReading != null) waterPrev = waterReading.ReadingPrev;
+
+            // คำนวณยอดรวมสุทธิ (ค่าห้อง + ไฟ + น้ำ + ส่วนกลาง + ขยะ)
+            decimal totalBill = roomRate + elecAmount + waterAmount + _settings.CommonAreaFee + _settings.GarbageFee;
+
+            // เช็คสถานะการชำระเงิน
+            bool isPaid = false;
+            if (existingBills.TryGetValue(room.Id, out var bill))
+            {
+                isPaid = bill.IsPaid;
+                totalBill = bill.TotalAmount;
+            }
 
             int rowIndex = _dgvMeterReadings.Rows.Add(
                 room.Id,
                 room.RoomNumber,
+                tenantName,
                 elecPrev,
                 elecCurr == 0 ? (object)"" : elecCurr,
                 elecUnits,
@@ -335,12 +382,27 @@ public class MeterReadingControl : UserControl
                 waterUnits,
                 waterAmount,
                 1, // default 1 person
+                totalBill,
+                isPaid ? "✅ ชำระแล้ว" : "❌ กดชำระเงิน",
+                "📄 พิมพ์บิลเดียว",
                 elecReading?.Notes ?? ""
             );
 
-            // Mark prev columns as read-only
             _dgvMeterReadings.Rows[rowIndex].Cells["ElecPrev"].ReadOnly = true;
             _dgvMeterReadings.Rows[rowIndex].Cells["WaterPrev"].ReadOnly = true;
+
+            // Style status button cell
+            var statusCell = _dgvMeterReadings.Rows[rowIndex].Cells["BtnStatus"];
+            if (isPaid)
+            {
+                statusCell.Style.BackColor = Color.FromArgb(220, 252, 231);
+                statusCell.Style.ForeColor = Color.FromArgb(22, 101, 52);
+            }
+            else
+            {
+                statusCell.Style.BackColor = Color.FromArgb(254, 226, 226);
+                statusCell.Style.ForeColor = Color.FromArgb(153, 27, 27);
+            }
         }
 
         UpdateSummary();
@@ -379,7 +441,7 @@ public class MeterReadingControl : UserControl
             }
         }
 
-        // Auto-calculate water (FLAT mode - per person)
+        // Auto-calculate water (FLAT mode)
         if (colName == "WaterPersons" && _settings.WaterBillingMode == "FLAT")
         {
             if (int.TryParse(row.Cells["WaterPersons"].Value?.ToString(), out int persons))
@@ -389,92 +451,141 @@ public class MeterReadingControl : UserControl
             }
         }
 
+        // Update total bill amount cell
+        int roomId = Convert.ToInt32(row.Cells["RoomId"].Value);
+        var room = _rooms.FirstOrDefault(r => r.Id == roomId);
+        decimal roomRate = room?.RoomType?.MonthlyRate ?? 3500m;
+
+        decimal.TryParse(row.Cells["ElecAmount"].Value?.ToString(), out decimal elecAmt);
+        decimal.TryParse(row.Cells["WaterAmount"].Value?.ToString(), out decimal waterAmt);
+        decimal total = roomRate + elecAmt + waterAmt + _settings.CommonAreaFee + _settings.GarbageFee;
+        row.Cells["TotalBillAmount"].Value = total;
+
         UpdateSummary();
+    }
+
+    private async Task DgvMeterReadings_CellContentClick(object? sender, DataGridViewCellEventArgs e)
+    {
+        if (e.RowIndex < 0) return;
+
+        string colName = _dgvMeterReadings.Columns[e.ColumnIndex].Name;
+        var row = _dgvMeterReadings.Rows[e.RowIndex];
+        int roomId = Convert.ToInt32(row.Cells["RoomId"].Value);
+        string roomNumber = row.Cells["RoomNumber"].Value?.ToString() ?? "";
+        if (_cmbBillingMonth.SelectedItem == null) return;
+        string billingMonth = ((MonthItem)_cmbBillingMonth.SelectedItem).Value;
+
+        // Action 1: พิมพ์บิลเดียวรายห้อง (Single Unified Bill)
+        if (colName == "BtnPrint")
+        {
+            await SaveSingleRoomReadingAsync(row, roomId, billingMonth);
+            
+            int waterPersons = 1;
+            if (int.TryParse(row.Cells["WaterPersons"].Value?.ToString(), out int p)) waterPersons = p;
+
+            // Generate or fetch existing bill
+            var bill = await _utilityBillService.GenerateMonthlyBillAsync(roomId, billingMonth, waterPersons);
+
+            // Fetch Customer Info
+            Customer? customer = null;
+            if (_bookingService != null && _customerService != null)
+            {
+                try
+                {
+                    var activeBooking = await _bookingService.GetActiveBookingByRoomIdAsync(roomId);
+                    if (activeBooking != null)
+                    {
+                        customer = await _customerService.GetCustomerByIdAsync(activeBooking.CustomerId);
+                    }
+                }
+                catch { }
+            }
+
+            // Launch Single Invoice Printer
+            var printer = new UtilityInvoicePrinter(bill, customer, _settings);
+            printer.ShowPrintPreview();
+        }
+
+        // Action 2: สลับสถานะชำระเงินตรงในตาราง (Quick Pay Toggle)
+        if (colName == "BtnStatus")
+        {
+            await SaveSingleRoomReadingAsync(row, roomId, billingMonth);
+            
+            int waterPersons = 1;
+            if (int.TryParse(row.Cells["WaterPersons"].Value?.ToString(), out int p)) waterPersons = p;
+
+            var bill = await _utilityBillService.GenerateMonthlyBillAsync(roomId, billingMonth, waterPersons);
+
+            if (!bill.IsPaid)
+            {
+                if (MessageBox.Show($"บันทึกว่าห้อง {roomNumber} ชำระเงินเรียบร้อยแล้ว ยอด ฿{bill.TotalAmount:N2}?",
+                    "💰 ยืนยันการชำระเงิน", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
+                {
+                    await _utilityBillService.MarkBillAsPaidAsync(bill.Id, PaymentMethod.Cash);
+                    row.Cells["BtnStatus"].Value = "✅ ชำระแล้ว";
+                    row.Cells["BtnStatus"].Style.BackColor = Color.FromArgb(220, 252, 231);
+                    row.Cells["BtnStatus"].Style.ForeColor = Color.FromArgb(22, 101, 52);
+                }
+            }
+            else
+            {
+                MessageBox.Show($"ห้อง {roomNumber} ชำระเงินเรียบร้อยแล้ว", "ข้อมูลการชำระ", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+
+            UpdateSummary();
+        }
+    }
+
+    private async Task SaveSingleRoomReadingAsync(DataGridViewRow row, int roomId, string billingMonth)
+    {
+        // Save electric
+        if (decimal.TryParse(row.Cells["ElecPrev"].Value?.ToString(), out decimal elecPrev) &&
+            decimal.TryParse(row.Cells["ElecCurr"].Value?.ToString(), out decimal elecCurr) && elecCurr > 0)
+        {
+            await _utilityBillService.RecordMeterReadingAsync(
+                roomId, UtilityType.Electric, elecPrev, elecCurr, billingMonth, row.Cells["Notes"].Value?.ToString());
+        }
+
+        // Save water (if METER mode)
+        if (_settings.WaterBillingMode == "METER")
+        {
+            if (decimal.TryParse(row.Cells["WaterPrev"].Value?.ToString(), out decimal waterPrev) &&
+                decimal.TryParse(row.Cells["WaterCurr"].Value?.ToString(), out decimal waterCurr) && waterCurr > 0)
+            {
+                await _utilityBillService.RecordMeterReadingAsync(
+                    roomId, UtilityType.Water, waterPrev, waterCurr, billingMonth, row.Cells["Notes"].Value?.ToString());
+            }
+        }
     }
 
     private void UpdateSummary()
     {
-        decimal totalElec = 0, totalWater = 0;
+        decimal totalElec = 0, totalWater = 0, grandTotal = 0;
         int roomCount = _dgvMeterReadings.Rows.Count;
 
         foreach (DataGridViewRow row in _dgvMeterReadings.Rows)
         {
             if (decimal.TryParse(row.Cells["ElecAmount"].Value?.ToString(), out decimal e)) totalElec += e;
             if (decimal.TryParse(row.Cells["WaterAmount"].Value?.ToString(), out decimal w)) totalWater += w;
+            if (decimal.TryParse(row.Cells["TotalBillAmount"].Value?.ToString(), out decimal t)) grandTotal += t;
         }
 
-        _lblSummary.Text = $"รวม: {roomCount} ห้อง | ⚡ ค่าไฟรวม: ฿{totalElec:N2} | 💧 ค่าน้ำรวม: ฿{totalWater:N2} | 🏷️ รวมทั้งหมด: ฿{totalElec + totalWater:N2}";
+        _lblSummary.Text = $"รวม: {roomCount} ห้อง | ⚡ ไฟ: ฿{totalElec:N2} | 💧 น้ำ: ฿{totalWater:N2} | 🏷️ รวมบิลสุทธิทุกห้อง: ฿{grandTotal:N2}";
     }
 
-    private async Task SaveAllReadingsAsync()
-    {
-        if (_cmbBillingMonth.SelectedItem == null) return;
-        string billingMonth = ((MonthItem)_cmbBillingMonth.SelectedItem).Value;
-
-        int savedCount = 0;
-        var errors = new List<string>();
-
-        foreach (DataGridViewRow row in _dgvMeterReadings.Rows)
-        {
-            int roomId = Convert.ToInt32(row.Cells["RoomId"].Value);
-            string roomNumber = row.Cells["RoomNumber"].Value?.ToString() ?? "";
-
-            try
-            {
-                // Save Electric Meter
-                if (decimal.TryParse(row.Cells["ElecPrev"].Value?.ToString(), out decimal elecPrev) &&
-                    decimal.TryParse(row.Cells["ElecCurr"].Value?.ToString(), out decimal elecCurr) && elecCurr > 0)
-                {
-                    await _utilityBillService.RecordMeterReadingAsync(
-                        roomId, UtilityType.Electric, elecPrev, elecCurr, billingMonth,
-                        row.Cells["Notes"].Value?.ToString());
-                    savedCount++;
-                }
-
-                // Save Water Meter (only in METER mode)
-                if (_settings.WaterBillingMode == "METER")
-                {
-                    if (decimal.TryParse(row.Cells["WaterPrev"].Value?.ToString(), out decimal waterPrev) &&
-                        decimal.TryParse(row.Cells["WaterCurr"].Value?.ToString(), out decimal waterCurr) && waterCurr > 0)
-                    {
-                        await _utilityBillService.RecordMeterReadingAsync(
-                            roomId, UtilityType.Water, waterPrev, waterCurr, billingMonth,
-                            row.Cells["Notes"].Value?.ToString());
-                        savedCount++;
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                errors.Add($"ห้อง {roomNumber}: {ex.Message}");
-            }
-        }
-
-        if (errors.Count > 0)
-        {
-            MessageBox.Show($"บันทึกสำเร็จ {savedCount} รายการ\n\nข้อผิดพลาด:\n{string.Join("\n", errors)}",
-                "⚠️ บันทึกไม่สมบูรณ์", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-        }
-        else
-        {
-            MessageBox.Show($"✅ บันทึกเลขมิเตอร์สำเร็จ {savedCount} รายการ",
-                "บันทึกสำเร็จ", MessageBoxButtons.OK, MessageBoxIcon.Information);
-        }
-    }
-
-    private async Task GenerateAllBillsAsync()
+    private async Task ProcessOneClickSaveAndGenerateAsync()
     {
         if (_cmbBillingMonth.SelectedItem == null) return;
         string billingMonth = ((MonthItem)_cmbBillingMonth.SelectedItem).Value;
 
         var confirm = MessageBox.Show(
-            $"ต้องการสร้างใบแจ้งหนี้รายเดือนทุกห้อง สำหรับเดือน {((MonthItem)_cmbBillingMonth.SelectedItem).Display}?\n\n" +
-            "ระบบจะรวม: ค่าเช่าห้อง + ค่าไฟ + ค่าน้ำ + ค่าบริการ + ค่าขยะ",
-            "📄 ยืนยันสร้างใบแจ้งหนี้", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+            $"⚡ ต้องการ [บันทึกเลขมิเตอร์ + ออกใบแจ้งหนี้รวม] ทุกห้อง สำหรับเดือน {((MonthItem)_cmbBillingMonth.SelectedItem).Display} ใช่หรือไม่?\n\n" +
+            "ระบบจะคำนวณและสรุปยอดบิล (ค่าห้อง + ค่าไฟ + ค่าน้ำ + ค่าบริการ + ค่าขยะ) ในคลิกเดียว!",
+            "⚡ 1-Click บันทึกและออกบิล", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
 
         if (confirm != DialogResult.Yes) return;
 
-        int generatedCount = 0;
+        int processed = 0;
         var errors = new List<string>();
 
         foreach (DataGridViewRow row in _dgvMeterReadings.Rows)
@@ -484,11 +595,13 @@ public class MeterReadingControl : UserControl
 
             try
             {
+                await SaveSingleRoomReadingAsync(row, roomId, billingMonth);
+
                 int waterPersons = 1;
                 if (int.TryParse(row.Cells["WaterPersons"].Value?.ToString(), out int p)) waterPersons = p;
 
                 await _utilityBillService.GenerateMonthlyBillAsync(roomId, billingMonth, waterPersons);
-                generatedCount++;
+                processed++;
             }
             catch (Exception ex)
             {
@@ -496,15 +609,56 @@ public class MeterReadingControl : UserControl
             }
         }
 
+        await LoadMeterDataAsync();
+
         if (errors.Count > 0)
         {
-            MessageBox.Show($"สร้างใบแจ้งหนี้ {generatedCount} ห้อง\n\nข้อผิดพลาด:\n{string.Join("\n", errors)}",
+            MessageBox.Show($"ดำเนินการสำเร็จ {processed} ห้อง\n\nข้อผิดพลาด:\n{string.Join("\n", errors)}",
                 "⚠️ ไม่สมบูรณ์", MessageBoxButtons.OK, MessageBoxIcon.Warning);
         }
         else
         {
-            MessageBox.Show($"✅ สร้างใบแจ้งหนี้สำเร็จ {generatedCount} ห้อง\n\nสามารถดูรายละเอียดและพิมพ์ใบแจ้งหนี้ได้ที่ปุ่ม 📋 ดูย้อนหลัง",
-                "สร้างใบแจ้งหนี้สำเร็จ", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            MessageBox.Show($"✅ บันทึกเลขมิเตอร์และออกใบแจ้งหนี้รวมสำเร็จ {processed} ห้องเรียบร้อยแล้ว!\n\nท่านสามารถกดปุ่ม [📄 พิมพ์บิลเดียว] ในแต่ละแถวเพื่อพิมพ์ใบแจ้งหนี้ให้ผู้เช่าได้ทันที",
+                "⚡ ทำรายการสำเร็จ 100%", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+    }
+
+    private async Task PrintBatchInvoicesAsync()
+    {
+        if (_cmbBillingMonth.SelectedItem == null) return;
+        string billingMonth = ((MonthItem)_cmbBillingMonth.SelectedItem).Value;
+
+        var confirm = MessageBox.Show(
+            $"ต้องการพิมพ์ใบแจ้งหนี้ของทุกห้องสำหรับเดือน {((MonthItem)_cmbBillingMonth.SelectedItem).Display} ใช่หรือไม่?",
+            "🖨️ พิมพ์บิลทุกห้อง", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+
+        if (confirm != DialogResult.Yes) return;
+
+        var bills = (await _utilityBillService.GetBillsByMonthAsync(billingMonth)).ToList();
+        if (bills.Count == 0)
+        {
+            MessageBox.Show("ยังไม่มีใบแจ้งหนี้ในระบบ กรุณากดปุ่ม [⚡ 1-Click บันทึกและออกบิลรวมทั้งหมด] ก่อน", "⚠️ ไม่พบใบแจ้งหนี้", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return;
+        }
+
+        foreach (var bill in bills)
+        {
+            Customer? customer = null;
+            if (_bookingService != null && _customerService != null)
+            {
+                try
+                {
+                    var activeBooking = await _bookingService.GetActiveBookingByRoomIdAsync(bill.RoomId);
+                    if (activeBooking != null)
+                    {
+                        customer = await _customerService.GetCustomerByIdAsync(activeBooking.CustomerId);
+                    }
+                }
+                catch { }
+            }
+
+            var printer = new UtilityInvoicePrinter(bill, customer, _settings);
+            printer.ShowPrintPreview();
         }
     }
 
@@ -516,19 +670,4 @@ public class MeterReadingControl : UserControl
         using var historyForm = new UtilityBillHistoryForm(_utilityBillService, billingMonth);
         historyForm.ShowDialog();
     }
-}
-
-/// <summary>Helper class สำหรับ ComboBox เดือน</summary>
-internal class MonthItem
-{
-    public string Value { get; } // "YYYY-MM"
-    public string Display { get; }
-
-    public MonthItem(string value, string display)
-    {
-        Value = value;
-        Display = display;
-    }
-
-    public override string ToString() => Display;
 }

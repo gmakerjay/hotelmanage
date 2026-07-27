@@ -89,7 +89,7 @@ public class MainForm : Form
         _bookingListControl = new BookingListControl(_bookingService, _roomService, _customerService) { Dock = DockStyle.Fill };
         _roomManagementControl = new RoomManagementControl(_roomService) { Dock = DockStyle.Fill };
         _customerManagementControl = new CustomerManagementControl(_customerService) { Dock = DockStyle.Fill };
-        _meterReadingControl = new MeterReadingControl(_utilityBillService, _roomService, _settingsService) { Dock = DockStyle.Fill };
+        _meterReadingControl = new MeterReadingControl(_utilityBillService, _roomService, _settingsService, _bookingService, _customerService) { Dock = DockStyle.Fill };
         _auditLogControl = new AuditLogControl(auditService) { Dock = DockStyle.Fill };
         _backupControl = new SystemBackupControl(backupService, exportImportService) { Dock = DockStyle.Fill };
         _systemSettingsControl = new SystemSettingsControl(_settingsService) { Dock = DockStyle.Fill };
