@@ -4,11 +4,9 @@ using System.Drawing;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows.Forms;
-using Dapper;
 using HotelPOS.Common;
 using HotelPOS.Common.Models;
 using HotelPOS.Core.Services;
-using HotelPOS.Data;
 using HotelPOS.Logging;
 using HotelPOS.Printing;
 
@@ -44,12 +42,15 @@ public class POSControl : UserControl
     private Button _btnCheckout = null!;
     private Button _btnClearCart = null!;
     private Button _btnManageInventory = null!;
+    private Button _btnSalesHistory = null!;
+    private readonly IAuditService? _auditService;
 
-    public POSControl(IPOSService posService, ISettingsService settingsService, IAppLogger logger)
+    public POSControl(IPOSService posService, ISettingsService settingsService, IAppLogger logger, IAuditService? auditService = null)
     {
         _posService = posService;
         _settingsService = settingsService;
         _logger = logger;
+        _auditService = auditService;
 
         InitializeUI();
         Load += async (s, e) => await LoadInitialDataAsync();
@@ -65,11 +66,27 @@ public class POSControl : UserControl
         var mainSplit = new SplitContainer
         {
             Dock = DockStyle.Fill,
-            SplitterDistance = 750,
             SplitterWidth = 8,
             IsSplitterFixed = false
         };
         Controls.Add(mainSplit);
+
+        mainSplit.Resize += (s, e) =>
+        {
+            try
+            {
+                if (mainSplit.Width > 700)
+                {
+                    mainSplit.Panel1MinSize = 300;
+                    mainSplit.Panel2MinSize = 300;
+                    int targetDist = (int)(mainSplit.Width * 0.58);
+                    int maxDist = mainSplit.Width - mainSplit.Panel2MinSize;
+                    int minDist = mainSplit.Panel1MinSize;
+                    mainSplit.SplitterDistance = Math.Clamp(targetDist, minDist, Math.Max(minDist, maxDist));
+                }
+            }
+            catch { }
+        };
 
         // --- LEFT PANEL ---
         var pnlLeft = new Panel { Dock = DockStyle.Fill, Padding = new Padding(12) };
@@ -89,7 +106,8 @@ public class POSControl : UserControl
         var pnlSearch = new Panel
         {
             Location = new Point(12, 45),
-            Size = new Size(720, 40)
+            Size = new Size(pnlLeft.Width - 24, 40),
+            Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
         };
         pnlLeft.Controls.Add(pnlSearch);
 
@@ -116,11 +134,30 @@ public class POSControl : UserControl
         _btnManageInventory.Click += BtnManageInventory_Click;
         pnlSearch.Controls.Add(_btnManageInventory);
 
+        _btnSalesHistory = new Button
+        {
+            Text = "📜 ประวัติการขาย & พิมพ์ใบเสร็จย้อนหลัง",
+            BackColor = Color.White,
+            ForeColor = Color.FromArgb(30, 41, 59),
+            FlatStyle = FlatStyle.Flat,
+            Font = new Font("Segoe UI", 9.5F, FontStyle.Bold),
+            Location = new Point(555, 3),
+            Size = new Size(230, 32),
+            Cursor = Cursors.Hand
+        };
+        _btnSalesHistory.Click += (s, e) =>
+        {
+            using var form = new POSSalesHistoryForm(_posService, _settingsService, _logger, _auditService);
+            form.ShowDialog();
+        };
+        pnlSearch.Controls.Add(_btnSalesHistory);
+
         // Category Flow Panel
         _flpCategories = new FlowLayoutPanel
         {
             Location = new Point(12, 90),
-            Size = new Size(720, 45),
+            Size = new Size(pnlLeft.Width - 24, 45),
+            Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
             FlowDirection = FlowDirection.LeftToRight,
             WrapContents = false,
             AutoScroll = true
@@ -131,13 +168,21 @@ public class POSControl : UserControl
         _flpProducts = new FlowLayoutPanel
         {
             Location = new Point(12, 140),
-            Size = new Size(720, 600),
+            Size = new Size(pnlLeft.Width - 24, Math.Max(200, pnlLeft.Height - 150)),
             Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right,
             AutoScroll = true,
             FlowDirection = FlowDirection.LeftToRight,
             Padding = new Padding(0, 0, 15, 10)
         };
         pnlLeft.Controls.Add(_flpProducts);
+
+        pnlLeft.SizeChanged += (s, e) =>
+        {
+            int w = Math.Max(200, pnlLeft.ClientSize.Width - 24);
+            pnlSearch.Width = w;
+            _flpCategories.Width = w;
+            _flpProducts.Width = w;
+        };
 
 
         // --- RIGHT PANEL (CART) ---
@@ -163,7 +208,7 @@ public class POSControl : UserControl
         _dgvCart = new DataGridView
         {
             Location = new Point(12, 45),
-            Size = new Size(460, 350),
+            Size = new Size(pnlRight.Width - 24, Math.Max(150, pnlRight.Height - 280)),
             Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right,
             AllowUserToAddRows = false,
             AllowUserToDeleteRows = false,
@@ -173,6 +218,7 @@ public class POSControl : UserControl
             BorderStyle = BorderStyle.None,
             RowHeadersVisible = false,
             GridColor = Color.FromArgb(241, 245, 249),
+            AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
             ColumnHeadersDefaultCellStyle = new DataGridViewCellStyle
             {
                 BackColor = Color.FromArgb(241, 245, 249),
@@ -692,47 +738,23 @@ public class POSControl : UserControl
 
             if (sale == null) return;
 
-            var connectionFactory = new DbConnectionFactory();
-            using var connection = connectionFactory.CreateConnection();
-            
             Room room = new Room { RoomNumber = "หน้าร้าน (Retail)" };
             Customer customer = new Customer { FullName = "ลูกค้าทั่วไป" };
             
             if (sale.FolioId.HasValue)
             {
-                var folioData = await connection.QuerySingleOrDefaultAsync<dynamic>(
-                    @"SELECT r.id AS RoomId, r.room_number, r.room_type_id, r.floor, r.status AS RoomStatus, r.notes AS RoomNotes,
-                             c.id AS CustomerId, c.full_name, c.phone, c.email
-                      FROM folios f
-                      JOIN bookings b ON f.booking_id = b.id
-                      JOIN rooms r ON b.room_id = r.id
-                      JOIN customers c ON b.customer_id = c.id
-                      WHERE f.id = @FolioId", new { FolioId = sale.FolioId.Value });
-                if (folioData != null)
+                var folioDetails = await _posService.GetFolioDetailsAsync(sale.FolioId.Value);
+                if (folioDetails.HasValue)
                 {
-                    room = new Room 
-                    { 
-                        Id = (int)folioData.RoomId,
-                        RoomNumber = folioData.room_number,
-                        RoomTypeId = (int)folioData.room_type_id,
-                        Floor = folioData.floor,
-                        Status = (RoomStatus)folioData.RoomStatus,
-                        Notes = folioData.RoomNotes
-                    };
-                    customer = new Customer 
-                    { 
-                        Id = (int)folioData.CustomerId,
-                        FullName = folioData.full_name,
-                        Phone = folioData.phone,
-                        Email = folioData.email
-                    };
+                    room = folioDetails.Value.Room;
+                    customer = folioDetails.Value.Customer;
                 }
             }
             else if (sale.CustomerId.HasValue)
             {
-                var custData = await connection.QuerySingleOrDefaultAsync<Customer>(
-                    "SELECT * FROM customers WHERE id = @Id", new { Id = sale.CustomerId.Value });
-                if (custData != null) customer = custData;
+                // ดึงข้อมูลลูกค้าผ่าน Service layer (ไม่ query DB ตรงจาก UI)
+                var folioDetails = await _posService.GetCustomerByIdAsync(sale.CustomerId.Value);
+                if (folioDetails != null) customer = folioDetails;
             }
 
             var settings = await _settingsService.GetAllSettingsAsync();
@@ -786,10 +808,13 @@ public class POSControl : UserControl
         using var dlg = new Form
         {
             Text = "จัดการสต็อกและสินค้า (POS Inventory & Products)",
-            Size = new Size(880, 520),
+            Size = new Size(1020, 600),
+            MinimumSize = new Size(950, 540),
             StartPosition = FormStartPosition.CenterParent,
             BackColor = Color.FromArgb(248, 250, 252),
-            Font = new Font("Segoe UI", 9.5F, FontStyle.Regular)
+            Font = new Font("Segoe UI", 9.5F, FontStyle.Regular),
+            MaximizeBox = true,
+            MinimizeBox = false
         };
 
         var mainTab = new TabControl { Dock = DockStyle.Fill };
@@ -799,7 +824,7 @@ public class POSControl : UserControl
         var tabProducts = new TabPage("รายการสินค้า (Products)");
         mainTab.TabPages.Add(tabProducts);
 
-        var splitProd = new SplitContainer { Dock = DockStyle.Fill, SplitterDistance = 480 };
+        var splitProd = new SplitContainer { Dock = DockStyle.Fill };
         tabProducts.Controls.Add(splitProd);
 
         var dgvProds = new DataGridView
@@ -819,43 +844,45 @@ public class POSControl : UserControl
         splitProd.Panel1.Controls.Add(dgvProds);
 
         // Inputs for product
-        var pnlProdInputs = new Panel { Dock = DockStyle.Fill, Padding = new Padding(12) };
+        var pnlProdInputs = new Panel { Dock = DockStyle.Fill, Padding = new Padding(12), AutoScroll = true };
         splitProd.Panel2.Controls.Add(pnlProdInputs);
 
         int iy = 15;
         var lblPName = new Label { Text = "ชื่อสินค้า:", Location = new Point(12, iy), Size = new Size(80, 20) };
-        var txtPName = new TextBox { Location = new Point(100, iy - 3), Size = new Size(200, 25) };
+        var txtPName = new TextBox { Location = new Point(100, iy - 3), Size = new Size(220, 25) };
         pnlProdInputs.Controls.AddRange(new Control[] { lblPName, txtPName });
-        iy += 35;
+        iy += 38;
 
         var lblPCat = new Label { Text = "ประเภท:", Location = new Point(12, iy), Size = new Size(80, 20) };
-        var cboPCat = new ComboBox { Location = new Point(100, iy - 3), Size = new Size(200, 25), DropDownStyle = ComboBoxStyle.DropDownList };
+        var cboPCat = new ComboBox { Location = new Point(100, iy - 3), Size = new Size(220, 25), DropDownStyle = ComboBoxStyle.DropDownList };
         pnlProdInputs.Controls.AddRange(new Control[] { lblPCat, cboPCat });
-        iy += 35;
+        iy += 38;
 
         var lblPPrice = new Label { Text = "ราคาขาย:", Location = new Point(12, iy), Size = new Size(80, 20) };
-        var numPPrice = new NumericUpDown { Location = new Point(100, iy - 3), Size = new Size(100, 25), Maximum = 100000 };
+        var numPPrice = new NumericUpDown { Location = new Point(100, iy - 3), Size = new Size(120, 25), Maximum = 100000, DecimalPlaces = 2 };
         pnlProdInputs.Controls.AddRange(new Control[] { lblPPrice, numPPrice });
-        iy += 35;
+        iy += 38;
 
-        var chkTrackStock = new CheckBox { Text = "ควบคุมสต็อกสินค้า", Location = new Point(100, iy), Size = new Size(200, 20) };
+        var chkTrackStock = new CheckBox { Text = "ควบคุมสต็อกสินค้า", Location = new Point(100, iy), Size = new Size(220, 24) };
         pnlProdInputs.Controls.Add(chkTrackStock);
-        iy += 30;
+        iy += 34;
 
         var lblPStock = new Label { Text = "สต็อกคงเหลือ:", Location = new Point(12, iy), Size = new Size(80, 20) };
-        var numPStock = new NumericUpDown { Location = new Point(100, iy - 3), Size = new Size(100, 25), Maximum = 99999 };
+        var numPStock = new NumericUpDown { Location = new Point(100, iy - 3), Size = new Size(120, 25), Maximum = 99999 };
         pnlProdInputs.Controls.AddRange(new Control[] { lblPStock, numPStock });
-        iy += 45;
+        iy += 48;
 
-        var btnSaveProd = new Button { Text = "บันทึกสินค้า", Location = new Point(12, iy), Size = new Size(130, 35), BackColor = Color.FromArgb(37, 99, 235), ForeColor = Color.White, FlatStyle = FlatStyle.Flat };
-        var btnDelProd = new Button { Text = "ลบสินค้า", Location = new Point(155, iy), Size = new Size(130, 35), BackColor = Color.White, ForeColor = Color.Red, FlatStyle = FlatStyle.Flat };
+        var btnSaveProd = new Button { Text = "บันทึกสินค้า", Location = new Point(12, iy), Size = new Size(125, 36), BackColor = Color.FromArgb(37, 99, 235), ForeColor = Color.White, FlatStyle = FlatStyle.Flat, Cursor = Cursors.Hand };
+        btnSaveProd.FlatAppearance.BorderSize = 0;
+        var btnDelProd = new Button { Text = "ลบสินค้า", Location = new Point(145, iy), Size = new Size(125, 36), BackColor = Color.White, ForeColor = Color.Red, FlatStyle = FlatStyle.Flat, Cursor = Cursors.Hand };
+        btnDelProd.FlatAppearance.BorderColor = Color.Red;
         pnlProdInputs.Controls.AddRange(new Control[] { btnSaveProd, btnDelProd });
 
         // Tab 2: Categories CRUD
         var tabCats = new TabPage("ประเภทสินค้า (Categories)");
         mainTab.TabPages.Add(tabCats);
 
-        var splitCat = new SplitContainer { Dock = DockStyle.Fill, SplitterDistance = 480 };
+        var splitCat = new SplitContainer { Dock = DockStyle.Fill };
         tabCats.Controls.Add(splitCat);
 
         var dgvCats = new DataGridView
@@ -871,17 +898,19 @@ public class POSControl : UserControl
         dgvCats.Columns.Add("Name", "ชื่อประเภท");
         splitCat.Panel1.Controls.Add(dgvCats);
 
-        var pnlCatInputs = new Panel { Dock = DockStyle.Fill, Padding = new Padding(12) };
+        var pnlCatInputs = new Panel { Dock = DockStyle.Fill, Padding = new Padding(12), AutoScroll = true };
         splitCat.Panel2.Controls.Add(pnlCatInputs);
 
         int cy = 15;
         var lblCName = new Label { Text = "ชื่อประเภท:", Location = new Point(12, cy), Size = new Size(80, 20) };
-        var txtCName = new TextBox { Location = new Point(100, cy - 3), Size = new Size(200, 25) };
+        var txtCName = new TextBox { Location = new Point(100, cy - 3), Size = new Size(220, 25) };
         pnlCatInputs.Controls.AddRange(new Control[] { lblCName, txtCName });
-        cy += 45;
+        cy += 48;
 
-        var btnSaveCat = new Button { Text = "บันทึกประเภท", Location = new Point(12, cy), Size = new Size(130, 35), BackColor = Color.FromArgb(37, 99, 235), ForeColor = Color.White, FlatStyle = FlatStyle.Flat };
-        var btnDelCat = new Button { Text = "ลบประเภท", Location = new Point(155, cy), Size = new Size(130, 35), BackColor = Color.White, ForeColor = Color.Red, FlatStyle = FlatStyle.Flat };
+        var btnSaveCat = new Button { Text = "บันทึกประเภท", Location = new Point(12, cy), Size = new Size(125, 36), BackColor = Color.FromArgb(37, 99, 235), ForeColor = Color.White, FlatStyle = FlatStyle.Flat, Cursor = Cursors.Hand };
+        btnSaveCat.FlatAppearance.BorderSize = 0;
+        var btnDelCat = new Button { Text = "ลบประเภท", Location = new Point(145, cy), Size = new Size(125, 36), BackColor = Color.White, ForeColor = Color.Red, FlatStyle = FlatStyle.Flat, Cursor = Cursors.Hand };
+        btnDelCat.FlatAppearance.BorderColor = Color.Red;
         pnlCatInputs.Controls.AddRange(new Control[] { btnSaveCat, btnDelCat });
 
         // Data binding helpers
@@ -965,6 +994,14 @@ public class POSControl : UserControl
             prod.StockQty = (int)numPStock.Value;
 
             await _posService.SaveProductAsync(prod);
+            if (_auditService != null)
+            {
+                var action = isNew ? "CREATE_PRODUCT" : "UPDATE_PRODUCT_STOCK";
+                var detail = isNew
+                    ? $"เพิ่มสินค้าใหม่ '{prod.Name}' ราคา {prod.Price:N2} บาท (สต็อก: {prod.StockQty})"
+                    : $"แก้ไขสินค้า '{prod.Name}' (ID={prod.Id}): ราคา {prod.Price:N2} บาท, สต็อก {prod.StockQty}";
+                await _auditService.LogAsync(action, "products", prod.Id.ToString(), detail);
+            }
             _products = (await _posService.GetProductsAsync()).ToList();
             reloadGrids();
             if (isNew) dgvProds.ClearSelection();
@@ -1033,6 +1070,26 @@ public class POSControl : UserControl
                 reloadGrids();
                 dgvCats.ClearSelection();
             }
+        };
+
+        dlg.Shown += (s, ev) =>
+        {
+            try
+            {
+                if (splitProd.Width > 700)
+                {
+                    splitProd.Panel1MinSize = 350;
+                    splitProd.Panel2MinSize = 300;
+                    splitProd.SplitterDistance = Math.Min(580, Math.Max(350, splitProd.Width - 340));
+                }
+                if (splitCat.Width > 700)
+                {
+                    splitCat.Panel1MinSize = 350;
+                    splitCat.Panel2MinSize = 300;
+                    splitCat.SplitterDistance = Math.Min(580, Math.Max(350, splitCat.Width - 340));
+                }
+            }
+            catch { }
         };
 
         dlg.ShowDialog();

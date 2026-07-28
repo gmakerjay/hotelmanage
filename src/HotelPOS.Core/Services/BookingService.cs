@@ -47,6 +47,11 @@ public class BookingService : IBookingService
         return await _bookingRepository.GetActiveBookingByRoomIdAsync(roomId);
     }
 
+    public async Task<Dictionary<int, (Booking Booking, Customer? Customer)>> GetAllActiveBookingsWithCustomersAsync()
+    {
+        return await _bookingRepository.GetAllActiveBookingsWithCustomersAsync();
+    }
+
     public async Task<Folio?> GetFolioByBookingIdAsync(int bookingId)
     {
         return await _folioRepository.GetFolioByBookingIdAsync(bookingId);

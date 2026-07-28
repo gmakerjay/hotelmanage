@@ -309,11 +309,15 @@ public class ReceiptInvoicePrinter
     private void RenderReceiptLayout(Graphics g, float contentWidth, float leftMargin, float rightMargin, float topMargin, string paperType)
     {
         float scale = (paperType == "58mm") ? 0.75f : 1.0f;
-        var fontTitle = new Font("Segoe UI", 12F * scale, FontStyle.Bold);
-        var fontSubtitle = new Font("Segoe UI", 9.5F * scale, FontStyle.Bold);
-        var fontBody = new Font("Segoe UI", 8.5F * scale, FontStyle.Regular);
-        var fontBodyBold = new Font("Segoe UI", 8.5F * scale, FontStyle.Bold);
-        var fontSmall = new Font("Segoe UI", 7.5F * scale, FontStyle.Regular);
+        // ใช้ Tahoma เพราะรองรับ Thai complex script ได้ดีกว่า Segoe UI บนเครื่องพิมพ์ Thermal
+        var fontTitle = new Font("Tahoma", 12F * scale, FontStyle.Bold);
+        var fontSubtitle = new Font("Tahoma", 9.5F * scale, FontStyle.Bold);
+        var fontBody = new Font("Tahoma", 8.5F * scale, FontStyle.Regular);
+        var fontBodyBold = new Font("Tahoma", 8.5F * scale, FontStyle.Bold);
+        var fontSmall = new Font("Tahoma", 7.5F * scale, FontStyle.Regular);
+
+        try
+        {
 
         float y = topMargin;
         float center = leftMargin + contentWidth / 2;
@@ -512,17 +516,26 @@ public class ReceiptInvoicePrinter
         string footerMsg = !string.IsNullOrWhiteSpace(_settings?.BillFooter) ? _settings.BillFooter : "ขอบคุณที่ใช้บริการ / Thank you";
         g.DrawString(footerMsg, fontSubtitle, Brushes.Black, new RectangleF(leftMargin, y, contentWidth, 30), sfCenter);
         y += 20 * scale;
+        }
+        finally
+        {
+            fontTitle.Dispose();
+            fontSubtitle.Dispose();
+            fontBody.Dispose();
+            fontBodyBold.Dispose();
+            fontSmall.Dispose();
+        }
     }
 
     private void RenderA4Layout(Graphics g, PrintPageEventArgs e)
     {
-        // Fonts
-        var fontTitle = new Font("Segoe UI", 20F, FontStyle.Bold);
-        var fontSubtitle = new Font("Segoe UI", 13.5F, FontStyle.Bold);
-        var fontHeader = new Font("Segoe UI", 11.5F, FontStyle.Bold);
-        var fontBody = new Font("Segoe UI", 10.5F, FontStyle.Regular);
-        var fontBodyBold = new Font("Segoe UI", 10.5F, FontStyle.Bold);
-        var fontSmall = new Font("Segoe UI", 9.5F, FontStyle.Regular);
+        // Fonts (ใช้ Tahoma สำหรับความเข้ากันได้กับภาษาไทย Thai complex script)
+        var fontTitle = new Font("Tahoma", 20F, FontStyle.Bold);
+        var fontSubtitle = new Font("Tahoma", 13.5F, FontStyle.Bold);
+        var fontHeader = new Font("Tahoma", 11.5F, FontStyle.Bold);
+        var fontBody = new Font("Tahoma", 10.5F, FontStyle.Regular);
+        var fontBodyBold = new Font("Tahoma", 10.5F, FontStyle.Bold);
+        var fontSmall = new Font("Tahoma", 9.5F, FontStyle.Regular);
 
         // Pens & Brushes
         var penDark = new Pen(Color.FromArgb(30, 41, 59), 1.5F);
@@ -530,6 +543,9 @@ public class ReceiptInvoicePrinter
         var brushText = Brushes.Black;
         var brushDark = new SolidBrush(Color.FromArgb(15, 23, 42));
         var brushHeaderBg = new SolidBrush(Color.FromArgb(241, 245, 249));
+
+        try
+        {
 
         float leftMargin = e.MarginBounds.Left;
         float rightMargin = e.MarginBounds.Right;
@@ -827,7 +843,21 @@ public class ReceiptInvoicePrinter
 
         // 7. Footer Message Note
         string footerMsg = !string.IsNullOrWhiteSpace(_settings?.BillFooter) ? _settings.BillFooter : "ขอบคุณที่ใช้บริการ / Thank you for staying with us";
-        g.DrawString(footerMsg, new Font("Segoe UI", 10.5F, FontStyle.Bold), Brushes.DarkSlateBlue, leftMargin + (contentWidth / 2) - 150, currentY);
+        g.DrawString(footerMsg, fontBodyBold, Brushes.DarkSlateBlue, leftMargin + (contentWidth / 2) - 150, currentY);
+        }
+        finally
+        {
+            fontTitle.Dispose();
+            fontSubtitle.Dispose();
+            fontHeader.Dispose();
+            fontBody.Dispose();
+            fontBodyBold.Dispose();
+            fontSmall.Dispose();
+            penDark.Dispose();
+            penLight.Dispose();
+            brushDark.Dispose();
+            brushHeaderBg.Dispose();
+        }
     }
 
     private static string GetRatePlanName(RatePlanType plan)

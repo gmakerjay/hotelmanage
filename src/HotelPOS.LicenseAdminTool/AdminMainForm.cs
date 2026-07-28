@@ -12,8 +12,37 @@ namespace HotelPOS.LicenseAdminTool;
 
 public class AdminMainForm : Form
 {
-    // Default Private Key (คีย์พัฒนาสำหรับการรันสอบทานสิทธิ์ร่วมกับ Public Key ฝั่ง Client)
-    private const string DefaultPrivateKeyBase64 = "MIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQDHGAL/OQhKcQQC1jvBIrntmAX0Sbg/qtYkRm6QN0uvYOX4Mthlu8ADQK6KZSVBYxCXaCA6nho6bTOGpCJmnDakj1BtOs6n3D/LvPKj7MMZ3sCEqvktWiJlKFNPHKtZbMpfXI+bqrxSkCxBDbFmrnG/PaU94rR+bXAluzXbzhcCH6gEmtKTUx6VM+EI/PVIlCdZMjcrkTO7aP7UCMFEnTkvuWMpuuHp1NmWUTEwNvqH9BnkkIdlPIhHpqPdegu93YraD71F5WIG8SU3rSO/wvPgHQTM7HCd8xRbchULLktPrEORHN6JC1ZJBkr1RbacgkHIpljJaxep0Yj/+NHowyl1AgMBAAECggEBAIIY7bRrR0ClszJLXcap84cPZSypk41/C+muYIc6qulST1QtnXx1AFbfyG5FA+BDZM8bSpwjPg5Z12avEI+umoJT6AFIgUvtP37Z3FBD4YWhKnpG4wbAtGMXw8CZglqwHVnNOUZGfkMRVOm5kegAK/IEzVqwLrPCvZraR6p3dE98yseuQdKwy/KNuA0PbCOA8Md8Le+hng36DAAdcn8kHKksi9W8gBqS9qB5LKnla4kXNKeYPGDBKhjaCf45k2aJtnBHMd74/P1y+VkeJMlSjH8elx9rDbzkn+CvmSBY/BDLLlpuD2nftPSuZ8yWNp/krG5lufUdFsFa8kHoqJnH+W0CgYEA15L4D2ZFC7stFenwPLGjbh0SFtQZACzM48xMX3I2Ecuro+qONrdHgZ7Q0wm6b1W1dUkUeNSZ4wMiux/lhhaHYbBqMbjRpIagPGsN6+62KPOsK+L90OqPz5N49BYdF0NuBTQSif1xGP39cv7LX2JwUEYaoSs7lTYVGJ73yQMnU5MCgYEA7G3gIjYt7PTJBWNtVt1dUJ1TNdIz6B6UM/sMWw0t3qCMR4oQBJz7E8NmZLIUeS0TT7McDaaCymnn2/JKBdXWWu8dM8KGjm9tzq6CPPd5Lvt2aUWkijFfwtVg6SYSmwp786SfStsNjXKED7xiqU03GwT8nLf8TewgCB7lV6uBw9cCgYEAlVEVRQVfedqyReV+I2wfeVvlda5/iqF9YaPWmp3vWbArOSR0UO3uN5gbqLGqUweY4p418ePAm39GhTp4rsHYEBAz3jDX9Q/S2UaFpA/6WK8/aD6X9CckaXEKbHcMu1pXUH9a//1uYxM6hHZ7w5vZk6CbPVtGr/l/70fc9XybtsUCgYAtaJDyoStC5mSxZz45v7xLXlv760pS24SlUyM1XZugtX8bwlV/PVMvoYjJ8DXkbBbYaNMLgB6Al8STRr6WzlIkFuap6UOEmbwiRPv4j6MztdIxN9H5RLBasDazsL9EDchurAB4FQhOUV8x0oG0eIML6nJF+0Q3BxHD3YM4ylTa8wKBgB+UjpKeSIcMuG1Em5wbXbLbzNwxjuPX6TwyZKHmzOZZRfZq/4ppJaV66h8pngQC1ZZOBMDI/IWIKorM40hFqHGXmnp+Z7dFwsjoRWoC77/Y6plkb4qq/Od5ZnCVLbBN8uTK3hYdAUd2OfYQ/m6E5CNkSA/xUGGgm8Zhzlf58ezI";
+    // Private Key ถูกโหลดจากไฟล์ภายนอก (private.pem) เท่านั้น เพื่อความปลอดภัย
+    // ห้ามฝัง Private Key ไว้ในซอร์สโค้ดเด็ดขาด
+    private string? _privateKeyBase64;
+
+    private string GetPrivateKeyBase64()
+    {
+        if (!string.IsNullOrEmpty(_privateKeyBase64)) return _privateKeyBase64;
+
+        // ลองอ่านจากไฟล์ private.pem ที่อยู่ข้าง .exe ก่อน
+        string exeDir = AppContext.BaseDirectory;
+        string[] keyFileNames = { "private.pem", "private.key", "rsa_private.pem" };
+        foreach (var name in keyFileNames)
+        {
+            string path = Path.Combine(exeDir, name);
+            if (File.Exists(path))
+            {
+                _privateKeyBase64 = File.ReadAllText(path).Trim()
+                    .Replace("-----BEGIN PRIVATE KEY-----", "")
+                    .Replace("-----END PRIVATE KEY-----", "")
+                    .Replace("\r", "")
+                    .Replace("\n", "")
+                    .Trim();
+                return _privateKeyBase64;
+            }
+        }
+
+        throw new FileNotFoundException(
+            "ไม่พบไฟล์ Private Key (private.pem) ในโฟลเดอร์โปรแกรม\n\n" +
+            $"กรุณาวางไฟล์ private.pem ไว้ที่: {exeDir}\n\n" +
+            "ไฟล์นี้จำเป็นสำหรับการลงลายเซ็นดิจิทัล RSA-2048 ลงบน USB Dongle Key");
+    }
 
     private List<UsbDriveInfo> _connectedDrives = new();
 
@@ -364,7 +393,7 @@ public class AdminMainForm : Form
                 string watermarkSignable = watermark.GetSignableData();
                 using (var rsaW = RSA.Create())
                 {
-                    rsaW.ImportPkcs8PrivateKey(Convert.FromBase64String(DefaultPrivateKeyBase64), out _);
+                    rsaW.ImportPkcs8PrivateKey(Convert.FromBase64String(GetPrivateKeyBase64()), out _);
                     byte[] wSig = rsaW.SignData(Encoding.UTF8.GetBytes(watermarkSignable), HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
                     watermark.Signature = Convert.ToBase64String(wSig);
                 }
@@ -507,8 +536,13 @@ public class AdminMainForm : Form
                 _progressBar.Value = 30;
                 _lblStatus.Text = $"กำลังฟอร์แมต USB Drive [{drive.DriveLetter}\\]...";
 
+                // Sanitize volume label: อนุญาตเฉพาะ A-Z, 0-9, _, - (ป้องกัน command injection)
+                string sanitizedLabel = System.Text.RegularExpressions.Regex.Replace(
+                    _tbVolumeLabel.Text.Trim(), @"[^A-Za-z0-9_\-]", "");
+                if (string.IsNullOrEmpty(sanitizedLabel)) sanitizedLabel = "REST_RENT_KEY";
+
                 bool formatSuccess = await System.Threading.Tasks.Task.Run(() =>
-                    UsbDongleManager.FormatUsbDrive(drive.DriveLetter, _cbFileSystem.SelectedItem?.ToString() ?? "FAT32", _tbVolumeLabel.Text.Trim()));
+                    UsbDongleManager.FormatUsbDrive(drive.DriveLetter, _cbFileSystem.SelectedItem?.ToString() ?? "FAT32", sanitizedLabel));
 
                 if (!formatSuccess)
                 {
@@ -545,7 +579,7 @@ public class AdminMainForm : Form
 
             using (var rsa = RSA.Create())
             {
-                rsa.ImportPkcs8PrivateKey(Convert.FromBase64String(DefaultPrivateKeyBase64), out _);
+                rsa.ImportPkcs8PrivateKey(Convert.FromBase64String(GetPrivateKeyBase64()), out _);
                 byte[] signatureBytes = rsa.SignData(dataBytes, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
                 license.Signature = Convert.ToBase64String(signatureBytes);
             }
@@ -567,7 +601,7 @@ public class AdminMainForm : Form
             string watermarkSignable = watermark.GetSignableData();
             using (var rsaW = RSA.Create())
             {
-                rsaW.ImportPkcs8PrivateKey(Convert.FromBase64String(DefaultPrivateKeyBase64), out _);
+                rsaW.ImportPkcs8PrivateKey(Convert.FromBase64String(GetPrivateKeyBase64()), out _);
                 byte[] wSig = rsaW.SignData(Encoding.UTF8.GetBytes(watermarkSignable), HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
                 watermark.Signature = Convert.ToBase64String(wSig);
             }

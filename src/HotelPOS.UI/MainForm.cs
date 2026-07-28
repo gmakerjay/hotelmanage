@@ -20,6 +20,7 @@ public class MainForm : Form
     private LicenseStatus _licenseStatus;
     private LicenseFile? _license;
     private int _daysRemaining;
+    private bool _isReadOnlyMode;
 
     // USB Dongle continuous detection
     private System.Windows.Forms.Timer? _dongleCheckTimer;
@@ -94,6 +95,9 @@ public class MainForm : Form
         Font = new Font("Segoe UI", 10.5F, FontStyle.Regular);
         try { Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath); } catch { }
 
+        // ตรวจสอบสิทธิ์การใช้งาน: ถ้าไม่ Active และไม่ใช่ Trial ให้เข้าโหมดอ่านอย่างเดียว (ดูข้อมูลเก่า + Backup ได้)
+        _isReadOnlyMode = _licenseStatus != LicenseStatus.Active;
+
         InitializeViews(auditService, backupService, exportImportService, posService);
         InitializeLayout();
 
@@ -123,7 +127,7 @@ public class MainForm : Form
         _auditLogControl = new AuditLogControl(auditService) { Dock = DockStyle.Fill };
         _backupControl = new SystemBackupControl(backupService, exportImportService) { Dock = DockStyle.Fill };
         _systemSettingsControl = new SystemSettingsControl(_settingsService) { Dock = DockStyle.Fill };
-        _posControl = new POSControl(posService, _settingsService, _logger) { Dock = DockStyle.Fill };
+        _posControl = new POSControl(posService, _settingsService, _logger, auditService) { Dock = DockStyle.Fill };
     }
 
     private void InitializeLayout()
@@ -234,7 +238,7 @@ public class MainForm : Form
             ("บริการเสริม & มินิบาร์ (POS)", _posControl, null),
             ("การจัดการห้องพัก", _roomManagementControl, null),
             ("ข้อมูลลูกค้า", _customerManagementControl, null),
-            ("ค่าน้ำ / ค่าไฟ", _meterReadingControl, async () => await _meterReadingControl.LoadMeterDataAsync()),
+            ("การออกบิลและค่าใช้จ่าย", _meterReadingControl, async () => await _meterReadingControl.LoadMeterDataAsync()),
             ("ประวัติระบบ (Audit Log)", _auditLogControl, async () => await _auditLogControl.LoadLogsAsync()),
             ("สำรอง/คืนค่าข้อมูล", _backupControl, null),
             ("ตั้งค่าระบบ", _systemSettingsControl, null)
@@ -341,6 +345,34 @@ public class MainForm : Form
             _contentPanel.Controls.Clear();
             _contentPanel.Controls.Add(targetControl);
             _activeControl = targetControl;
+
+            // ล็อคฟีเจอร์เมื่ออยู่ในโหมดอ่านอย่างเดียว (ยกเว้น Backup, Audit Log, Settings ที่ยังใช้ได้)
+            if (_isReadOnlyMode)
+            {
+                bool isAllowedInReadOnly = targetControl == _auditLogControl 
+                    || targetControl == _backupControl 
+                    || targetControl == _systemSettingsControl
+                    || targetControl == _roomGridControl
+                    || targetControl == _bookingListControl
+                    || targetControl == _customerManagementControl;
+
+                if (!isAllowedInReadOnly)
+                {
+                    _contentPanel.Controls.Clear();
+                    var lockPanel = new Panel { Dock = DockStyle.Fill, BackColor = Color.FromArgb(254, 243, 199) };
+                    var lockLabel = new Label
+                    {
+                        Text = "ฟีเจอร์นี้ถูกล็อคเนื่องจากสิทธิ์ใช้งานหมดอายุ/ไม่ถูกต้อง\n\nคุณสามารถดูข้อมูลเก่า, สำรองข้อมูล, และดูประวัติระบบได้ตามปกติ\nกรุณาลงทะเบียนรหัสสิทธิ์หรือเสียบ USB Dongle เพื่อปลดล็อคฟีเจอร์ทั้งหมด",
+                        Font = new Font("Segoe UI", 13F, FontStyle.Bold),
+                        ForeColor = Color.FromArgb(146, 64, 14),
+                        TextAlign = ContentAlignment.MiddleCenter,
+                        Dock = DockStyle.Fill
+                    };
+                    lockPanel.Controls.Add(lockLabel);
+                    _contentPanel.Controls.Add(lockPanel);
+                    _activeControl = null; // รีเซ็ตเพื่อให้คลิกได้อีกครั้งหลัง activate
+                }
+            }
         }
     }
 
@@ -444,7 +476,7 @@ public class MainForm : Form
         try
         {
             var shopName = await _settingsService.GetShopNameAsync();
-            Text = $"{shopName} - HotelPOS TH";
+            Text = $"{shopName} - PSoft Rest & Rent Manager";
             _logger.Info(LogCategory.UI, "โหลดหน้าหลักพร้อมแถบไซด์บาร์สำเร็จ", correlationId);
         }
         catch (Exception ex)

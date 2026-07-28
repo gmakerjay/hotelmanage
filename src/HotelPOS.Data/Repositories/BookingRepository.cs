@@ -134,6 +134,56 @@ public class BookingRepository : IBookingRepository
         }
     }
 
+    /// <summary>
+    /// ดึงการจองที่ active ทั้งหมด (status IN (0,1)) พร้อม Customer ใน query เดียว (แก้ N+1)
+    /// คืน Dictionary keyed by room_id
+    /// </summary>
+    public async Task<Dictionary<int, (Booking Booking, Customer? Customer)>> GetAllActiveBookingsWithCustomersAsync()
+    {
+        var correlationId = _logger.NewCorrelationId();
+        try
+        {
+            using var connection = _connectionFactory.CreateConnection();
+            const string sql = @"
+                SELECT b.id AS Id, b.booking_code AS BookingCode, b.room_id AS RoomId, b.customer_id AS CustomerId,
+                       b.rate_plan AS RatePlan, b.check_in_planned AS CheckInPlanned, b.check_out_planned AS CheckOutPlanned,
+                       b.check_in_actual AS CheckInActual, b.check_out_actual AS CheckOutActual, b.status AS Status,
+                       b.agreed_rate AS AgreedRate, b.notes AS Notes, b.created_by AS CreatedBy,
+                       b.created_at AS CreatedAt, b.updated_at AS UpdatedAt, b.is_deleted AS IsDeleted,
+                       c.id AS CustId, c.full_name AS FullName, c.phone AS Phone, c.email AS Email,
+                       c.id_card_or_passport AS IdCardOrPassport, c.address AS Address, c.notes AS CustNotes,
+                       c.created_at AS CustCreatedAt
+                FROM bookings b
+                LEFT JOIN customers c ON b.customer_id = c.id
+                WHERE b.status IN (0, 1) AND b.is_deleted = 0
+                ORDER BY b.created_at DESC";
+
+            var result = new Dictionary<int, (Booking, Customer?)>();
+
+            var rows = await connection.QueryAsync<Booking, Customer?, (Booking, Customer?)>(
+                sql,
+                (booking, customer) => (booking, customer),
+                splitOn: "CustId"
+            );
+
+            foreach (var (booking, customer) in rows)
+            {
+                // เก็บเฉพาะ booking ล่าสุดของแต่ละห้อง (อันแรกเพราะ ORDER BY DESC)
+                if (!result.ContainsKey(booking.RoomId))
+                {
+                    result[booking.RoomId] = (booking, customer);
+                }
+            }
+
+            return result;
+        }
+        catch (Exception ex)
+        {
+            _logger.Error(LogCategory.Database, "ดึงการจอง active ทั้งหมดไม่สำเร็จ (batch)", ex, correlationId);
+            throw;
+        }
+    }
+
     public async Task<int> SaveBookingAsync(Booking booking)
     {
         var correlationId = _logger.NewCorrelationId();

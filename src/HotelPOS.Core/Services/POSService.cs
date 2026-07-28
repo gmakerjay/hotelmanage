@@ -167,4 +167,62 @@ public class POSService : IPOSService
             throw;
         }
     }
+
+    public async Task<(Room Room, Customer Customer)?> GetFolioDetailsAsync(int folioId)
+    {
+        var correlationId = _logger.NewCorrelationId();
+        try
+        {
+            using var connection = _connectionFactory.CreateConnection();
+            const string sql = @"
+                SELECT r.id AS RoomId, r.room_number, r.room_type_id, r.floor, r.status AS RoomStatus, r.notes AS RoomNotes,
+                       c.id AS CustomerId, c.full_name, c.phone, c.email
+                FROM folios f
+                JOIN bookings b ON f.booking_id = b.id
+                JOIN rooms r ON b.room_id = r.id
+                JOIN customers c ON b.customer_id = c.id
+                WHERE f.id = @FolioId";
+            var data = await connection.QuerySingleOrDefaultAsync<dynamic>(sql, new { FolioId = folioId });
+            if (data == null) return null;
+
+            var room = new Room
+            {
+                Id = (int)data.RoomId,
+                RoomNumber = data.room_number,
+                RoomTypeId = (int)data.room_type_id,
+                Floor = data.floor,
+                Status = (RoomStatus)data.RoomStatus,
+                Notes = data.RoomNotes
+            };
+            var customer = new Customer
+            {
+                Id = (int)data.CustomerId,
+                FullName = data.full_name,
+                Phone = data.phone,
+                Email = data.email
+            };
+            return (room, customer);
+        }
+        catch (Exception ex)
+        {
+            _logger.Error(LogCategory.Database, $"ดึงข้อมูล Folio ID={folioId} ไม่สำเร็จ", ex, correlationId);
+            return null;
+        }
+    }
+
+    public async Task<Customer?> GetCustomerByIdAsync(int customerId)
+    {
+        var correlationId = _logger.NewCorrelationId();
+        try
+        {
+            using var connection = _connectionFactory.CreateConnection();
+            return await connection.QuerySingleOrDefaultAsync<Customer>(
+                "SELECT * FROM customers WHERE id = @Id", new { Id = customerId });
+        }
+        catch (Exception ex)
+        {
+            _logger.Error(LogCategory.Database, $"ดึงข้อมูลลูกค้า ID={customerId} ไม่สำเร็จ", ex, correlationId);
+            return null;
+        }
+    }
 }

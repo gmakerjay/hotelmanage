@@ -25,4 +25,10 @@ public interface IPOSService
 
     // Helper to get active checked-in bookings/folios
     Task<IEnumerable<dynamic>> GetActiveFoliosAsync();
+
+    // ดึงข้อมูล Room + Customer จาก Folio ID (สำหรับใบเสร็จ POS)
+    Task<(Room Room, Customer Customer)?> GetFolioDetailsAsync(int folioId);
+
+    // ดึงข้อมูลลูกค้าจาก ID (สำหรับใบเสร็จ POS กรณีลูกค้า Walk-in)
+    Task<Customer?> GetCustomerByIdAsync(int customerId);
 }

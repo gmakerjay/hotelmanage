@@ -1,5 +1,7 @@
 using HotelPOS.Logging;
 using HotelPOS.Core.Services;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace HotelPOS.UI;
 
@@ -13,6 +15,12 @@ public class LoginForm : Form
     private Label _lblError = null!;
 
     public string LoggedInUser { get; private set; } = "admin";
+
+    // Brute force protection
+    private int _failedAttempts;
+    private DateTime _lockoutUntil = DateTime.MinValue;
+    private const int MaxFailedAttempts = 5;
+    private const int LockoutSeconds = 30;
 
     public LoginForm(ISettingsService settingsService)
     {
@@ -173,20 +181,71 @@ public class LoginForm : Form
             return;
         }
 
+        // Brute force protection: ตรวจสอบการ lockout
+        if (_failedAttempts >= MaxFailedAttempts && DateTime.Now < _lockoutUntil)
+        {
+            int remainingSecs = (int)(_lockoutUntil - DateTime.Now).TotalSeconds;
+            _lblError.Text = $"กรุณารอสักครู่ ระบบถูกล็อคชั่วคราว (เหลืออีก {remainingSecs} วินาที)";
+            return;
+        }
+
+        // รีเซ็ต lockout ถ้าหมดเวลาแล้ว
+        if (_failedAttempts >= MaxFailedAttempts && DateTime.Now >= _lockoutUntil)
+        {
+            _failedAttempts = 0;
+        }
+
         string dbPassword = await _settingsService.GetAsync("admin_password") ?? "psoft123";
         if (string.IsNullOrWhiteSpace(dbPassword)) dbPassword = "psoft123";
 
-        if (username.Equals("admin", StringComparison.OrdinalIgnoreCase) && password == dbPassword)
+        // เปรียบเทียบรหัสผ่าน: รองรับทั้งแบบ plain text (เดิม) และแบบ SHA256 hash (ใหม่)
+        bool passwordMatch = false;
+        if (username.Equals("admin", StringComparison.OrdinalIgnoreCase))
         {
+            // ตรวจสอบแบบ hash ก่อน (SHA256)
+            string inputHash = ComputeSha256Hash(password);
+            if (inputHash == dbPassword)
+            {
+                passwordMatch = true;
+            }
+            // Fallback: รองรับแบบ plain text เดิม (สำหรับการอัปเกรดจากระบบเดิม)
+            else if (password == dbPassword)
+            {
+                passwordMatch = true;
+                // อัปเกรดเป็น hash อัตโนมัติ
+                await _settingsService.SetAsync("admin_password", inputHash);
+            }
+        }
+
+        if (passwordMatch)
+        {
+            _failedAttempts = 0;
             LoggedInUser = username;
             DialogResult = DialogResult.OK;
             Close();
         }
         else
         {
-            _lblError.Text = "ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง";
+            _failedAttempts++;
+            if (_failedAttempts >= MaxFailedAttempts)
+            {
+                _lockoutUntil = DateTime.Now.AddSeconds(LockoutSeconds);
+                _lblError.Text = $"กรอกรหัสผิดเกิน {MaxFailedAttempts} ครั้ง กรุณารอ {LockoutSeconds} วินาที";
+            }
+            else
+            {
+                _lblError.Text = $"ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง (เหลืออีก {MaxFailedAttempts - _failedAttempts} ครั้ง)";
+            }
             _txtPassword.SelectAll();
             _txtPassword.Focus();
         }
+    }
+
+    private static string ComputeSha256Hash(string rawData)
+    {
+        byte[] bytes = SHA256.HashData(Encoding.UTF8.GetBytes(rawData));
+        var sb = new StringBuilder();
+        foreach (var b in bytes) sb.Append(b.ToString("x2"));
+        return sb.ToString();
     }
 }

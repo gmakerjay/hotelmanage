@@ -49,7 +49,10 @@ public class LicenseFile
     {
         try
         {
-            return JsonSerializer.Deserialize<LicenseFile>(json);
+            return JsonSerializer.Deserialize<LicenseFile>(json, new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            });
         }
         catch
         {

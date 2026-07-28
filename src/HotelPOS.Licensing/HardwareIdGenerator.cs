@@ -8,6 +8,14 @@ namespace HotelPOS.Licensing;
 
 public static class HardwareIdGenerator
 {
+    // Fallback ที่ไม่ซ้ำกัน ใช้เมื่อ WMI มีปัญหา
+    private static string UniqueFallback(string source)
+    {
+        string data = $"{Environment.MachineName}|{Environment.UserName}|{source}";
+        return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(data)))
+            .Substring(0, 16).ToUpperInvariant();
+    }
+
     public static string Generate()
     {
         string cpuId = GetCpuId().Trim();
@@ -40,7 +48,7 @@ public static class HardwareIdGenerator
         {
             // Fallback กรณี WMI มีปัญหา
         }
-        return "GENERIC-CPU";
+        return UniqueFallback("CPU");
     }
 
     private static string GetDiskSerial()
@@ -59,7 +67,7 @@ public static class HardwareIdGenerator
         {
             // Fallback กรณี WMI มีปัญหา
         }
-        return "GENERIC-DISK";
+        return UniqueFallback("DISK");
     }
 
     private static string GetMacAddress()
@@ -80,7 +88,7 @@ public static class HardwareIdGenerator
         {
             // Fallback
         }
-        return "GENERIC-MAC";
+        return UniqueFallback("MAC");
     }
 
     private static string GetBoardSerial()
@@ -99,7 +107,7 @@ public static class HardwareIdGenerator
         {
             // Fallback
         }
-        return "GENERIC-BOARD";
+        return UniqueFallback("BOARD");
     }
 
     private static string GetBiosSerial()
@@ -118,6 +126,6 @@ public static class HardwareIdGenerator
         {
             // Fallback
         }
-        return "GENERIC-BIOS";
+        return UniqueFallback("BIOS");
     }
 }

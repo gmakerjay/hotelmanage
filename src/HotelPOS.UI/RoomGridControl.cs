@@ -74,7 +74,7 @@ public class RoomGridControl : UserControl
         Font = new Font("Segoe UI", 11F, FontStyle.Regular);
         BackColor = Color.FromArgb(241, 245, 249);
 
-        // Header Panel
+        // Header Panel — ใช้ FlowLayoutPanel เพื่อ Responsive (ไม่ hardcode pixel position)
         _headerPanel = new Panel
         {
             Dock = DockStyle.Top,
@@ -83,13 +83,25 @@ public class RoomGridControl : UserControl
             Padding = new Padding(15, 10, 15, 10)
         };
 
+        // Row 1: Title + Utility Rate + Search + Filters + Buttons (FlowLayoutPanel)
+        var rowTopFlow = new FlowLayoutPanel
+        {
+            Dock = DockStyle.Top,
+            Height = 40,
+            FlowDirection = FlowDirection.LeftToRight,
+            WrapContents = false,
+            AutoSize = false,
+            Padding = new Padding(0),
+            Margin = new Padding(0)
+        };
+
         var titleLabel = new Label
         {
             Text = "ผังห้องพักและสถานะปัจจุบัน (Room Floor Plan)",
             Font = new Font("Segoe UI", 15F, FontStyle.Bold),
             ForeColor = Color.FromArgb(30, 41, 59),
-            Location = new Point(15, 8),
-            AutoSize = true
+            AutoSize = true,
+            Margin = new Padding(3, 4, 10, 0)
         };
 
         _lblUtilityRates = new Label
@@ -97,83 +109,98 @@ public class RoomGridControl : UserControl
             Text = "อัตราค่าไฟ: - /หน่วย",
             Font = new Font("Segoe UI", 10.5F, FontStyle.Bold),
             ForeColor = Color.FromArgb(234, 88, 12),
-            Location = new Point(440, 14),
-            AutoSize = true
+            AutoSize = true,
+            Margin = new Padding(3, 8, 15, 0)
         };
 
-        // Summary Badges
-        _lblAvailableCount = CreateBadgeLabel("ว่าง: 0", Color.FromArgb(236, 253, 245), Color.FromArgb(6, 95, 70), 15, 42);
-        _lblOccupiedCount = CreateBadgeLabel("มีคนพัก: 0", Color.FromArgb(254, 226, 226), Color.FromArgb(153, 27, 27), 115, 42);
-        _lblCleaningCount = CreateBadgeLabel("รอทำความสะอาด: 0", Color.FromArgb(254, 243, 199), Color.FromArgb(146, 64, 14), 225, 42);
-        _lblReservedCount = CreateBadgeLabel("จองล่วงหน้า: 0", Color.FromArgb(239, 246, 255), Color.FromArgb(30, 58, 138), 380, 42);
-        _lblNearCheckoutCount = CreateBadgeLabel("ใกล้ครบกำหนด: 0", Color.FromArgb(254, 243, 199), Color.DarkOrange, 520, 42);
-        _lblOverdueCount = CreateBadgeLabel("เลยกำหนด: 0", Color.FromArgb(254, 226, 226), Color.DarkRed, 675, 42);
-
-        // Instant Search Box
-        var lblSearch = new Label { Text = "ค้นหา:", Location = new Point(810, 12), Font = new Font("Segoe UI", 10F, FontStyle.Bold), AutoSize = true };
+        var lblSearch = new Label { Text = "ค้นหา:", Font = new Font("Segoe UI", 10F, FontStyle.Bold), AutoSize = true, Margin = new Padding(10, 8, 0, 0) };
         _txtSearch = new TextBox
         {
-            Location = new Point(860, 8),
             Width = 160,
             Font = new Font("Segoe UI", 10.5F),
-            PlaceholderText = "เลขห้อง / ผู้พัก / เบอร์โทร..."
+            PlaceholderText = "เลขห้อง / ผู้พัก / เบอร์โทร...",
+            Margin = new Padding(3, 5, 8, 0)
         };
         _txtSearch.TextChanged += async (s, e) => await ApplyFilterAsync();
 
-        // Floor Filter
-        var lblFloor = new Label { Text = "ชั้น:", Location = new Point(1030, 12), Font = new Font("Segoe UI", 10F, FontStyle.Bold), AutoSize = true };
-        _cboFloorFilter = new ComboBox { Location = new Point(1065, 8), Width = 85, Font = new Font("Segoe UI", 10F), DropDownStyle = ComboBoxStyle.DropDownList };
+        var lblFloor = new Label { Text = "ชั้น:", Font = new Font("Segoe UI", 10F, FontStyle.Bold), AutoSize = true, Margin = new Padding(5, 8, 0, 0) };
+        _cboFloorFilter = new ComboBox { Width = 85, Font = new Font("Segoe UI", 10F), DropDownStyle = ComboBoxStyle.DropDownList, Margin = new Padding(3, 5, 8, 0) };
         _cboFloorFilter.SelectedIndexChanged += async (s, e) => await ApplyFilterAsync();
 
-        // Type Filter
-        var lblType = new Label { Text = "ประเภท:", Location = new Point(1160, 12), Font = new Font("Segoe UI", 10F, FontStyle.Bold), AutoSize = true };
-        _cboTypeFilter = new ComboBox { Location = new Point(1220, 8), Width = 110, Font = new Font("Segoe UI", 10F), DropDownStyle = ComboBoxStyle.DropDownList };
+        var lblType = new Label { Text = "ประเภท:", Font = new Font("Segoe UI", 10F, FontStyle.Bold), AutoSize = true, Margin = new Padding(5, 8, 0, 0) };
+        _cboTypeFilter = new ComboBox { Width = 110, Font = new Font("Segoe UI", 10F), DropDownStyle = ComboBoxStyle.DropDownList, Margin = new Padding(3, 5, 8, 0) };
         _cboTypeFilter.SelectedIndexChanged += async (s, e) => await ApplyFilterAsync();
 
         _btnRefresh = new Button
         {
             Text = "รีเฟรช",
-            Location = new Point(1340, 6),
-            Size = new Size(80, 36),
+            Size = new Size(80, 34),
             Font = new Font("Segoe UI", 10F, FontStyle.Bold),
             FlatStyle = FlatStyle.Flat,
-            Cursor = Cursors.Hand
+            Cursor = Cursors.Hand,
+            Margin = new Padding(5, 3, 5, 0)
         };
         _btnRefresh.Click += async (s, e) => await RefreshGridAsync();
 
         _btnNewBooking = new Button
         {
             Text = "+ จองล่วงหน้า",
-            Location = new Point(1340, 44),
-            Size = new Size(115, 36),
+            Size = new Size(115, 34),
             BackColor = Color.FromArgb(37, 99, 235),
             ForeColor = Color.White,
             FlatStyle = FlatStyle.Flat,
             Font = new Font("Segoe UI", 10F, FontStyle.Bold),
-            Cursor = Cursors.Hand
+            Cursor = Cursors.Hand,
+            Margin = new Padding(5, 3, 0, 0)
         };
         _btnNewBooking.FlatAppearance.BorderSize = 0;
         _btnNewBooking.Click += BtnNewBooking_Click;
 
-        // Quick Filter Pills Panel
+        rowTopFlow.Controls.AddRange(new Control[] {
+            titleLabel, _lblUtilityRates,
+            lblSearch, _txtSearch, lblFloor, _cboFloorFilter, lblType, _cboTypeFilter,
+            _btnRefresh, _btnNewBooking
+        });
+
+        // Row 2: Summary Badges (FlowLayoutPanel — จะ wrap อัตโนมัติเมื่อหน้าจอแคบ)
+        var rowBadgeFlow = new FlowLayoutPanel
+        {
+            Dock = DockStyle.Top,
+            Height = 38,
+            FlowDirection = FlowDirection.LeftToRight,
+            WrapContents = true,
+            Padding = new Padding(0),
+            Margin = new Padding(0, 2, 0, 0)
+        };
+
+        _lblAvailableCount = CreateBadgeLabel("ว่าง: 0", Color.FromArgb(236, 253, 245), Color.FromArgb(6, 95, 70));
+        _lblOccupiedCount = CreateBadgeLabel("มีคนพัก: 0", Color.FromArgb(254, 226, 226), Color.FromArgb(153, 27, 27));
+        _lblCleaningCount = CreateBadgeLabel("รอทำความสะอาด: 0", Color.FromArgb(254, 243, 199), Color.FromArgb(146, 64, 14));
+        _lblReservedCount = CreateBadgeLabel("จองล่วงหน้า: 0", Color.FromArgb(239, 246, 255), Color.FromArgb(30, 58, 138));
+        _lblNearCheckoutCount = CreateBadgeLabel("ใกล้ครบกำหนด: 0", Color.FromArgb(254, 243, 199), Color.DarkOrange);
+        _lblOverdueCount = CreateBadgeLabel("เลยกำหนด: 0", Color.FromArgb(254, 226, 226), Color.DarkRed);
+
+        rowBadgeFlow.Controls.AddRange(new Control[] {
+            _lblAvailableCount, _lblOccupiedCount, _lblCleaningCount,
+            _lblReservedCount, _lblNearCheckoutCount, _lblOverdueCount
+        });
+
+        // Row 3: Quick Filter Pills
         _statusFilterPanel = new FlowLayoutPanel
         {
-            Location = new Point(15, 84),
-            Size = new Size(1300, 42),
+            Dock = DockStyle.Top,
+            Height = 38,
             BackColor = Color.Transparent,
-            WrapContents = false
+            WrapContents = false,
+            AutoScroll = true
         };
 
         BuildStatusFilterButtons();
 
-        _headerPanel.Controls.AddRange(new Control[]
-        {
-            titleLabel, _lblUtilityRates,
-            _lblAvailableCount, _lblOccupiedCount, _lblCleaningCount, _lblReservedCount,
-            _lblNearCheckoutCount, _lblOverdueCount,
-            lblSearch, _txtSearch, lblFloor, _cboFloorFilter, lblType, _cboTypeFilter,
-            _btnRefresh, _btnNewBooking, _statusFilterPanel
-        });
+        // เพิ่ม Rows เข้า Header (Dock=Top จะเรียงจากบนลงล่าง ต้อง add กลับด้าน)
+        _headerPanel.Controls.Add(_statusFilterPanel);
+        _headerPanel.Controls.Add(rowBadgeFlow);
+        _headerPanel.Controls.Add(rowTopFlow);
 
         // Cards Container
         _cardsContainer = new FlowLayoutPanel
@@ -257,7 +284,7 @@ public class RoomGridControl : UserControl
         }
     }
 
-    private static Label CreateBadgeLabel(string text, Color backColor, Color foreColor, int x, int y)
+    private static Label CreateBadgeLabel(string text, Color backColor, Color foreColor, int x = 0, int y = 0)
     {
         return new Label
         {
@@ -268,6 +295,7 @@ public class RoomGridControl : UserControl
             Location = new Point(x, y),
             AutoSize = true,
             Padding = new Padding(8, 4, 8, 4),
+            Margin = new Padding(3, 2, 3, 2),
             BorderStyle = BorderStyle.FixedSingle
         };
     }
@@ -343,6 +371,9 @@ public class RoomGridControl : UserControl
         var now = DateTime.Now;
         var roomsToDisplay = new List<(Room Room, RoomType? Type, Booking? Booking, Customer? Customer)>();
 
+        // Batch: ดึงการจอง active ทั้งหมดพร้อม Customer ใน query เดียว (แทน N+1 query ต่อห้อง)
+        var activeBookingsMap = await _bookingService.GetAllActiveBookingsWithCustomersAsync();
+
         foreach (var room in _allRooms)
         {
             var roomType = _allRoomTypes.FirstOrDefault(t => t.Id == room.RoomTypeId);
@@ -351,10 +382,10 @@ public class RoomGridControl : UserControl
 
             if (room.Status == RoomStatus.Occupied || room.Status == RoomStatus.Reserved)
             {
-                booking = await _bookingService.GetActiveBookingByRoomIdAsync(room.Id);
-                if (booking != null && booking.CustomerId > 0)
+                if (activeBookingsMap.TryGetValue(room.Id, out var entry))
                 {
-                    customer = await _customerService.GetCustomerByIdAsync(booking.CustomerId);
+                    booking = entry.Booking;
+                    customer = entry.Customer;
                 }
 
                 if (room.Status == RoomStatus.Occupied && booking?.CheckOutPlanned.HasValue == true)

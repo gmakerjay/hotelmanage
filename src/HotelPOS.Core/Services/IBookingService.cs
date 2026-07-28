@@ -9,6 +9,8 @@ public interface IBookingService
     Task<Booking?> GetBookingByIdAsync(int id);
     Task<Booking?> GetBookingByCodeAsync(string bookingCode);
     Task<Booking?> GetActiveBookingByRoomIdAsync(int roomId);
+    // Batch: ดึงการจอง active ทั้งหมดพร้อม Customer ใน query เดียว (แก้ N+1)
+    Task<Dictionary<int, (Booking Booking, Customer? Customer)>> GetAllActiveBookingsWithCustomersAsync();
     Task<Folio?> GetFolioByBookingIdAsync(int bookingId);
 
     Task<Booking> WalkInCheckInAsync(int roomId, Customer customer, RatePlanType ratePlan, decimal agreedRate, DateTime plannedCheckOut, string? notes = null, int? createdBy = null);

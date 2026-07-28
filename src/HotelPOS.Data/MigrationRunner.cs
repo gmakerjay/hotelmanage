@@ -38,6 +38,7 @@ public class MigrationRunner
 
             // Auto-Migrate missing columns for existing SQLite databases
             EnsureUtilityBillColumnsExist(connection);
+            EnsureCustomerColumnsExist(connection);
 
             transaction.Commit();
 
@@ -83,6 +84,35 @@ public class MigrationRunner
                 using var cmd = connection.CreateCommand();
                 cmd.CommandText = $"ALTER TABLE utility_bills ADD COLUMN {colName} {colDef};";
                 cmd.ExecuteNonQuery();
+            }
+        }
+    }
+
+    private static void EnsureCustomerColumnsExist(System.Data.IDbConnection connection)
+    {
+        var existingColumns = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        using (var cmd = connection.CreateCommand())
+        {
+            cmd.CommandText = "PRAGMA table_info(customers);";
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read())
+            {
+                existingColumns.Add(reader.GetString(1));
+            }
+        }
+
+        if (!existingColumns.Contains("id_card_or_passport"))
+        {
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = "ALTER TABLE customers ADD COLUMN id_card_or_passport TEXT;";
+            cmd.ExecuteNonQuery();
+
+            // หากมีคอลัมน์ id_card_number เดิม ให้ย้ายข้อมูลมาใส่ id_card_or_passport
+            if (existingColumns.Contains("id_card_number"))
+            {
+                using var copyCmd = connection.CreateCommand();
+                copyCmd.CommandText = "UPDATE customers SET id_card_or_passport = id_card_number WHERE id_card_or_passport IS NULL;";
+                copyCmd.ExecuteNonQuery();
             }
         }
     }

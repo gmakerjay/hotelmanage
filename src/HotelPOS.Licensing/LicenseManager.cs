@@ -57,6 +57,9 @@ public static class LicenseManager
                     dongleLicense.IssueDate, dongleLicense.ExpireDate, dongleLicense.MaxRooms,
                     JsonSerializer.Serialize(dongleLicense.Features), dongleStatus);
 
+                // บันทึกว่าพบ Dongle → หยุดนับ Trial ทันที (ไม่นับวันนี้เป็นวัน Trial)
+                TrialManager.RecordDonglePresent(dbPath);
+
                 return (dongleStatus, dongleLicense, dongleDaysRemaining);
             }
             else

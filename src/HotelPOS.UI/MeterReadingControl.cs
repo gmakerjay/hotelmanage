@@ -64,7 +64,7 @@ public class MeterReadingControl : UserControl
 
         var lblTitle = new Label
         {
-            Text = "ระบบคำนวณและออกใบแจ้งหนี้รวมรายห้อง (ค่าห้อง + ค่าไฟ + ค่าน้ำ + ค่าขยะ + จิปาถะ)",
+            Text = "ระบบการออกบิลและค่าใช้จ่ายรวมรายห้อง (ค่าห้อง + ค่าไฟ + ค่าน้ำ + ค่าขยะ + จิปาถะ)",
             Font = new Font("Segoe UI", 15F, FontStyle.Bold),
             ForeColor = Color.FromArgb(15, 23, 42),
             AutoSize = true,
