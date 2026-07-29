@@ -45,4 +45,14 @@ public class CustomerService : ICustomerService
     {
         await _customerRepository.DeleteCustomerAsync(id);
     }
+
+    public async Task<IEnumerable<CustomerStayHistoryDto>> GetCustomerStayHistoryAsync(int customerId)
+    {
+        return await _customerRepository.GetCustomerStayHistoryAsync(customerId);
+    }
+
+    public async Task<IEnumerable<CustomerPOSHistoryDto>> GetCustomerPOSHistoryAsync(int customerId)
+    {
+        return await _customerRepository.GetCustomerPOSHistoryAsync(customerId);
+    }
 }

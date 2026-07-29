@@ -34,6 +34,7 @@ public class POSSalesHistoryForm : Form
 
     private List<Sale> _currentSales = new();
     private Sale? _selectedSale;
+    private GridPaginationPanel _pgPanel = null!;
 
     public POSSalesHistoryForm(IPOSService posService, ISettingsService settingsService, IAppLogger logger, IAuditService? auditService = null)
     {
@@ -84,6 +85,8 @@ public class POSSalesHistoryForm : Form
             Format = DateTimePickerFormat.Short,
             Value = DateTime.Today
         };
+        _dtpStart.ValueChanged += async (s, e) => await LoadSalesDataAsync();
+        _dtpEnd.ValueChanged += async (s, e) => await LoadSalesDataAsync();
 
         var btnToday = new Button
         {
@@ -197,15 +200,28 @@ public class POSSalesHistoryForm : Form
             BackgroundColor = Color.White,
             BorderStyle = BorderStyle.None,
             RowHeadersVisible = false,
-            GridColor = Color.FromArgb(241, 245, 249),
+            GridColor = Color.FromArgb(226, 232, 240),
             AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
+            DefaultCellStyle = new DataGridViewCellStyle
+            {
+                Font = new Font("Segoe UI", 9.5F),
+                Padding = new Padding(6, 2, 6, 2),
+                BackColor = Color.White,
+                ForeColor = Color.FromArgb(15, 23, 42),
+                SelectionBackColor = Color.FromArgb(224, 231, 255),
+                SelectionForeColor = Color.FromArgb(15, 23, 42)
+            },
             ColumnHeadersDefaultCellStyle = new DataGridViewCellStyle
             {
                 BackColor = Color.FromArgb(30, 41, 59),
                 ForeColor = Color.White,
-                Font = new Font("Segoe UI", 9.5F, FontStyle.Bold)
+                Font = new Font("Segoe UI", 9.5F, FontStyle.Bold),
+                Padding = new Padding(6, 8, 6, 8),
+                Alignment = DataGridViewContentAlignment.MiddleCenter
             },
-            EnableHeadersVisualStyles = false
+            EnableHeadersVisualStyles = false,
+            RowTemplate = { Height = 36 },
+            ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize
         };
         _dgvSales.Columns.Add("Id", "ID");
         _dgvSales.Columns["Id"]!.Visible = false;
@@ -215,8 +231,16 @@ public class POSSalesHistoryForm : Form
         _dgvSales.Columns["SaleCode"]!.FillWeight = 22;
 
         _dgvSales.Columns.Add("CreatedAt", "วันเวลาที่ขาย");
-        _dgvSales.Columns["CreatedAt"]!.MinimumWidth = 120;
+        _dgvSales.Columns["CreatedAt"]!.MinimumWidth = 150;
         _dgvSales.Columns["CreatedAt"]!.FillWeight = 24;
+
+        _dgvSales.Columns.Add("RoomNumber", "ห้องพัก");
+        _dgvSales.Columns["RoomNumber"]!.MinimumWidth = 80;
+        _dgvSales.Columns["RoomNumber"]!.FillWeight = 16;
+
+        _dgvSales.Columns.Add("CustomerName", "ชื่อลูกค้า");
+        _dgvSales.Columns["CustomerName"]!.MinimumWidth = 120;
+        _dgvSales.Columns["CustomerName"]!.FillWeight = 24;
 
         _dgvSales.Columns.Add("SubTotal", "รวมหลัก");
         _dgvSales.Columns["SubTotal"]!.MinimumWidth = 85;
@@ -235,7 +259,10 @@ public class POSSalesHistoryForm : Form
         _dgvSales.Columns["TotalAmount"]!.DefaultCellStyle.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
 
         _dgvSales.SelectionChanged += async (s, e) => await DisplaySelectedSaleItemsAsync();
+        _pgPanel = new GridPaginationPanel(() => FilterSalesGrid());
+        pnlLeft.Controls.Add(_pgPanel);
         pnlLeft.Controls.Add(_dgvSales);
+        _dgvSales.BringToFront();
 
         // Right Panel: Sale Details & Items
         var pnlRight = new Panel { Dock = DockStyle.Fill, Padding = new Padding(12), BackColor = Color.White };
@@ -262,15 +289,28 @@ public class POSSalesHistoryForm : Form
             BackgroundColor = Color.White,
             BorderStyle = BorderStyle.None,
             RowHeadersVisible = false,
-            GridColor = Color.FromArgb(241, 245, 249),
+            GridColor = Color.FromArgb(226, 232, 240),
             AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
+            DefaultCellStyle = new DataGridViewCellStyle
+            {
+                Font = new Font("Segoe UI", 9.5F),
+                Padding = new Padding(6, 2, 6, 2),
+                BackColor = Color.White,
+                ForeColor = Color.FromArgb(15, 23, 42),
+                SelectionBackColor = Color.FromArgb(224, 231, 255),
+                SelectionForeColor = Color.FromArgb(15, 23, 42)
+            },
             ColumnHeadersDefaultCellStyle = new DataGridViewCellStyle
             {
                 BackColor = Color.FromArgb(241, 245, 249),
                 ForeColor = Color.FromArgb(51, 65, 85),
-                Font = new Font("Segoe UI", 9.5F, FontStyle.Bold)
+                Font = new Font("Segoe UI", 9.5F, FontStyle.Bold),
+                Padding = new Padding(6, 8, 6, 8),
+                Alignment = DataGridViewContentAlignment.MiddleCenter
             },
-            EnableHeadersVisualStyles = false
+            EnableHeadersVisualStyles = false,
+            RowTemplate = { Height = 36 },
+            ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize
         };
         _dgvSaleItems.Columns.Add("ProductName", "ชื่อสินค้า");
         _dgvSaleItems.Columns["ProductName"]!.MinimumWidth = 140;
@@ -353,6 +393,7 @@ public class POSSalesHistoryForm : Form
             TextAlign = ContentAlignment.MiddleLeft
         };
         pnlSummary.Controls.Add(_lblSummary);
+        mainSplit.BringToFront();
     }
 
     private async Task LoadSalesDataAsync()
@@ -365,6 +406,7 @@ public class POSSalesHistoryForm : Form
             var sales = await _posService.GetSalesAsync(start, end);
             _currentSales = sales.Where(s => !s.IsDeleted).OrderByDescending(s => s.CreatedAt).ToList();
 
+            _pgPanel.Reset();
             FilterSalesGrid();
         }
         catch (Exception ex)
@@ -381,16 +423,31 @@ public class POSSalesHistoryForm : Form
 
         var filtered = string.IsNullOrWhiteSpace(query)
             ? _currentSales
-            : _currentSales.Where(s => s.SaleCode.Contains(query, StringComparison.OrdinalIgnoreCase)).ToList();
+            : _currentSales.Where(s => 
+                s.SaleCode.Contains(query, StringComparison.OrdinalIgnoreCase) ||
+                (s.RoomNumber != null && s.RoomNumber.Contains(query, StringComparison.OrdinalIgnoreCase)) ||
+                (s.CustomerName != null && s.CustomerName.Contains(query, StringComparison.OrdinalIgnoreCase))
+              ).ToList();
 
-        decimal grandTotal = 0;
-        foreach (var s in filtered)
-        {
-            _dgvSales.Rows.Add(s.Id, s.SaleCode, s.CreatedAt.ToString("dd/MM/yyyy HH:mm"), s.SubTotal.ToString("N2"), s.DiscountAmount.ToString("N2"), s.TotalAmount.ToString("N2"));
-            grandTotal += s.TotalAmount;
-        }
-
+        decimal grandTotal = filtered.Sum(s => s.TotalAmount);
         _lblSummary.Text = $"รวมทั้งหมด: {filtered.Count} รายการขาย | ยอดขายรวมสุทธิ: {grandTotal:N2} บาท";
+
+        _pgPanel.UpdateState(filtered.Count);
+        var pageData = _pgPanel.GetPageData(filtered).ToList();
+
+        foreach (var s in pageData)
+        {
+            _dgvSales.Rows.Add(
+                s.Id, 
+                s.SaleCode, 
+                s.CreatedAt.ToString("dd/MM/yyyy HH:mm"), 
+                s.RoomNumber ?? "หน้าร้าน Walk-In",
+                s.CustomerName ?? "-",
+                s.SubTotal.ToString("N2"), 
+                s.DiscountAmount.ToString("N2"), 
+                s.TotalAmount.ToString("N2")
+            );
+        }
 
         if (_dgvSales.Rows.Count > 0)
         {
@@ -505,16 +562,17 @@ public class POSSalesHistoryForm : Form
     {
         if (_selectedSale == null) return;
 
-        using var authForm = new AdminAuthForm();
+        using var authForm = new AdminAuthForm(_settingsService);
         if (authForm.ShowDialog() != DialogResult.OK) return;
 
-        if (MessageBox.Show($"คุณต้องการยกเลิกบิลขายเลขที่ '{_selectedSale.SaleCode}' ใช่หรือไม่?",
+        if (MessageBox.Show($"คุณต้องการยกเลิกบิลขายเลขที่ '{_selectedSale.SaleCode}' ใช่หรือไม่?\n(ระบบจะคืนจำนวนสต็อกสินค้าและหักยอดออกจาก Folio ห้องพัก หากมีการชาร์จไว้)",
             "ยืนยันการยกเลิกบิล", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) == DialogResult.Yes)
         {
             try
             {
-                // Soft delete sale
-                _selectedSale.IsDeleted = true;
+                // Call database void sale operation
+                await _posService.VoidSaleAsync(_selectedSale.Id);
+
                 _logger.Info(LogCategory.Pos, $"ยกเลิกบิลขายเลขที่ '{_selectedSale.SaleCode}' เรียบร้อยแล้ว");
                 if (_auditService != null)
                 {
@@ -526,7 +584,7 @@ public class POSSalesHistoryForm : Form
             catch (Exception ex)
             {
                 _logger.Error(LogCategory.Pos, "ยกเลิกรายการขายไม่สำเร็จ", ex);
-                MessageBox.Show($"ยกเลิกรายการขายไม่สำเร็จ: {ex.Message}", "ข้อผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                Program.ShowDetailedErrorPopup(ex, "ยกเลิกรายการขายล้มเหลวเนื่องจากข้อผิดพลาดในการเชื่อมต่อฐานข้อมูล");
             }
         }
     }

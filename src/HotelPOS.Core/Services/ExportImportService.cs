@@ -13,12 +13,14 @@ public class ExportImportService : IExportImportService
     private readonly ICustomerService _customerService;
     private readonly IRoomService _roomService;
     private readonly IAuditService _auditService;
+    private readonly IPOSService? _posService;
 
-    public ExportImportService(ICustomerService customerService, IRoomService roomService, IAuditService auditService)
+    public ExportImportService(ICustomerService customerService, IRoomService roomService, IAuditService auditService, IPOSService? posService = null)
     {
         _customerService = customerService;
         _roomService = roomService;
         _auditService = auditService;
+        _posService = posService;
     }
 
     public async Task ExportCustomersToCsvAsync(string filePath)
@@ -29,7 +31,7 @@ public class ExportImportService : IExportImportService
 
         foreach (var c in customers)
         {
-            sb.AppendLine($"{c.Id},\"{Escape(c.FullName)}\",\"{Escape(c.Phone)}\",\"{Escape(c.Email)}\",\"{Escape(c.IdCardOrPassport)}\",\"{Escape(c.Address)}\",\"{Escape(c.Notes)}\"");
+            sb.AppendLine($"{c.Id},\"{Escape(c.FullName)}\",\"=\"\"{Escape(c.Phone)}\"\"\",\"{Escape(c.Email)}\",\"=\"\"{Escape(c.IdCardOrPassport)}\"\"\",\"{Escape(c.Address)}\",\"{Escape(c.Notes)}\"");
         }
 
         await File.WriteAllTextAsync(filePath, sb.ToString(), Encoding.UTF8);
@@ -54,12 +56,12 @@ public class ExportImportService : IExportImportService
             {
                 var customer = new Customer
                 {
-                    FullName = parts[1].Trim(),
-                    Phone = parts.Count > 2 ? parts[2].Trim() : null,
-                    Email = parts.Count > 3 ? parts[3].Trim() : null,
-                    IdCardOrPassport = parts.Count > 4 ? parts[4].Trim() : null,
-                    Address = parts.Count > 5 ? parts[5].Trim() : null,
-                    Notes = parts.Count > 6 ? parts[6].Trim() : null
+                    FullName = CleanValue(parts[1]),
+                    Phone = parts.Count > 2 ? CleanValue(parts[2]) : null,
+                    Email = parts.Count > 3 ? CleanValue(parts[3]) : null,
+                    IdCardOrPassport = parts.Count > 4 ? CleanValue(parts[4]) : null,
+                    Address = parts.Count > 5 ? CleanValue(parts[5]) : null,
+                    Notes = parts.Count > 6 ? CleanValue(parts[6]) : null
                 };
 
                 await _customerService.SaveCustomerAsync(customer);
@@ -81,7 +83,7 @@ public class ExportImportService : IExportImportService
         foreach (var r in rooms)
         {
             var typeName = types.FirstOrDefault(t => t.Id == r.RoomTypeId)?.Name ?? "";
-            sb.AppendLine($"{r.Id},\"{Escape(r.RoomNumber)}\",\"{Escape(r.Floor)}\",\"{Escape(typeName)}\",{(int)r.Status},\"{Escape(r.Notes)}\"");
+            sb.AppendLine($"{r.Id},\"=\"\"{Escape(r.RoomNumber)}\"\"\",\"=\"\"{Escape(r.Floor)}\"\"\",\"{Escape(typeName)}\",{(int)r.Status},\"{Escape(r.Notes)}\"");
         }
 
         await File.WriteAllTextAsync(filePath, sb.ToString(), Encoding.UTF8);
@@ -109,9 +111,9 @@ public class ExportImportService : IExportImportService
             var parts = ParseCsvLine(line);
             if (parts.Count >= 2 && !string.IsNullOrWhiteSpace(parts[1]))
             {
-                var roomNum = parts[1].Trim();
-                var floor = parts.Count > 2 ? parts[2].Trim() : null;
-                var typeName = parts.Count > 3 ? parts[3].Trim() : null;
+                var roomNum = CleanValue(parts[1]);
+                var floor = parts.Count > 2 ? CleanValue(parts[2]) : null;
+                var typeName = parts.Count > 3 ? CleanValue(parts[3]) : null;
 
                 int typeId = defaultTypeId;
                 if (!string.IsNullOrWhiteSpace(typeName))
@@ -142,6 +144,113 @@ public class ExportImportService : IExportImportService
 
         await _auditService.LogAsync("นำเข้าข้อมูลห้องพัก (Import CSV)", "Room", filePath, $"นำเข้าสำเร็จ {importedCount} รายการ");
         return importedCount;
+    }
+
+    public async Task ExportProductsToCsvAsync(string filePath)
+    {
+        if (_posService == null) throw new InvalidOperationException("POSService ไม่พร้อมใช้งาน");
+
+        var products = await _posService.GetProductsAsync();
+        var categories = await _posService.GetCategoriesAsync();
+        var sb = new StringBuilder();
+        sb.AppendLine("ID,Name,Category,SKU,Price,Cost,StockQty,TrackStock");
+
+        foreach (var p in products)
+        {
+            var catName = categories.FirstOrDefault(c => c.Id == p.CategoryId)?.Name ?? "";
+            sb.AppendLine($"{p.Id},\"{Escape(p.Name)}\",\"{Escape(catName)}\",\"=\"\"{Escape(p.Sku)}\"\"\",{p.Price},{p.Cost},{p.StockQty},{(p.TrackStock ? 1 : 0)}");
+        }
+
+        await File.WriteAllTextAsync(filePath, sb.ToString(), Encoding.UTF8);
+        await _auditService.LogAsync("ส่งออกข้อมูลสินค้า/สต็อก (Export CSV)", "Product", filePath, $"จำนวน {products.Count()} รายการ");
+    }
+
+    public async Task<int> ImportProductsFromCsvAsync(string filePath)
+    {
+        if (!File.Exists(filePath)) throw new FileNotFoundException("ไม่พบไฟล์ CSV", filePath);
+        if (_posService == null) throw new InvalidOperationException("POSService ไม่พร้อมใช้งาน");
+
+        var lines = await File.ReadAllLinesAsync(filePath, Encoding.UTF8);
+        if (lines.Length <= 1) return 0;
+
+        var categories = (await _posService.GetCategoriesAsync()).ToList();
+        var existingProducts = (await _posService.GetProductsAsync()).ToList();
+        int importedCount = 0;
+
+        for (int i = 1; i < lines.Length; i++)
+        {
+            var line = lines[i].Trim();
+            if (string.IsNullOrWhiteSpace(line)) continue;
+
+            var parts = ParseCsvLine(line);
+            if (parts.Count >= 2 && !string.IsNullOrWhiteSpace(parts[1]))
+            {
+                var prodName = CleanValue(parts[1]);
+                var catName = parts.Count > 2 ? CleanValue(parts[2]) : "ทั่วไป";
+                var sku = parts.Count > 3 ? CleanValue(parts[3]) : null;
+                
+                decimal.TryParse(parts.Count > 4 ? parts[4] : "0", out var price);
+                decimal.TryParse(parts.Count > 5 ? parts[5] : "0", out var cost);
+                int.TryParse(parts.Count > 6 ? parts[6] : "0", out var stockQty);
+                bool trackStock = (parts.Count > 7 && (parts[7] == "1" || parts[7].Equals("true", StringComparison.OrdinalIgnoreCase)));
+
+                // Find or create Category
+                int catId;
+                var matchedCat = categories.FirstOrDefault(c => c.Name.Equals(catName, StringComparison.OrdinalIgnoreCase));
+                if (matchedCat != null)
+                {
+                    catId = matchedCat.Id;
+                }
+                else
+                {
+                    var newCat = new ProductCategory { Name = string.IsNullOrWhiteSpace(catName) ? "ทั่วไป" : catName, IsActive = true };
+                    catId = await _posService.SaveCategoryAsync(newCat);
+                    newCat.Id = catId;
+                    categories.Add(newCat);
+                }
+
+                // Find existing product by SKU or Name
+                var existingProd = existingProducts.FirstOrDefault(p => 
+                    (!string.IsNullOrEmpty(sku) && p.Sku == sku) || 
+                    p.Name.Equals(prodName, StringComparison.OrdinalIgnoreCase));
+
+                var prod = existingProd ?? new Product();
+                prod.Name = prodName;
+                prod.CategoryId = catId;
+                prod.Sku = string.IsNullOrWhiteSpace(sku) ? null : sku;
+                prod.Price = price;
+                prod.Cost = cost;
+                prod.StockQty = stockQty;
+                prod.TrackStock = trackStock;
+                prod.IsActive = true;
+
+                await _posService.SaveProductAsync(prod);
+                importedCount++;
+            }
+        }
+
+        await _auditService.LogAsync("นำเข้าข้อมูลสินค้า/สต็อก (Import CSV)", "Product", filePath, $"นำเข้าสำเร็จ {importedCount} รายการ");
+        return importedCount;
+    }
+
+    private static string CleanValue(string val)
+    {
+        if (string.IsNullOrEmpty(val)) return "";
+        val = val.Trim();
+
+        // Strip Excel formula format: ="value"
+        if (val.StartsWith("=") && val.Length > 1)
+        {
+            val = val.Substring(1);
+        }
+
+        // Strip wrapping double quotes
+        if (val.StartsWith("\"") && val.EndsWith("\"") && val.Length >= 2)
+        {
+            val = val.Substring(1, val.Length - 2);
+        }
+
+        return val.Replace("\"\"", "\"").Trim();
     }
 
     private static string Escape(string? input)

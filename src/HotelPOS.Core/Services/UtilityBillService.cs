@@ -12,19 +12,22 @@ public class UtilityBillService : IUtilityBillService
     private readonly ISettingsService _settingsService;
     private readonly IRoomRepository _roomRepo;
     private readonly IAppLogger _logger;
+    private readonly IAuditService? _auditService;
 
     public UtilityBillService(
         IMeterReadingRepository meterRepo,
         IUtilityBillRepository billRepo,
         ISettingsService settingsService,
         IRoomRepository roomRepo,
-        IAppLogger logger)
+        IAppLogger logger,
+        IAuditService? auditService = null)
     {
         _meterRepo = meterRepo;
         _billRepo = billRepo;
         _settingsService = settingsService;
         _roomRepo = roomRepo;
         _logger = logger;
+        _auditService = auditService;
     }
 
     public async Task<int> RecordMeterReadingAsync(int roomId, UtilityType type, decimal prevReading, decimal currReading, string billingMonth, string? notes = null)
@@ -58,6 +61,12 @@ public class UtilityBillService : IUtilityBillService
 
         int id = await _meterRepo.UpsertAsync(reading);
         _logger.Info(LogCategory.Utility, $"บันทึกมิเตอร์ {type} ห้อง {roomId} เดือน {billingMonth}: {prevReading} → {currReading} = {unitsUsed} หน่วย × {ratePerUnit} = {totalAmount} บาท", correlationId);
+
+        if (_auditService != null)
+        {
+            await _auditService.LogAsync("RECORD_METER", "rooms", roomId.ToString(), $"บันทึกเลขมิเตอร์ {type} รอบบิล {billingMonth}: เลขก่อนหน้า={prevReading:N0}, เลขหลังบันทึก={currReading:N0} (ใช้ไป {unitsUsed:N0} หน่วย)");
+        }
+
         return id;
     }
 
@@ -78,7 +87,10 @@ public class UtilityBillService : IUtilityBillService
         var electricReading = readings.FirstOrDefault(r => r.UtilityType == UtilityType.Electric);
         var waterReading = readings.FirstOrDefault(r => r.UtilityType == UtilityType.Water);
 
-        decimal electricAmount = electricReading?.TotalAmount ?? 0;
+        // คำนวณค่าไฟตามโหมด
+        decimal electricAmount = settings.ElectricBillingMode == "FLAT"
+            ? settings.ElectricFlatRate
+            : (electricReading?.TotalAmount ?? 0);
 
         // คำนวณค่าน้ำตามโหมด
         decimal waterAmount;
@@ -138,6 +150,12 @@ public class UtilityBillService : IUtilityBillService
 
         bill.Id = await _billRepo.SaveAsync(bill);
         _logger.Info(LogCategory.Utility, $"สร้างใบแจ้งหนี้ {bill.BillCode} ห้อง {room.RoomNumber} เดือน {billingMonth}: รวม {totalAmount} บาท", correlationId);
+
+        if (_auditService != null)
+        {
+            await _auditService.LogAsync("GENERATE_BILL", "rooms", roomId.ToString(), $"ออกใบแจ้งหนี้รายเดือน ห้อง {room.RoomNumber} รอบ {billingMonth} ยอดสุทธิ {totalAmount:N2} บาท เลขที่บิล {bill.BillCode}");
+        }
+
         return bill;
     }
 

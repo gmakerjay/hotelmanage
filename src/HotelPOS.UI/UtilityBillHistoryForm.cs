@@ -22,6 +22,7 @@ public class UtilityBillHistoryForm : Form
 
     private List<UtilityBill> _allBills = new();
     private SystemSettingsDto? _settings;
+    private GridPaginationPanel _pgPanel = null!;
 
     public UtilityBillHistoryForm(IUtilityBillService utilityBillService, string billingMonth, ISettingsService? settingsService = null)
     {
@@ -215,9 +216,12 @@ public class UtilityBillHistoryForm : Form
         };
         footerPanel.Controls.Add(_lblSummary);
 
-        Controls.Add(_dgvBills);
+        _pgPanel = new GridPaginationPanel(() => ApplyFilter());
+        Controls.Add(_pgPanel);
         Controls.Add(footerPanel);
         Controls.Add(headerPanel);
+        Controls.Add(_dgvBills);
+        _dgvBills.BringToFront();
 
         Load += async (s, e) => await LoadBillsAsync();
     }
@@ -230,6 +234,7 @@ public class UtilityBillHistoryForm : Form
         }
 
         _allBills = (await _utilityBillService.GetBillsByMonthAsync(_billingMonth)).ToList();
+        _pgPanel.Reset();
         ApplyFilter();
     }
 
@@ -258,7 +263,10 @@ public class UtilityBillHistoryForm : Form
 
         _dgvBills.Rows.Clear();
 
-        foreach (var bill in filtered)
+        _pgPanel.UpdateState(filtered.Count);
+        var pageData = _pgPanel.GetPageData(filtered).ToList();
+
+        foreach (var bill in pageData)
         {
             string status = bill.IsPaid ? "ชำระแล้ว" : "ยังไม่ชำระ";
             decimal serviceFees = bill.CommonAreaFee + bill.GarbageFee;

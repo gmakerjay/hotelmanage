@@ -9,4 +9,6 @@ public interface ICustomerService
     Task<Customer?> GetCustomerByPhoneOrIdCardAsync(string identifier);
     Task<int> SaveCustomerAsync(Customer customer);
     Task DeleteCustomerAsync(int id);
+    Task<IEnumerable<CustomerStayHistoryDto>> GetCustomerStayHistoryAsync(int customerId);
+    Task<IEnumerable<CustomerPOSHistoryDto>> GetCustomerPOSHistoryAsync(int customerId);
 }

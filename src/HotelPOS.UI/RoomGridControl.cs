@@ -225,8 +225,9 @@ public class RoomGridControl : UserControl
             }
         };
 
-        Controls.Add(_cardsContainer);
         Controls.Add(_headerPanel);
+        Controls.Add(_cardsContainer);
+        _cardsContainer.BringToFront();
     }
 
     private void BuildStatusFilterButtons()
@@ -410,7 +411,7 @@ public class RoomGridControl : UserControl
 
                 if (_selectedFilterMode == "Monthly" && (roomType == null || roomType.MonthlyRate == 0)) continue;
                 if (_selectedFilterMode == "Hourly" && (roomType == null || roomType.HourlyRate == 0)) continue;
-                if (_selectedFilterMode == "Daily" && (roomType == null || (roomType.DailyRate == 0 && roomType.MonthlyRate == 0 && roomType.HourlyRate == 0))) continue;
+                if (_selectedFilterMode == "Daily" && (roomType == null || roomType.DailyRate == 0)) continue;
             }
 
             // Search query check
@@ -661,11 +662,13 @@ public class RoomGridControl : UserControl
         string guestDetailText;
         if (room.Status == RoomStatus.Occupied && customer != null)
         {
-            guestDetailText = $"ผู้พัก: {customer.FullName} ({customer.Phone ?? "-"})";
+            string planText = booking?.RatePlan == RatePlanType.Daily ? "รายวัน" : (booking?.RatePlan == RatePlanType.Hourly ? "รายชั่วโมง" : "รายเดือน");
+            guestDetailText = $"ผู้พัก: {customer.FullName} ({planText})";
         }
         else if (room.Status == RoomStatus.Reserved && customer != null)
         {
-            guestDetailText = $"ผู้จอง: {customer.FullName} ({customer.Phone ?? "-"})";
+            string planText = booking?.RatePlan == RatePlanType.Daily ? "รายวัน" : (booking?.RatePlan == RatePlanType.Hourly ? "รายชั่วโมง" : "รายเดือน");
+            guestDetailText = $"ผู้จอง: {customer.FullName} ({planText})";
         }
         else if (room.Status == RoomStatus.Cleaning)
         {
@@ -757,8 +760,24 @@ public class RoomGridControl : UserControl
         }
         if (room.Status == RoomStatus.Occupied)
         {
-            var itemCheckOut = cms.Items.Add("คืนห้องพัก / เช็คเอาท์");
+            var itemMeter = cms.Items.Add("กรอก/คำนวณค่าน้ำ-ค่าไฟ");
+            itemMeter.Click += async (s, e) => await OpenMeterReadingDialogFromRoomGridAsync(room);
+
+            var itemPayUtilities = cms.Items.Add("บันทึกรับเงินค่าน้ำ-ค่าไฟ (Pay Utilities)");
+            itemPayUtilities.Click += async (s, e) => await PayUtilitiesFromRoomGridAsync(room);
+
+            var itemCheckOut = cms.Items.Add("คืนห้องพัก / เช็คเอาท์ & ออกบิล");
             itemCheckOut.Click += async (s, e) => await OpenCheckOutDialogAsync(room);
+
+            var itemMinibar = cms.Items.Add("สั่งมินิบาร์ / สั่งสินค้า (POS)");
+            itemMinibar.Click += async (s, e) =>
+            {
+                var mainForm = this.FindForm() as MainForm;
+                if (mainForm != null)
+                {
+                    await mainForm.NavigateToPOSWithRoomChargeAsync(room.RoomNumber);
+                }
+            };
         }
         if (room.Status == RoomStatus.Cleaning)
         {
@@ -785,6 +804,41 @@ public class RoomGridControl : UserControl
                 await _roomService.UpdateRoomStatusAsync(room.Id, RoomStatus.Available);
                 await RefreshGridAsync();
             };
+        }
+
+        if (room.Status != RoomStatus.Occupied)
+        {
+            cms.Items.Add(new ToolStripSeparator());
+            var menuStatus = new ToolStripMenuItem("เปลี่ยนสถานะห้องพัก");
+            cms.Items.Add(menuStatus);
+
+            if (room.Status != RoomStatus.Available)
+            {
+                var subAvailable = menuStatus.DropDownItems.Add("ว่าง (Available)");
+                subAvailable.Click += async (s, e) =>
+                {
+                    await _roomService.UpdateRoomStatusAsync(room.Id, RoomStatus.Available);
+                    await RefreshGridAsync();
+                };
+            }
+            if (room.Status != RoomStatus.Cleaning)
+            {
+                var subCleaning = menuStatus.DropDownItems.Add("รอทำความสะอาด (Cleaning)");
+                subCleaning.Click += async (s, e) =>
+                {
+                    await _roomService.UpdateRoomStatusAsync(room.Id, RoomStatus.Cleaning);
+                    await RefreshGridAsync();
+                };
+            }
+            if (room.Status != RoomStatus.Maintenance)
+            {
+                var subMaint = menuStatus.DropDownItems.Add("ปิดซ่อมบำรุง (Maintenance)");
+                subMaint.Click += async (s, e) =>
+                {
+                    await _roomService.UpdateRoomStatusAsync(room.Id, RoomStatus.Maintenance, "ปิดซ่อมบำรุง");
+                    await RefreshGridAsync();
+                };
+            }
         }
 
         switch (room.Status)
@@ -941,10 +995,114 @@ public class RoomGridControl : UserControl
         var customer = await _customerService.GetCustomerByIdAsync(booking.CustomerId);
         var folio = await _bookingService.GetFolioByBookingIdAsync(booking.Id);
 
-        using var form = new CheckOutForm(room, booking, customer, folio, _bookingService);
+        IUtilityBillService? utilityBillService = null;
+        var mainForm = FindForm() as MainForm;
+        if (mainForm != null)
+        {
+            utilityBillService = mainForm.UtilityBillService;
+        }
+
+        using var form = new CheckOutForm(room, booking, customer, folio, _bookingService, utilityBillService, _settingsService);
         if (form.ShowDialog() == DialogResult.OK)
         {
             await RefreshGridAsync();
+        }
+    }
+
+    private async Task OpenMeterReadingDialogFromRoomGridAsync(Room room)
+    {
+        IUtilityBillService? utilityBillService = null;
+        var mainForm = FindForm() as MainForm;
+        if (mainForm != null)
+        {
+            utilityBillService = mainForm.UtilityBillService;
+        }
+
+        if (utilityBillService == null)
+        {
+            MessageBox.Show("ระบบบันทึกค่าน้ำ-ค่าไฟไม่ได้ถูกเชื่อมต่อ", "คำเตือน", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return;
+        }
+
+        try
+        {
+            string billingMonth = DateTime.Now.ToString("yyyy-MM");
+            var settings = await _settingsService.GetAllSettingsAsync();
+
+            Booking? activeBooking = await _bookingService.GetActiveBookingByRoomIdAsync(room.Id);
+            Customer? customer = null;
+            if (activeBooking != null)
+            {
+                customer = await _customerService.GetCustomerByIdAsync(activeBooking.CustomerId);
+            }
+
+            decimal elecPrev = await utilityBillService.GetPreviousMeterValueAsync(room.Id, UtilityType.Electric, billingMonth);
+            decimal waterPrev = await utilityBillService.GetPreviousMeterValueAsync(room.Id, UtilityType.Water, billingMonth);
+
+            var readings = (await utilityBillService.GetMeterReadingsByMonthAsync(billingMonth))
+                .Where(r => r.RoomId == room.Id).ToList();
+
+            var elecReading = readings.FirstOrDefault(r => r.UtilityType == UtilityType.Electric);
+            var waterReading = readings.FirstOrDefault(r => r.UtilityType == UtilityType.Water);
+
+            decimal elecCurr = elecReading?.ReadingCurr ?? 0;
+            decimal waterCurr = waterReading?.ReadingCurr ?? 0;
+            if (elecReading != null) elecPrev = elecReading.ReadingPrev;
+            if (waterReading != null) waterPrev = waterReading.ReadingPrev;
+
+            using var dlg = new MeterReadingInputDialog(
+                room,
+                customer?.FullName ?? "ผู้พักอาศัย",
+                billingMonth,
+                3500m,
+                elecPrev,
+                elecCurr,
+                waterPrev,
+                waterCurr,
+                1,
+                0m,
+                0m,
+                "",
+                settings
+            );
+
+            if (dlg.ShowDialog() == DialogResult.OK)
+            {
+                await utilityBillService.RecordMeterReadingAsync(
+                    room.Id,
+                    UtilityType.Electric,
+                    dlg.ElecPrev,
+                    dlg.ElecCurr,
+                    billingMonth,
+                    dlg.Notes
+                );
+
+                if (settings.WaterBillingMode == "METER")
+                {
+                    await utilityBillService.RecordMeterReadingAsync(
+                        room.Id,
+                        UtilityType.Water,
+                        dlg.WaterPrev,
+                        dlg.WaterCurr,
+                        billingMonth,
+                        dlg.Notes
+                    );
+                }
+
+                var bill = await utilityBillService.GenerateMonthlyBillAsync(room.Id, billingMonth, dlg.WaterPersons);
+
+                if (dlg.PrintBillRequested)
+                {
+                    var printer = new HotelPOS.Printing.UtilityInvoicePrinter(bill, customer, settings);
+                    printer.ShowPrintPreview();
+                }
+
+                MessageBox.Show($"บันทึกค่าน้ำ-ค่าไฟห้อง {room.RoomNumber} เรียบร้อยแล้ว (ยอดรวมค่าน้ำไฟ: {bill.ElectricAmount + bill.WaterAmount:N2} บาท)", "สำเร็จ", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"เกิดข้อผิดพลาดในการบันทึกค่าน้ำ-ค่าไฟ: {ex.Message}", "ข้อผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
     }
 
@@ -980,6 +1138,53 @@ public class RoomGridControl : UserControl
         if (form.ShowDialog() == DialogResult.OK)
         {
             await RefreshGridAsync();
+        }
+    }
+
+    private async Task PayUtilitiesFromRoomGridAsync(Room room)
+    {
+        IUtilityBillService? utilityBillService = null;
+        var mainForm = FindForm() as MainForm;
+        if (mainForm != null)
+        {
+            utilityBillService = mainForm.UtilityBillService;
+        }
+
+        if (utilityBillService == null)
+        {
+            MessageBox.Show("ระบบบันทึกค่าน้ำ-ค่าไฟไม่ได้ถูกเชื่อมต่อ", "คำเตือน", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return;
+        }
+
+        try
+        {
+            string billingMonth = DateTime.Now.ToString("yyyy-MM");
+            var bills = await utilityBillService.GetBillsByMonthAsync(billingMonth);
+            var bill = bills.FirstOrDefault(b => b.RoomId == room.Id);
+
+            if (bill == null)
+            {
+                MessageBox.Show($"ยังไม่มีการบันทึกมิเตอร์หรือออกบิลค่าน้ำไฟของห้อง {room.RoomNumber} สำหรับเดือนนี้\n\nกรุณาคลิกขวาเลือก 'กรอก/คำนวณค่าน้ำ-ค่าไฟ' เพื่อออกบิลก่อนครับ", "ไม่พบข้อมูลบิล", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            if (bill.IsPaid)
+            {
+                MessageBox.Show($"บิลค่าน้ำ-ค่าไฟห้อง {room.RoomNumber} รอบบิล {billingMonth} ชำระเงินเรียบร้อยแล้วเมื่อ {bill.PaidAt?.ToString("dd/MM/yyyy HH:mm") ?? "-"} ครับ", "ชำระเงินแล้ว", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            if (MessageBox.Show($"ยืนยันการรับเงินค่าห้องพัก/ค่าน้ำไฟ ห้อง {room.RoomNumber} รอบบิล {billingMonth}\n\nยอดรวมสุทธิที่ต้องชำระ: {bill.TotalAmount:N2} บาท?", 
+                "บันทึกรับเงิน", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
+            {
+                await utilityBillService.MarkBillAsPaidAsync(bill.Id, PaymentMethod.Cash);
+                MessageBox.Show($"บันทึกการชำระเงินห้อง {room.RoomNumber} เรียบร้อยแล้ว ยอดชำระ {bill.TotalAmount:N2} บาท", "ชำระเงินสำเร็จ", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                await RefreshGridAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"บันทึกชำระเงินล้มเหลว: {ex.Message}", "ข้อผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
     }
 }

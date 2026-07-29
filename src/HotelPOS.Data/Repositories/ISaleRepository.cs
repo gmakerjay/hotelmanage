@@ -12,4 +12,5 @@ public interface ISaleRepository
     Task<Sale?> GetSaleByIdAsync(int id);
     Task<IEnumerable<SaleItem>> GetSaleItemsBySaleIdAsync(int saleId);
     Task<IEnumerable<Payment>> GetPaymentsBySaleIdAsync(int saleId);
+    Task VoidSaleAsync(int saleId);
 }

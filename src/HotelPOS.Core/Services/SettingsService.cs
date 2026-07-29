@@ -93,7 +93,9 @@ public class SettingsService : ISettingsService
         dto.ReceiptDocRunningNumber = int.TryParse(await GetAsync("receipt_doc_running_number"), out var rn) ? rn : dto.ReceiptDocRunningNumber;
 
         // ค่าสาธารณูปโภค
+        dto.ElectricBillingMode = await GetAsync("electric_billing_mode") ?? dto.ElectricBillingMode;
         dto.ElectricRatePerUnit = decimal.TryParse(await GetAsync("electric_rate_per_unit"), out var elec) ? elec : dto.ElectricRatePerUnit;
+        dto.ElectricFlatRate = decimal.TryParse(await GetAsync("electric_flat_rate"), out var eFlat) ? eFlat : dto.ElectricFlatRate;
         dto.WaterBillingMode = await GetAsync("water_billing_mode") ?? dto.WaterBillingMode;
         dto.WaterRatePerUnit = decimal.TryParse(await GetAsync("water_rate_per_unit"), out var water) ? water : dto.WaterRatePerUnit;
         dto.WaterFlatRatePerPerson = decimal.TryParse(await GetAsync("water_flat_rate_per_person"), out var wFlat) ? wFlat : dto.WaterFlatRatePerPerson;
@@ -136,7 +138,9 @@ public class SettingsService : ISettingsService
             await SetAsync("receipt_doc_running_number", settings.ReceiptDocRunningNumber.ToString());
 
             // ค่าสาธารณูปโภค
+            await SetAsync("electric_billing_mode", settings.ElectricBillingMode);
             await SetAsync("electric_rate_per_unit", settings.ElectricRatePerUnit.ToString());
+            await SetAsync("electric_flat_rate", settings.ElectricFlatRate.ToString());
             await SetAsync("water_billing_mode", settings.WaterBillingMode);
             await SetAsync("water_rate_per_unit", settings.WaterRatePerUnit.ToString());
             await SetAsync("water_flat_rate_per_person", settings.WaterFlatRatePerPerson.ToString());

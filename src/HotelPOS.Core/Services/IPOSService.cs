@@ -31,4 +31,7 @@ public interface IPOSService
 
     // ดึงข้อมูลลูกค้าจาก ID (สำหรับใบเสร็จ POS กรณีลูกค้า Walk-in)
     Task<Customer?> GetCustomerByIdAsync(int customerId);
+
+    // ยกเลิกบิลการขาย คืนสต็อก และหัก Folio
+    Task VoidSaleAsync(int saleId);
 }

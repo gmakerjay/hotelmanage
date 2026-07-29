@@ -8,4 +8,6 @@ public interface IExportImportService
     Task<int> ImportCustomersFromCsvAsync(string filePath);
     Task ExportRoomsToCsvAsync(string filePath);
     Task<int> ImportRoomsFromCsvAsync(string filePath);
+    Task ExportProductsToCsvAsync(string filePath);
+    Task<int> ImportProductsFromCsvAsync(string filePath);
 }

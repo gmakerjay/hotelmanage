@@ -1,3 +1,4 @@
+using HotelPOS.Common;
 using HotelPOS.Common.Models;
 using HotelPOS.Core.Services;
 
@@ -9,6 +10,11 @@ namespace HotelPOS.UI;
 public class CustomerManagementControl : UserControl
 {
     private readonly ICustomerService _customerService;
+    private readonly IBookingService? _bookingService;
+    private readonly IRoomService? _roomService;
+    private readonly ISettingsService? _settingsService;
+    private readonly IUtilityBillService? _utilityBillService;
+    private readonly IPOSService? _posService;
 
     private DataGridView _dgvCustomers = null!;
     private TextBox _txtSearch = null!;
@@ -29,11 +35,28 @@ public class CustomerManagementControl : UserControl
     private Label _lblModeText = null!;
     private Button _btnCancelEdit = null!;
 
+    private DataGridView _dgvStayHistory = null!;
+    private DataGridView _dgvPOSHistory = null!;
+    private DataGridView _dgvBillHistory = null!;
     private List<Customer> _customersList = new();
+    private List<UtilityBill> _loadedBills = new();
+    private GridPaginationPanel _pgPanel = null!;
 
-    public CustomerManagementControl(ICustomerService customerService)
+    public CustomerManagementControl(
+        ICustomerService customerService,
+        IBookingService? bookingService = null,
+        IRoomService? roomService = null,
+        ISettingsService? settingsService = null,
+        IUtilityBillService? utilityBillService = null,
+        IPOSService? posService = null)
     {
         _customerService = customerService;
+        _bookingService = bookingService;
+        _roomService = roomService;
+        _settingsService = settingsService;
+        _utilityBillService = utilityBillService;
+        _posService = posService;
+
         InitializeUI();
         Load += async (s, e) => await LoadCustomersAsync();
     }
@@ -208,11 +231,191 @@ public class CustomerManagementControl : UserControl
             lblNotes, _txtNotes, _btnSave, _btnClear, _btnDelete
         });
 
-        split.Panel1.Controls.Add(_dgvCustomers);
-        split.Panel2.Controls.Add(panelInput);
+        var tabControlRight = new TabControl
+        {
+            Dock = DockStyle.Fill,
+            Font = new Font("Segoe UI", 10.5F)
+        };
 
-        Controls.Add(split);
+        var tabInfo = new TabPage { Text = "📝 ข้อมูลผู้เข้าพัก" };
+        panelInput.Dock = DockStyle.Fill;
+        tabInfo.Controls.Add(panelInput);
+
+        var tabStayHistory = new TabPage { Text = "🏨 ประวัติเข้าพัก" };
+        _dgvStayHistory = new DataGridView
+        {
+            Dock = DockStyle.Fill,
+            ReadOnly = true,
+            SelectionMode = DataGridViewSelectionMode.FullRowSelect,
+            MultiSelect = false,
+            AllowUserToAddRows = false,
+            AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
+            BackgroundColor = Color.White,
+            BorderStyle = BorderStyle.None,
+            RowTemplate = { Height = 36 },
+            GridColor = Color.FromArgb(226, 232, 240),
+            DefaultCellStyle = new DataGridViewCellStyle
+            {
+                Font = new Font("Segoe UI", 9.5F),
+                Padding = new Padding(6, 2, 6, 2),
+                BackColor = Color.White,
+                ForeColor = Color.FromArgb(15, 23, 42),
+                SelectionBackColor = Color.FromArgb(224, 231, 255),
+                SelectionForeColor = Color.FromArgb(15, 23, 42)
+            },
+            ColumnHeadersDefaultCellStyle = new DataGridViewCellStyle
+            {
+                Font = new Font("Segoe UI", 9.5F, FontStyle.Bold),
+                BackColor = Color.FromArgb(71, 85, 105),
+                ForeColor = Color.White,
+                Padding = new Padding(6, 8, 6, 8),
+                Alignment = DataGridViewContentAlignment.MiddleCenter
+            },
+            EnableHeadersVisualStyles = false,
+            ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize
+        };
+        tabStayHistory.Controls.Add(_dgvStayHistory);
+
+        var tabPOSHistory = new TabPage { Text = "🛒 ประวัติซื้อสินค้า (POS)" };
+        _dgvPOSHistory = new DataGridView
+        {
+            Dock = DockStyle.Fill,
+            ReadOnly = true,
+            SelectionMode = DataGridViewSelectionMode.FullRowSelect,
+            MultiSelect = false,
+            AllowUserToAddRows = false,
+            AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
+            BackgroundColor = Color.White,
+            BorderStyle = BorderStyle.None,
+            RowTemplate = { Height = 36 },
+            GridColor = Color.FromArgb(226, 232, 240),
+            DefaultCellStyle = new DataGridViewCellStyle
+            {
+                Font = new Font("Segoe UI", 9.5F),
+                Padding = new Padding(6, 2, 6, 2),
+                BackColor = Color.White,
+                ForeColor = Color.FromArgb(15, 23, 42),
+                SelectionBackColor = Color.FromArgb(224, 231, 255),
+                SelectionForeColor = Color.FromArgb(15, 23, 42)
+            },
+            ColumnHeadersDefaultCellStyle = new DataGridViewCellStyle
+            {
+                Font = new Font("Segoe UI", 9.5F, FontStyle.Bold),
+                BackColor = Color.FromArgb(71, 85, 105),
+                ForeColor = Color.White,
+                Padding = new Padding(6, 8, 6, 8),
+                Alignment = DataGridViewContentAlignment.MiddleCenter
+            },
+            EnableHeadersVisualStyles = false,
+            ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize
+        };
+        tabPOSHistory.Controls.Add(_dgvPOSHistory);
+
+        var tabBillHistory = new TabPage { Text = "⚡ ค่าน้ำ/ค่าไฟ" };
+        _dgvBillHistory = new DataGridView
+        {
+            Dock = DockStyle.Fill,
+            ReadOnly = true,
+            SelectionMode = DataGridViewSelectionMode.FullRowSelect,
+            MultiSelect = false,
+            AllowUserToAddRows = false,
+            AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
+            BackgroundColor = Color.White,
+            BorderStyle = BorderStyle.None,
+            RowTemplate = { Height = 36 },
+            GridColor = Color.FromArgb(226, 232, 240),
+            DefaultCellStyle = new DataGridViewCellStyle
+            {
+                Font = new Font("Segoe UI", 9.5F),
+                Padding = new Padding(6, 2, 6, 2),
+                BackColor = Color.White,
+                ForeColor = Color.FromArgb(15, 23, 42),
+                SelectionBackColor = Color.FromArgb(224, 231, 255),
+                SelectionForeColor = Color.FromArgb(15, 23, 42)
+            },
+            ColumnHeadersDefaultCellStyle = new DataGridViewCellStyle
+            {
+                Font = new Font("Segoe UI", 9.5F, FontStyle.Bold),
+                BackColor = Color.FromArgb(71, 85, 105),
+                ForeColor = Color.White,
+                Padding = new Padding(6, 8, 6, 8),
+                Alignment = DataGridViewContentAlignment.MiddleCenter
+            },
+            EnableHeadersVisualStyles = false,
+            ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize
+        };
+        tabBillHistory.Controls.Add(_dgvBillHistory);
+
+        tabControlRight.TabPages.Add(tabInfo);
+        tabControlRight.TabPages.Add(tabStayHistory);
+        tabControlRight.TabPages.Add(tabPOSHistory);
+        tabControlRight.TabPages.Add(tabBillHistory);
+
+        // Double-click grid event handlers
+        _dgvStayHistory.CellDoubleClick += async (s, ev) =>
+        {
+            if (ev.RowIndex >= 0 && _dgvStayHistory.Columns.Contains("BookingId"))
+            {
+                var val = _dgvStayHistory.Rows[ev.RowIndex].Cells["BookingId"].Value;
+                if (val != null)
+                {
+                    int bookingId = Convert.ToInt32(val);
+                    await ShowBookingReceiptPreviewAsync(bookingId);
+                }
+            }
+        };
+
+        _dgvPOSHistory.CellDoubleClick += async (s, ev) =>
+        {
+            if (ev.RowIndex >= 0 && _dgvPOSHistory.Columns.Contains("SaleId"))
+            {
+                var val = _dgvPOSHistory.Rows[ev.RowIndex].Cells["SaleId"].Value;
+                if (val != null)
+                {
+                    int saleId = Convert.ToInt32(val);
+                    await ShowPOSReceiptPreviewAsync(saleId);
+                }
+            }
+        };
+
+        _dgvBillHistory.CellDoubleClick += async (s, ev) =>
+        {
+            if (ev.RowIndex >= 0 && _dgvBillHistory.Columns.Contains("Id"))
+            {
+                var val = _dgvBillHistory.Rows[ev.RowIndex].Cells["Id"].Value;
+                if (val != null)
+                {
+                    int billId = Convert.ToInt32(val);
+                    await ShowUtilityBillPreviewAsync(billId);
+                }
+            }
+        };
+
+        _pgPanel = new GridPaginationPanel(() => UpdatePagination());
+        split.Panel1.Controls.Add(_pgPanel);
+        split.Panel1.Controls.Add(_dgvCustomers);
+        _dgvCustomers.BringToFront();
+        split.Panel2.Controls.Add(tabControlRight);
+
         Controls.Add(topPanel);
+        Controls.Add(split);
+        split.BringToFront();
+    }
+
+    private void UpdatePagination()
+    {
+        _pgPanel.UpdateState(_customersList.Count);
+        var pageData = _pgPanel.GetPageData(_customersList).ToList();
+
+        _dgvCustomers.DataSource = pageData.Select(c => new
+        {
+            c.Id,
+            ชื่อนามสกุล = c.FullName,
+            เบอร์โทร = c.Phone ?? "-",
+            เลขบัตร = c.IdCardOrPassport ?? "-",
+            อีเมล = c.Email ?? "-",
+            วันที่ลงทะเบียน = c.CreatedAt.ToString("dd/MM/yyyy")
+        }).ToList();
     }
 
     private async Task LoadCustomersAsync(string? query = null)
@@ -220,15 +423,8 @@ public class CustomerManagementControl : UserControl
         try
         {
             _customersList = (await _customerService.GetCustomersAsync(query)).ToList();
-            _dgvCustomers.DataSource = _customersList.Select(c => new
-            {
-                c.Id,
-                ชื่อนามสกุล = c.FullName,
-                เบอร์โทร = c.Phone ?? "-",
-                เลขบัตร = c.IdCardOrPassport ?? "-",
-                อีเมล = c.Email ?? "-",
-                วันที่ลงทะเบียน = c.CreatedAt.ToString("dd/MM/yyyy")
-            }).ToList();
+            _pgPanel.Reset();
+            UpdatePagination();
         }
         catch (Exception ex)
         {
@@ -236,7 +432,7 @@ public class CustomerManagementControl : UserControl
         }
     }
 
-    private void DgvCustomers_SelectionChanged(object? sender, EventArgs e)
+    private async void DgvCustomers_SelectionChanged(object? sender, EventArgs e)
     {
         if (_dgvCustomers.SelectedRows.Count == 0) return;
         var row = _dgvCustomers.SelectedRows[0];
@@ -256,6 +452,210 @@ public class CustomerManagementControl : UserControl
             _lblModeText.Text = $"โหมด: แก้ไขผู้เข้าพัก '{cust.FullName}'";
             _lblModeText.ForeColor = Color.DarkGoldenrod;
             _btnCancelEdit.Visible = true;
+
+            await LoadCustomerHistoriesAsync(_selectedCustomerId);
+        }
+    }
+
+    private async Task LoadCustomerHistoriesAsync(int customerId)
+    {
+        try
+        {
+            var stays = (await _customerService.GetCustomerStayHistoryAsync(customerId)).ToList();
+            _dgvStayHistory.DataSource = stays.Select(s => new
+            {
+                BookingId = s.BookingId,
+                เลขบิล = s.BookingCode,
+                ห้องพัก = s.RoomNumber,
+                วันที่เข้าพัก = s.CheckIn.ToString("dd/MM/yyyy HH:mm"),
+                วันที่ออก = s.CheckOut?.ToString("dd/MM/yyyy HH:mm") ?? "-",
+                สถานะ = s.Status,
+                ยอดชำระ = s.TotalAmount.ToString("N2") + " บาท"
+            }).ToList();
+            if (_dgvStayHistory.Columns.Contains("BookingId"))
+            {
+                _dgvStayHistory.Columns["BookingId"].Visible = false;
+            }
+
+            var sales = (await _customerService.GetCustomerPOSHistoryAsync(customerId)).ToList();
+            _dgvPOSHistory.DataSource = sales.Select(s => new
+            {
+                SaleId = s.SaleId,
+                เลขที่บิล = s.SaleCode,
+                วันที่ขาย = s.Date.ToString("dd/MM/yyyy HH:mm"),
+                ยอดชำระ = s.TotalAmount.ToString("N2") + " บาท",
+                รายการสินค้า = s.ItemsSummary ?? "-"
+            }).ToList();
+            if (_dgvPOSHistory.Columns.Contains("SaleId"))
+            {
+                _dgvPOSHistory.Columns["SaleId"].Visible = false;
+            }
+
+            _loadedBills.Clear();
+            if (_utilityBillService != null && _roomService != null)
+            {
+                var rooms = (await _roomService.GetRoomsAsync()).ToList();
+                foreach (var s in stays)
+                {
+                    var room = rooms.FirstOrDefault(r => r.RoomNumber == s.RoomNumber);
+                    if (room != null)
+                    {
+                        var bills = await _utilityBillService.GetBillHistoryAsync(room.Id, 12);
+                        foreach (var bill in bills)
+                        {
+                            var billDate = DateTime.TryParse(bill.BillingMonth + "-01", out var d) ? d : DateTime.MinValue;
+                            if (billDate != DateTime.MinValue)
+                            {
+                                var stayStart = s.CheckIn.Date;
+                                var stayEnd = s.CheckOut?.Date ?? DateTime.Today;
+                                var billMonthStart = new DateTime(billDate.Year, billDate.Month, 1);
+                                var billMonthEnd = billMonthStart.AddMonths(1).AddDays(-1);
+                                if (stayStart <= billMonthEnd && stayEnd >= billMonthStart)
+                                {
+                                    if (!_loadedBills.Any(b => b.Id == bill.Id))
+                                    {
+                                        _loadedBills.Add(bill);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            _dgvBillHistory.DataSource = _loadedBills.Select(b => new
+            {
+                b.Id,
+                เลขที่บิล = b.BillCode,
+                ห้องพัก = b.RoomNumber ?? "-",
+                รอบบิล = b.BillingMonth,
+                ยอดรวม = b.TotalAmount.ToString("N2") + " บาท",
+                สถานะชำระ = b.IsPaid ? "ชำระแล้ว" : "ยังไม่ชำระ"
+            }).ToList();
+            if (_dgvBillHistory.Columns.Contains("Id"))
+            {
+                _dgvBillHistory.Columns["Id"].Visible = false;
+            }
+        }
+        catch
+        {
+            _dgvStayHistory.DataSource = null;
+            _dgvPOSHistory.DataSource = null;
+            _dgvBillHistory.DataSource = null;
+        }
+    }
+
+    private async Task ShowBookingReceiptPreviewAsync(int bookingId)
+    {
+        if (_bookingService == null || _roomService == null) return;
+        try
+        {
+            var booking = await _bookingService.GetBookingByIdAsync(bookingId);
+            if (booking == null) return;
+
+            var room = (await _roomService.GetRoomsAsync()).FirstOrDefault(r => r.Id == booking.RoomId) ?? new Room { RoomNumber = "?" };
+            var customer = await _customerService.GetCustomerByIdAsync(booking.CustomerId);
+            var folio = await _bookingService.GetFolioByBookingIdAsync(booking.Id);
+
+            SystemSettingsDto? settings = null;
+            if (_settingsService != null)
+            {
+                settings = await _settingsService.GetAllSettingsAsync();
+            }
+
+            UtilityBill? utilityBill = null;
+            if (_utilityBillService != null && booking.RatePlan == RatePlanType.Monthly)
+            {
+                var checkoutDate = booking.CheckOutActual ?? DateTime.Now;
+                string billingMonth = checkoutDate.ToString("yyyy-MM");
+                var bills = await _utilityBillService.GetBillsByMonthAsync(billingMonth);
+                utilityBill = bills.FirstOrDefault(b => b.RoomId == booking.RoomId);
+            }
+
+            var printer = new HotelPOS.Printing.ReceiptInvoicePrinter(
+                settings?.ShopName ?? "ชื่อร้าน/ที่พักของคุณ",
+                settings?.ShopAddress ?? "123/45 ถนนสุขุมวิท กรุงเทพฯ",
+                settings?.ShopPhone ?? "02-123-4567",
+                settings?.ShopTaxId ?? "0105560000000",
+                booking,
+                room,
+                customer,
+                folio,
+                "admin",
+                settings,
+                utilityBill
+            );
+            printer.ShowPrintPreview();
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"ไม่สามารถโหลดบิลเข้าพักย้อนหลังได้: {ex.Message}", "ข้อผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+    }
+
+    private async Task ShowPOSReceiptPreviewAsync(int saleId)
+    {
+        if (_posService == null || _settingsService == null) return;
+        try
+        {
+            var sale = await _posService.GetSaleByIdAsync(saleId);
+            if (sale == null) return;
+
+            Room room = new Room { RoomNumber = "หน้าร้าน (Retail)" };
+            Customer customer = new Customer { FullName = "ลูกค้าทั่วไป" };
+
+            if (sale.FolioId.HasValue)
+            {
+                var folioDetails = await _posService.GetFolioDetailsAsync(sale.FolioId.Value);
+                if (folioDetails.HasValue)
+                {
+                    room = folioDetails.Value.Room;
+                    customer = folioDetails.Value.Customer;
+                }
+            }
+            else if (sale.CustomerId.HasValue)
+            {
+                var cust = await _posService.GetCustomerByIdAsync(sale.CustomerId.Value);
+                if (cust != null) customer = cust;
+            }
+
+            var settings = await _settingsService.GetAllSettingsAsync();
+            var dummyBooking = new Booking
+            {
+                BookingCode = sale.SaleCode,
+                AgreedRate = sale.SubTotal,
+                CreatedAt = sale.CreatedAt
+            };
+            var dummyFolio = new Folio
+            {
+                TotalAmount = sale.TotalAmount,
+                DiscountAmount = sale.DiscountAmount
+            };
+
+            var printer = new HotelPOS.Printing.ReceiptInvoicePrinter(dummyBooking, room, customer, dummyFolio, settings);
+            printer.ShowPrintPreview();
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"ไม่สามารถแสดงตัวอย่างใบเสร็จ POS ได้: {ex.Message}", "ข้อผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+    }
+
+    private async Task ShowUtilityBillPreviewAsync(int billId)
+    {
+        if (_utilityBillService == null || _settingsService == null) return;
+        try
+        {
+            var bill = _loadedBills.FirstOrDefault(b => b.Id == billId);
+            if (bill == null) return;
+
+            var settings = await _settingsService.GetAllSettingsAsync();
+            var printer = new HotelPOS.Printing.UtilityInvoicePrinter(bill, null, settings);
+            printer.ShowPrintPreview();
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"ไม่สามารถแสดงตัวอย่างใบแจ้งหนี้ค่าน้ำค่าไฟได้: {ex.Message}", "ข้อผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
     }
 
@@ -275,6 +675,9 @@ public class CustomerManagementControl : UserControl
         _lblModeText.ForeColor = Color.ForestGreen;
         _btnCancelEdit.Visible = false;
 
+        _dgvStayHistory.DataSource = null;
+        _dgvPOSHistory.DataSource = null;
+        _dgvBillHistory.DataSource = null;
         _dgvCustomers.ClearSelection();
     }
 

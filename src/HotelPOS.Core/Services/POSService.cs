@@ -225,4 +225,9 @@ public class POSService : IPOSService
             return null;
         }
     }
+
+    public async Task VoidSaleAsync(int saleId)
+    {
+        await _saleRepository.VoidSaleAsync(saleId);
+    }
 }

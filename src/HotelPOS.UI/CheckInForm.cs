@@ -83,16 +83,18 @@ public class CheckInForm : Form
         {
             _cboRatePlan.Items.Add(new RatePlanItem { RatePlan = RatePlanType.Monthly, DisplayName = "รายเดือน (Monthly)" });
         }
-        else
+        if (_roomType.DailyRate > 0)
         {
-            if (_roomType.DailyRate > 0 || (_roomType.DailyRate == 0 && _roomType.HourlyRate == 0))
-            {
-                _cboRatePlan.Items.Add(new RatePlanItem { RatePlan = RatePlanType.Daily, DisplayName = "รายวัน (Daily)" });
-            }
-            if (_roomType.HourlyRate > 0)
-            {
-                _cboRatePlan.Items.Add(new RatePlanItem { RatePlan = RatePlanType.Hourly, DisplayName = "รายชั่วโมง (Hourly)" });
-            }
+            _cboRatePlan.Items.Add(new RatePlanItem { RatePlan = RatePlanType.Daily, DisplayName = "รายวัน (Daily)" });
+        }
+        if (_roomType.HourlyRate > 0)
+        {
+            _cboRatePlan.Items.Add(new RatePlanItem { RatePlan = RatePlanType.Hourly, DisplayName = "รายชั่วโมง (Hourly)" });
+        }
+
+        if (_cboRatePlan.Items.Count == 0)
+        {
+            _cboRatePlan.Items.Add(new RatePlanItem { RatePlan = RatePlanType.Daily, DisplayName = "รายวัน (Daily)" });
         }
 
         var lblRate = new Label { Text = "ราคาตกลง (บาท):", Location = new Point(20, 325), Font = new Font("Segoe UI", 11F), AutoSize = true };

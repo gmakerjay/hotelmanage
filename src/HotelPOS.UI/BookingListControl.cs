@@ -25,6 +25,7 @@ public class BookingListControl : UserControl
     private List<Booking> _bookingsList = new();
     private List<Room> _roomsList = new();
     private List<Customer> _customersList = new();
+    private GridPaginationPanel _pgPanel = null!;
 
     public BookingListControl(
         IBookingService bookingService,
@@ -152,6 +153,13 @@ public class BookingListControl : UserControl
                 col.MinimumWidth = 90;
             }
         };
+        _dgvBookings.CellDoubleClick += (s, e) =>
+        {
+            if (e.RowIndex >= 0)
+            {
+                BtnPrintReceipt_Click(s, e);
+            }
+        };
 
         var cms = new ContextMenuStrip { Font = new Font("Segoe UI", 11F) };
         var itemCheckIn = cms.Items.Add("เช็คอินเข้าพัก");
@@ -164,7 +172,10 @@ public class BookingListControl : UserControl
         itemCancel.Click += BtnCancel_Click;
         _dgvBookings.ContextMenuStrip = cms;
 
+        _pgPanel = new GridPaginationPanel(() => ApplyFilter());
+        Controls.Add(_pgPanel);
         Controls.Add(_dgvBookings);
+        _dgvBookings.BringToFront();
         Controls.Add(topPanel);
     }
 
@@ -185,6 +196,7 @@ public class BookingListControl : UserControl
             _customersList = (await _customerService.GetCustomersAsync()).ToList();
             _bookingsList = (await _bookingService.GetBookingsAsync(_dtpStart.Value.Date, _dtpEnd.Value.Date.AddDays(1).AddSeconds(-1), status)).ToList();
 
+            _pgPanel.Reset();
             ApplyFilter();
         }
         catch (Exception ex)
@@ -212,7 +224,10 @@ public class BookingListControl : UserControl
             return matchCode || matchRoom || matchName || matchPhone;
         }).ToList();
 
-        _dgvBookings.DataSource = filtered.Select(b =>
+        _pgPanel.UpdateState(filtered.Count);
+        var pageData = _pgPanel.GetPageData(filtered).ToList();
+
+        _dgvBookings.DataSource = pageData.Select(b =>
         {
             var room = _roomsList.FirstOrDefault(r => r.Id == b.RoomId);
             var cust = _customersList.FirstOrDefault(c => c.Id == b.CustomerId);
@@ -337,7 +352,7 @@ public class BookingListControl : UserControl
         }
 
         var printer = new HotelPOS.Printing.ReceiptInvoicePrinter(
-            settings?.ShopName ?? "โรงแรม HotelPOS TH",
+            settings?.ShopName ?? "ชื่อร้าน/ที่พักของคุณ",
             settings?.ShopAddress ?? "123/45 ถนนสุขุมวิท กรุงเทพฯ",
             settings?.ShopPhone ?? "02-123-4567",
             settings?.ShopTaxId ?? "0105560000000",

@@ -15,6 +15,8 @@ public class MainForm : Form
     private readonly IBookingService _bookingService;
     private readonly ICustomerService _customerService;
     private readonly IUtilityBillService _utilityBillService;
+    public IUtilityBillService UtilityBillService => _utilityBillService;
+    private readonly IBackupService _backupService;
     private readonly IAppLogger _logger;
 
     private LicenseStatus _licenseStatus;
@@ -43,7 +45,6 @@ public class MainForm : Form
     private RoomManagementControl _roomManagementControl = null!;
     private CustomerManagementControl _customerManagementControl = null!;
     private MeterReadingControl _meterReadingControl = null!;
-    private AuditLogControl _auditLogControl = null!;
     private SystemBackupControl _backupControl = null!;
     private SystemSettingsControl _systemSettingsControl = null!;
     private POSControl _posControl = null!;
@@ -77,15 +78,16 @@ public class MainForm : Form
         var auditService = new AuditService(auditRepo, _logger);
         _roomService = new RoomService(roomRepo, _logger);
         _customerService = new CustomerService(customerRepo, _logger);
-        _bookingService = new BookingService(bookingRepo, roomRepo, customerRepo, folioRepo, _logger);
+        _bookingService = new BookingService(bookingRepo, roomRepo, customerRepo, folioRepo, _logger, auditService);
         var backupService = new BackupService(connectionFactory, auditService, _logger);
-        var exportImportService = new ExportImportService(_customerService, _roomService, auditService);
+        _backupService = backupService;
         IPOSService posService = new POSService(productRepo, saleRepo, connectionFactory, _logger);
+        var exportImportService = new ExportImportService(_customerService, _roomService, auditService, posService);
 
         // Utility Billing Services
         IMeterReadingRepository meterRepo = new MeterReadingRepository(connectionFactory, _logger);
         IUtilityBillRepository utilityBillRepo = new UtilityBillRepository(connectionFactory, _logger);
-        _utilityBillService = new UtilityBillService(meterRepo, utilityBillRepo, _settingsService, roomRepo, _logger);
+        _utilityBillService = new UtilityBillService(meterRepo, utilityBillRepo, _settingsService, roomRepo, _logger, auditService);
 
         Text = "PSoft Rest & Rent Manager - โปรแกรมจัดการห้องพักและห้องเช่า";
         Width = 1280;
@@ -122,11 +124,10 @@ public class MainForm : Form
         _roomGridControl = new RoomGridControl(_roomService, _bookingService, _customerService, _settingsService) { Dock = DockStyle.Fill };
         _bookingListControl = new BookingListControl(_bookingService, _roomService, _customerService, _settingsService, _utilityBillService) { Dock = DockStyle.Fill };
         _roomManagementControl = new RoomManagementControl(_roomService) { Dock = DockStyle.Fill };
-        _customerManagementControl = new CustomerManagementControl(_customerService) { Dock = DockStyle.Fill };
-        _meterReadingControl = new MeterReadingControl(_utilityBillService, _roomService, _settingsService, _bookingService, _customerService) { Dock = DockStyle.Fill };
-        _auditLogControl = new AuditLogControl(auditService) { Dock = DockStyle.Fill };
+        _customerManagementControl = new CustomerManagementControl(_customerService, _bookingService, _roomService, _settingsService, _utilityBillService, posService) { Dock = DockStyle.Fill };
+        _meterReadingControl = new MeterReadingControl(_utilityBillService, _roomService, _settingsService, _logger, _bookingService, _customerService) { Dock = DockStyle.Fill };
         _backupControl = new SystemBackupControl(backupService, exportImportService) { Dock = DockStyle.Fill };
-        _systemSettingsControl = new SystemSettingsControl(_settingsService) { Dock = DockStyle.Fill };
+        _systemSettingsControl = new SystemSettingsControl(_settingsService, auditService) { Dock = DockStyle.Fill };
         _posControl = new POSControl(posService, _settingsService, _logger, auditService) { Dock = DockStyle.Fill };
     }
 
@@ -155,6 +156,7 @@ public class MainForm : Form
         var bodyContainer = new Panel { Dock = DockStyle.Fill };
         bodyContainer.Controls.Add(_contentPanel);
         bodyContainer.Controls.Add(_sidebarPanel);
+        _contentPanel.BringToFront();
 
         mainLayout.Controls.Add(_licenseBannerPanel!, 0, 0);
         mainLayout.Controls.Add(bodyContainer, 0, 1);
@@ -238,8 +240,7 @@ public class MainForm : Form
             ("บริการเสริม & มินิบาร์ (POS)", _posControl, null),
             ("การจัดการห้องพัก", _roomManagementControl, null),
             ("ข้อมูลลูกค้า", _customerManagementControl, null),
-            ("การออกบิลและค่าใช้จ่าย", _meterReadingControl, async () => await _meterReadingControl.LoadMeterDataAsync()),
-            ("ประวัติระบบ (Audit Log)", _auditLogControl, async () => await _auditLogControl.LoadLogsAsync()),
+            ("ระบบบิลค่าไฟ/ค่าน้ำ", _meterReadingControl, async () => await _meterReadingControl.LoadMeterDataAsync()),
             ("สำรอง/คืนค่าข้อมูล", _backupControl, null),
             ("ตั้งค่าระบบ", _systemSettingsControl, null)
         };
@@ -349,8 +350,7 @@ public class MainForm : Form
             // ล็อคฟีเจอร์เมื่ออยู่ในโหมดอ่านอย่างเดียว (ยกเว้น Backup, Audit Log, Settings ที่ยังใช้ได้)
             if (_isReadOnlyMode)
             {
-                bool isAllowedInReadOnly = targetControl == _auditLogControl 
-                    || targetControl == _backupControl 
+                bool isAllowedInReadOnly = targetControl == _backupControl 
                     || targetControl == _systemSettingsControl
                     || targetControl == _roomGridControl
                     || targetControl == _bookingListControl
@@ -478,10 +478,82 @@ public class MainForm : Form
             var shopName = await _settingsService.GetShopNameAsync();
             Text = $"{shopName} - PSoft Rest & Rent Manager";
             _logger.Info(LogCategory.UI, "โหลดหน้าหลักพร้อมแถบไซด์บาร์สำเร็จ", correlationId);
+
+            // Run auto backup in background
+            _ = Task.Run(async () => await RunAutoBackupAsync());
         }
         catch (Exception ex)
         {
             _logger.Error(LogCategory.UI, "โหลดข้อมูลหน้าหลักไม่สำเร็จ", ex, correlationId);
+        }
+    }
+
+    private async Task RunAutoBackupAsync()
+    {
+        var correlationId = _logger.NewCorrelationId();
+        try
+        {
+            var autoEnabled = await _settingsService.GetAsync("backup_auto_enabled");
+            if (autoEnabled != "1")
+            {
+                return;
+            }
+
+            _logger.Info(LogCategory.Backup, "เริ่มกระบวนการสำรองข้อมูลอัตโนมัติ (Auto-Backup)", correlationId);
+
+            var backupDir = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                "PSoftRestRentManager",
+                "Backups");
+
+            if (!Directory.Exists(backupDir))
+            {
+                Directory.CreateDirectory(backupDir);
+            }
+
+            var timeStamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
+            var targetFilePath = Path.Combine(backupDir, $"PSoftRestRent_AutoBackup_{timeStamp}.db");
+
+            // Perform SQLite Online Backup
+            await _backupService.CreateBackupAsync(targetFilePath);
+            _logger.Info(LogCategory.Backup, $"สำรองข้อมูลอัตโนมัติสำเร็จที่: {targetFilePath}", correlationId);
+
+            // Clean up old auto backups
+            var retentionStr = await _settingsService.GetAsync("backup_retention_days");
+            if (!int.TryParse(retentionStr, out int retentionDays))
+            {
+                retentionDays = 90; // Default retention
+            }
+
+            var files = Directory.GetFiles(backupDir, "PSoftRestRent_AutoBackup_*.db");
+            var thresholdDate = DateTime.Now.AddDays(-retentionDays);
+            int deletedCount = 0;
+
+            foreach (var file in files)
+            {
+                var fileInfo = new FileInfo(file);
+                if (fileInfo.LastWriteTime < thresholdDate)
+                {
+                    try
+                    {
+                        File.Delete(file);
+                        deletedCount++;
+                    }
+                    catch (Exception deleteEx)
+                    {
+                        _logger.Warning(LogCategory.Backup, $"ไม่สามารถลบไฟล์ Backup เก่าได้: {file}. Error: {deleteEx.Message}", correlationId);
+                    }
+                }
+            }
+
+            if (deletedCount > 0)
+            {
+                _logger.Info(LogCategory.Backup, $"ลบไฟล์สำรองข้อมูลเก่าที่หมดอายุรวม {deletedCount} ไฟล์ (พ้นกำหนด {retentionDays} วัน)", correlationId);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.Error(LogCategory.Backup, "เกิดข้อผิดพลาดระหว่างกระบวนการสำรองข้อมูลอัตโนมัติ (Auto-Backup)", ex, correlationId);
         }
     }
 
@@ -636,6 +708,17 @@ public class MainForm : Form
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Information);
             }
+        }
+    }
+
+    public async Task NavigateToPOSWithRoomChargeAsync(string roomNumber)
+    {
+        var posBtn = _navButtons.FirstOrDefault(b => b.Text.Contains("บริการเสริม & มินิบาร์ (POS)"));
+        if (posBtn != null)
+        {
+            SwitchView(posBtn, _posControl);
+            await _posControl.LoadInitialDataAsync();
+            _posControl.SetRoomCharge(roomNumber);
         }
     }
 }

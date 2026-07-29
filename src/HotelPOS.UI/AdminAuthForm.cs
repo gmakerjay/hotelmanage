@@ -1,3 +1,7 @@
+using System.Security.Cryptography;
+using System.Text;
+using HotelPOS.Core.Services;
+
 namespace HotelPOS.UI;
 
 /// <summary>
@@ -5,13 +9,15 @@ namespace HotelPOS.UI;
 /// </summary>
 public class AdminAuthForm : Form
 {
+    private readonly ISettingsService? _settingsService;
     private TextBox _txtAdminPassword = null!;
     private Button _btnConfirm = null!;
     private Button _btnCancel = null!;
     private Label _lblError = null!;
 
-    public AdminAuthForm()
+    public AdminAuthForm(ISettingsService? settingsService = null)
     {
+        _settingsService = settingsService;
         InitializeComponents();
     }
 
@@ -94,13 +100,43 @@ public class AdminAuthForm : Form
         Controls.AddRange(new Control[] { lblPrompt, lblPassword, _txtAdminPassword, _lblError, _btnConfirm, _btnCancel });
     }
 
-    private void VerifyPassword()
+    private async void VerifyPassword()
     {
         string inputPassword = _txtAdminPassword.Text.Trim();
+        bool isOk = false;
 
-        if (inputPassword.Equals("psoft123", StringComparison.OrdinalIgnoreCase) || 
-            inputPassword.Equals("admin", StringComparison.OrdinalIgnoreCase) || 
-            inputPassword.Equals("1234", StringComparison.OrdinalIgnoreCase))
+        if (_settingsService != null)
+        {
+            try
+            {
+                string dbPassword = await _settingsService.GetAsync("admin_password") ?? "psoft123";
+                if (string.IsNullOrWhiteSpace(dbPassword)) dbPassword = "psoft123";
+
+                string inputHash = ComputeSha256Hash(inputPassword);
+                if (inputHash == dbPassword || inputPassword == dbPassword)
+                {
+                    isOk = true;
+                    if (inputPassword == dbPassword)
+                    {
+                        await _settingsService.SetAsync("admin_password", inputHash);
+                    }
+                }
+            }
+            catch
+            {
+                // Fallback on error
+            }
+        }
+        else
+        {
+            // Default password fallback if service is null
+            if (inputPassword == "psoft123")
+            {
+                isOk = true;
+            }
+        }
+
+        if (isOk)
         {
             DialogResult = DialogResult.OK;
             Close();
@@ -111,5 +147,13 @@ public class AdminAuthForm : Form
             _txtAdminPassword.SelectAll();
             _txtAdminPassword.Focus();
         }
+    }
+
+    private static string ComputeSha256Hash(string rawData)
+    {
+        byte[] bytes = SHA256.HashData(Encoding.UTF8.GetBytes(rawData));
+        var sb = new StringBuilder();
+        foreach (var b in bytes) sb.Append(b.ToString("x2"));
+        return sb.ToString();
     }
 }

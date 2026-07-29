@@ -455,6 +455,32 @@ public class E2EComprehensiveTests : IDisposable
                 WHERE sale_id = @Id", new { Id = saleId });
             Assert.Equal("มันฝรั่งทอด", item.ProductNameSnapshot);
             Assert.Equal(2, item.Quantity);
+
+            // ==========================================
+            // STAGE 8.5: POS Void Sale and Stock Restoration Test
+            // ==========================================
+            var productRepository = new ProductRepository(_connectionFactory, _logger);
+            var saleRepository = new SaleRepository(_connectionFactory, _logger);
+            var posService = new POSService(productRepository, saleRepository, _connectionFactory, _logger);
+
+            // Verify initial stock of product (which is 10)
+            var prodBefore = await productRepository.GetProductByIdAsync(productId);
+            Assert.Equal(10, prodBefore!.StockQty);
+
+            // Void the sale
+            await posService.VoidSaleAsync(saleId);
+
+            // Verify that the sale is marked as deleted
+            var saleAfterVoid = await saleRepository.GetSaleByIdAsync(saleId);
+            Assert.Null(saleAfterVoid); // GetSaleByIdAsync filters out is_deleted = 1
+
+            // Let's query directly to check is_deleted flag
+            var rawIsDeleted = await connection.ExecuteScalarAsync<int>("SELECT is_deleted FROM sales WHERE id = @Id", new { Id = saleId });
+            Assert.Equal(1, rawIsDeleted);
+
+            // Verify stock is restored (+2 because the quantity sold was 2)
+            var prodAfter = await productRepository.GetProductByIdAsync(productId);
+            Assert.Equal(12, prodAfter!.StockQty);
         }
 
         // ==========================================

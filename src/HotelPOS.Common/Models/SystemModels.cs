@@ -57,7 +57,9 @@ public class SystemSettingsDto
     public string? QrCodeImagePath { get; set; }
 
     // --- ค่าสาธารณูปโภค (ค่าน้ำ/ค่าไฟ) ---
-    public decimal ElectricRatePerUnit { get; set; } = 8.00m;       // ค่าไฟต่อหน่วย (บาท)
+    public string ElectricBillingMode { get; set; } = "METER";     // โหมดคิดค่าไฟ: "METER" = ตามมิเตอร์, "FLAT" = เหมาจ่ายรายเดือน
+    public decimal ElectricRatePerUnit { get; set; } = 8.00m;       // ค่าไฟต่อหน่วย (บาท) - ใช้เมื่อ mode=METER
+    public decimal ElectricFlatRate { get; set; } = 300.00m;        // ค่าไฟเหมาจ่ายต่อห้อง (บาท/เดือน) - ใช้เมื่อ mode=FLAT
     public string WaterBillingMode { get; set; } = "METER";        // โหมดคิดค่าน้ำ: "METER" = ตามมิเตอร์, "FLAT" = เหมาจ่ายรายคน
     public decimal WaterRatePerUnit { get; set; } = 18.00m;        // ค่าน้ำต่อหน่วย (บาท) - ใช้เมื่อ mode=METER
     public decimal WaterFlatRatePerPerson { get; set; } = 100.00m; // ค่าน้ำเหมาจ่ายต่อคน (บาท) - ใช้เมื่อ mode=FLAT
@@ -103,4 +105,24 @@ public class BackupHistoryEntry
     public string? PerformedBy { get; set; }
     public string Type { get; set; } = "BACKUP"; // BACKUP | RESTORE | RESET
     public DateTime CreatedAt { get; set; } = DateTime.Now;
+}
+
+public class CustomerStayHistoryDto
+{
+    public int BookingId { get; set; }
+    public string BookingCode { get; set; } = string.Empty;
+    public string RoomNumber { get; set; } = string.Empty;
+    public DateTime CheckIn { get; set; }
+    public DateTime? CheckOut { get; set; }
+    public string Status { get; set; } = string.Empty;
+    public decimal TotalAmount { get; set; }
+}
+
+public class CustomerPOSHistoryDto
+{
+    public int SaleId { get; set; }
+    public string SaleCode { get; set; } = string.Empty;
+    public DateTime Date { get; set; }
+    public decimal TotalAmount { get; set; }
+    public string ItemsSummary { get; set; } = string.Empty;
 }

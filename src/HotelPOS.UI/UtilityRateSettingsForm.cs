@@ -10,7 +10,9 @@ public class UtilityRateSettingsForm : Form
 {
     private readonly ISettingsService _settingsService;
 
+    private ComboBox _cboElectricMode = null!;
     private NumericUpDown _numElectricRate = null!;
+    private NumericUpDown _numElectricFlatRate = null!;
     private ComboBox _cboWaterMode = null!;
     private NumericUpDown _numWaterRate = null!;
     private NumericUpDown _numWaterFlatRate = null!;
@@ -33,8 +35,8 @@ public class UtilityRateSettingsForm : Form
     private void InitializeComponents()
     {
         Text = "ตั้งค่าอัตราค่าน้ำค่าไฟต่อหน่วย (Admin Authorized)";
-        Width = 520;
-        Height = 440;
+        Width = 540;
+        Height = 510;
         StartPosition = FormStartPosition.CenterParent;
         FormBorderStyle = FormBorderStyle.FixedDialog;
         MaximizeBox = false;
@@ -44,7 +46,7 @@ public class UtilityRateSettingsForm : Form
 
         var lblHeader = new Label
         {
-            Text = "ตั้งค่าอัตราค่าน้ำค่าไฟ (กี่บาท : 1 หน่วย)",
+            Text = "ตั้งค่าอัตราค่าน้ำค่าไฟและบริการ",
             Font = new Font("Segoe UI", 13F, FontStyle.Bold),
             ForeColor = Color.FromArgb(15, 23, 42),
             Location = new Point(20, 15),
@@ -53,94 +55,120 @@ public class UtilityRateSettingsForm : Form
 
         var lblSubheader = new Label
         {
-            Text = "กำหนดอัตราค่าหน่วยสำหรับคำนวณบิลรายเดือน (ยืนยันสิทธิ์ Admin เรียบร้อย)",
+            Text = "กำหนดอัตราค่าหน่วยและโหมดคิดค่าน้ำ-ค่าไฟสำหรับคำนวณบิลรายเดือน",
             Font = new Font("Segoe UI", 9.5F),
             ForeColor = Color.FromArgb(100, 116, 139),
             Location = new Point(20, 44),
             AutoSize = true
         };
 
-        int currentY = 85;
+        int currentY = 80;
 
-        // 1. ค่าไฟต่อหน่วย
+        // 1. โหมดค่าไฟ
+        var lblElecMode = new Label { Text = "รูปแบบการคิดค่าไฟฟ้า:", Location = new Point(20, currentY), AutoSize = true, Font = new Font("Segoe UI", 10F, FontStyle.Bold) };
+        _cboElectricMode = new ComboBox
+        {
+            Location = new Point(290, currentY - 4),
+            Width = 200,
+            DropDownStyle = ComboBoxStyle.DropDownList,
+            Font = new Font("Segoe UI", 10.5F)
+        };
+        _cboElectricMode.Items.AddRange(new object[] { "ตามมิเตอร์ (METER)", "เหมาจ่ายรายเดือน (FLAT)" });
+        _cboElectricMode.SelectedIndex = 0;
+        currentY += 42;
+
+        // 2. ค่าไฟต่อหน่วย
         var lblElec = new Label { Text = "อัตราค่าไฟฟ้า (บาท : 1 หน่วย):", Location = new Point(20, currentY), AutoSize = true, Font = new Font("Segoe UI", 10F, FontStyle.Bold) };
         _numElectricRate = new NumericUpDown
         {
-            Location = new Point(280, currentY - 4),
-            Width = 190,
+            Location = new Point(290, currentY - 4),
+            Width = 200,
             DecimalPlaces = 2,
             Maximum = 1000,
             Minimum = 0,
             Font = new Font("Segoe UI", 11F, FontStyle.Bold),
             ForeColor = Color.FromArgb(234, 88, 12)
         };
-        currentY += 45;
+        currentY += 42;
 
-        // 2. โหมดค่าน้ำ
+        // 3. ค่าไฟเหมาจ่าย (บาท/เดือน)
+        var lblElecFlat = new Label { Text = "ค่าไฟเหมาจ่าย (บาท / เดือน):", Location = new Point(20, currentY), AutoSize = true, Font = new Font("Segoe UI", 10F, FontStyle.Bold) };
+        _numElectricFlatRate = new NumericUpDown
+        {
+            Location = new Point(290, currentY - 4),
+            Width = 200,
+            DecimalPlaces = 2,
+            Maximum = 100000,
+            Minimum = 0,
+            Font = new Font("Segoe UI", 10.5F)
+        };
+        currentY += 42;
+
+        // 4. โหมดค่าน้ำ
         var lblWaterMode = new Label { Text = "รูปแบบการคิดค่าน้ำประปา:", Location = new Point(20, currentY), AutoSize = true, Font = new Font("Segoe UI", 10F, FontStyle.Bold) };
         _cboWaterMode = new ComboBox
         {
-            Location = new Point(280, currentY - 4),
-            Width = 190,
+            Location = new Point(290, currentY - 4),
+            Width = 200,
             DropDownStyle = ComboBoxStyle.DropDownList,
             Font = new Font("Segoe UI", 10.5F)
         };
         _cboWaterMode.Items.AddRange(new object[] { "ตามมิเตอร์ (METER)", "เหมาจ่ายรายคน (FLAT)" });
         _cboWaterMode.SelectedIndex = 0;
-        currentY += 45;
+        currentY += 42;
 
-        // 3. ค่าน้ำต่อหน่วย (ตามมิเตอร์)
+        // 5. ค่าน้ำต่อหน่วย (ตามมิเตอร์)
         var lblWater = new Label { Text = "อัตราค่าน้ำประปา (บาท : 1 หน่วย):", Location = new Point(20, currentY), AutoSize = true, Font = new Font("Segoe UI", 10F, FontStyle.Bold) };
         _numWaterRate = new NumericUpDown
         {
-            Location = new Point(280, currentY - 4),
-            Width = 190,
+            Location = new Point(290, currentY - 4),
+            Width = 200,
             DecimalPlaces = 2,
             Maximum = 1000,
             Minimum = 0,
             Font = new Font("Segoe UI", 11F, FontStyle.Bold),
             ForeColor = Color.FromArgb(14, 116, 144)
         };
-        currentY += 45;
+        currentY += 42;
 
-        // 4. ค่าน้ำเหมาจ่าย (บาท/คน)
+        // 6. ค่าน้ำเหมาจ่าย (บาท/คน)
         var lblWaterFlat = new Label { Text = "ค่าน้ำเหมาจ่าย (บาท / คน):", Location = new Point(20, currentY), AutoSize = true, Font = new Font("Segoe UI", 10F, FontStyle.Bold) };
         _numWaterFlatRate = new NumericUpDown
         {
-            Location = new Point(280, currentY - 4),
-            Width = 190,
+            Location = new Point(290, currentY - 4),
+            Width = 200,
             DecimalPlaces = 2,
             Maximum = 10000,
             Minimum = 0,
             Font = new Font("Segoe UI", 10.5F)
         };
-        currentY += 45;
+        currentY += 42;
 
-        // 5. ค่าส่วนกลาง
+        // 7. ค่าส่วนกลาง
         var lblCommon = new Label { Text = "ค่าบริการส่วนกลาง (บาท / เดือน):", Location = new Point(20, currentY), AutoSize = true, Font = new Font("Segoe UI", 10F, FontStyle.Bold) };
         _numCommonAreaFee = new NumericUpDown
         {
-            Location = new Point(280, currentY - 4),
-            Width = 190,
+            Location = new Point(290, currentY - 4),
+            Width = 200,
             DecimalPlaces = 2,
             Maximum = 100000,
             Minimum = 0,
             Font = new Font("Segoe UI", 10.5F)
         };
-        currentY += 45;
+        currentY += 42;
 
-        // 6. ค่าขยะ
+        // 8. ค่าขยะ
         var lblGarbage = new Label { Text = "ค่าจัดเก็บขยะ (บาท / เดือน):", Location = new Point(20, currentY), AutoSize = true, Font = new Font("Segoe UI", 10F, FontStyle.Bold) };
         _numGarbageFee = new NumericUpDown
         {
-            Location = new Point(280, currentY - 4),
-            Width = 190,
+            Location = new Point(290, currentY - 4),
+            Width = 200,
             DecimalPlaces = 2,
             Maximum = 100000,
             Minimum = 0,
             Font = new Font("Segoe UI", 10.5F)
         };
-        currentY += 55;
+        currentY += 50;
 
         // Buttons
         _btnSave = new Button
@@ -151,7 +179,7 @@ public class UtilityRateSettingsForm : Form
             BackColor = Color.FromArgb(22, 163, 74),
             FlatStyle = FlatStyle.Flat,
             Size = new Size(190, 42),
-            Location = new Point(160, currentY),
+            Location = new Point(170, currentY),
             Cursor = Cursors.Hand
         };
         _btnSave.FlatAppearance.BorderSize = 0;
@@ -165,7 +193,7 @@ public class UtilityRateSettingsForm : Form
             BackColor = Color.White,
             FlatStyle = FlatStyle.Flat,
             Size = new Size(110, 42),
-            Location = new Point(360, currentY),
+            Location = new Point(370, currentY),
             Cursor = Cursors.Hand
         };
         _btnCancel.Click += (s, e) => Close();
@@ -173,7 +201,9 @@ public class UtilityRateSettingsForm : Form
         Controls.AddRange(new Control[]
         {
             lblHeader, lblSubheader,
+            lblElecMode, _cboElectricMode,
             lblElec, _numElectricRate,
+            lblElecFlat, _numElectricFlatRate,
             lblWaterMode, _cboWaterMode,
             lblWater, _numWaterRate,
             lblWaterFlat, _numWaterFlatRate,
@@ -187,7 +217,9 @@ public class UtilityRateSettingsForm : Form
     {
         _settings = await _settingsService.GetAllSettingsAsync();
 
+        _cboElectricMode.SelectedIndex = _settings.ElectricBillingMode == "FLAT" ? 1 : 0;
         _numElectricRate.Value = Math.Min(_numElectricRate.Maximum, Math.Max(0, _settings.ElectricRatePerUnit));
+        _numElectricFlatRate.Value = Math.Min(_numElectricFlatRate.Maximum, Math.Max(0, _settings.ElectricFlatRate));
         _cboWaterMode.SelectedIndex = _settings.WaterBillingMode == "FLAT" ? 1 : 0;
         _numWaterRate.Value = Math.Min(_numWaterRate.Maximum, Math.Max(0, _settings.WaterRatePerUnit));
         _numWaterFlatRate.Value = Math.Min(_numWaterFlatRate.Maximum, Math.Max(0, _settings.WaterFlatRatePerPerson));
@@ -199,7 +231,9 @@ public class UtilityRateSettingsForm : Form
     {
         try
         {
+            _settings.ElectricBillingMode = _cboElectricMode.SelectedIndex == 1 ? "FLAT" : "METER";
             _settings.ElectricRatePerUnit = _numElectricRate.Value;
+            _settings.ElectricFlatRate = _numElectricFlatRate.Value;
             _settings.WaterBillingMode = _cboWaterMode.SelectedIndex == 1 ? "FLAT" : "METER";
             _settings.WaterRatePerUnit = _numWaterRate.Value;
             _settings.WaterFlatRatePerPerson = _numWaterFlatRate.Value;
@@ -207,7 +241,7 @@ public class UtilityRateSettingsForm : Form
             _settings.GarbageFee = _numGarbageFee.Value;
 
             await _settingsService.SaveAllSettingsAsync(_settings);
-            MessageBox.Show("บันทึกตั้งค่าอัตราค่าน้ำค่าไฟต่อหน่วยเรียบร้อยแล้ว", "สำเร็จ", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            MessageBox.Show("บันทึกตั้งค่าอัตราค่าน้ำค่าไฟเรียบร้อยแล้ว", "สำเร็จ", MessageBoxButtons.OK, MessageBoxIcon.Information);
             DialogResult = DialogResult.OK;
             Close();
         }

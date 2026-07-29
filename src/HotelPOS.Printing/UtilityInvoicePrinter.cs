@@ -145,7 +145,7 @@ public class UtilityInvoicePrinter
             height += 58f;
         }
 
-        string shopName = string.IsNullOrWhiteSpace(_settings.ShopName) ? "อพาร์ทเม้นท์ / ห้องเช่า" : _settings.ShopName;
+        string shopName = string.IsNullOrWhiteSpace(_settings.ShopName) ? "ชื่อร้าน/ที่พักของคุณ" : _settings.ShopName;
         height += 24f * scale; // Shop name
 
         if (!string.IsNullOrEmpty(_settings.ShopAddress) && _settings.ShopAddress != "-")
@@ -276,11 +276,16 @@ public class UtilityInvoicePrinter
         float y = topMargin;
         float center = leftMargin + contentWidth / 2;
 
-        void DrawLeftRight(string left, string right, Font fLeft, Font fRight, float drawY)
+        float DrawLeftRight(string left, string right, Font fLeft, Font fRight, float drawY)
         {
-            g.DrawString(left, fLeft, Brushes.Black, leftMargin, drawY);
-            var size = g.MeasureString(right, fRight);
-            g.DrawString(right, fRight, Brushes.Black, rightMargin - size.Width, drawY);
+            var sizeRight = g.MeasureString(right, fRight);
+            float maxLeftWidth = Math.Max(30f, contentWidth - sizeRight.Width - 6f);
+            var sizeLeft = g.MeasureString(left, fLeft, (int)maxLeftWidth);
+            float rowHeight = Math.Max(sizeLeft.Height, sizeRight.Height);
+
+            g.DrawString(left, fLeft, Brushes.Black, new RectangleF(leftMargin, drawY, maxLeftWidth, rowHeight));
+            g.DrawString(right, fRight, Brushes.Black, new RectangleF(rightMargin - sizeRight.Width, drawY, sizeRight.Width + 4f, rowHeight));
+            return Math.Max(18f * scale, rowHeight);
         }
 
         // 1. Logo
@@ -302,7 +307,7 @@ public class UtilityInvoicePrinter
 
         // 2. Shop Header
         var sfCenter = new StringFormat { Alignment = StringAlignment.Center };
-        string shopName = string.IsNullOrWhiteSpace(_settings.ShopName) ? "อพาร์ทเม้นท์ / ห้องเช่า" : _settings.ShopName;
+        string shopName = string.IsNullOrWhiteSpace(_settings.ShopName) ? "ชื่อร้าน/ที่พักของคุณ" : _settings.ShopName;
         g.DrawString(shopName, fontTitle, Brushes.Black, new RectangleF(leftMargin, y, contentWidth, 40), sfCenter);
         y += 22 * scale + 4;
 
@@ -331,23 +336,18 @@ public class UtilityInvoicePrinter
         y += 8;
 
         // 4. Metadata
-        DrawLeftRight("เลขที่บิล:", _bill.BillCode ?? "", fontBody, fontBodyBold, y);
-        y += 18 * scale;
+        y += DrawLeftRight("เลขที่บิล:", _bill.BillCode ?? "", fontBody, fontBodyBold, y) + 2;
 
-        DrawLeftRight("ห้องพัก:", _bill.RoomNumber ?? "", fontBody, fontBodyBold, y);
-        y += 18 * scale;
+        y += DrawLeftRight("ห้องพัก:", _bill.RoomNumber ?? "", fontBody, fontBodyBold, y) + 2;
 
-        DrawLeftRight("ประจำเดือน:", _bill.BillingMonth ?? "", fontBody, fontBody, y);
-        y += 18 * scale;
+        y += DrawLeftRight("ประจำเดือน:", _bill.BillingMonth ?? "", fontBody, fontBody, y) + 2;
 
         if (_customer != null)
         {
-            DrawLeftRight("ผู้เช่า:", _customer.FullName ?? "", fontBody, fontBody, y);
-            y += 18 * scale;
+            y += DrawLeftRight("ผู้เช่า:", _customer.FullName ?? "", fontBody, fontBody, y) + 2;
         }
 
-        DrawLeftRight("สถานะ:", _bill.IsPaid ? "ชำระแล้ว" : "ยังไม่ชำระ", fontBody, fontBodyBold, y);
-        y += 18 * scale;
+        y += DrawLeftRight("สถานะ:", _bill.IsPaid ? "ชำระแล้ว" : "ยังไม่ชำระ", fontBody, fontBodyBold, y) + 2;
 
         g.DrawLine(Pens.LightGray, leftMargin, y, rightMargin, y);
         y += 6;
@@ -358,55 +358,47 @@ public class UtilityInvoicePrinter
         g.DrawString("จำนวนเงิน", fontBodyBold, Brushes.Black, rightMargin - priceTitleSize.Width, y);
         y += 20 * scale;
 
-        DrawLeftRight("ค่าเช่าห้องพักรายเดือน", $"{_bill.RoomCharge:N2}", fontBody, fontBodyBold, y);
-        y += 18 * scale;
+        y += DrawLeftRight("ค่าเช่าห้องพักรายเดือน", $"{_bill.RoomCharge:N2}", fontBody, fontBodyBold, y) + 2;
 
         if (_bill.ElectricUnits > 0 || _bill.ElectricAmount > 0)
         {
-            DrawLeftRight($"ค่าไฟ ({_bill.ElectricPrev:N0}->{_bill.ElectricCurr:N0} = {_bill.ElectricUnits:N0} หน่วย)", $"{_bill.ElectricAmount:N2}", fontBody, fontBody, y);
-            y += 18 * scale;
+            y += DrawLeftRight($"ค่าไฟ ({_bill.ElectricPrev:N0}->{_bill.ElectricCurr:N0} = {_bill.ElectricUnits:N0} หน่วย)", $"{_bill.ElectricAmount:N2}", fontBody, fontBody, y) + 2;
         }
 
         if (_bill.WaterBillingMode == "FLAT")
         {
-            DrawLeftRight($"ค่าน้ำ (เหมาจ่าย {_bill.WaterRate:N2} ฿/คน x {_bill.WaterPersonCount} คน)", $"{_bill.WaterAmount:N2}", fontBody, fontBody, y);
-            y += 18 * scale;
+            y += DrawLeftRight($"ค่าน้ำ (เหมาจ่าย {_bill.WaterRate:N2} ฿/คน x {_bill.WaterPersonCount} คน)", $"{_bill.WaterAmount:N2}", fontBody, fontBody, y) + 2;
         }
         else if (_bill.WaterUnits > 0 || _bill.WaterAmount > 0)
         {
-            DrawLeftRight($"ค่าน้ำ ({_bill.WaterPrev:N0}->{_bill.WaterCurr:N0} = {_bill.WaterUnits:N0} หน่วย)", $"{_bill.WaterAmount:N2}", fontBody, fontBody, y);
-            y += 18 * scale;
+            y += DrawLeftRight($"ค่าน้ำ ({_bill.WaterPrev:N0}->{_bill.WaterCurr:N0} = {_bill.WaterUnits:N0} หน่วย)", $"{_bill.WaterAmount:N2}", fontBody, fontBody, y) + 2;
         }
 
         if (_bill.CommonAreaFee > 0)
         {
-            DrawLeftRight("ค่าบริการส่วนกลาง", $"{_bill.CommonAreaFee:N2}", fontBody, fontBody, y);
-            y += 18 * scale;
+            y += DrawLeftRight("ค่าบริการส่วนกลาง", $"{_bill.CommonAreaFee:N2}", fontBody, fontBody, y) + 2;
         }
 
         if (_bill.GarbageFee > 0)
         {
-            DrawLeftRight("ค่าจัดเก็บขยะรายเดือน", $"{_bill.GarbageFee:N2}", fontBody, fontBody, y);
-            y += 18 * scale;
+            y += DrawLeftRight("ค่าจัดเก็บขยะรายเดือน", $"{_bill.GarbageFee:N2}", fontBody, fontBody, y) + 2;
         }
 
         if (_bill.ExtraCharges > 0)
         {
-            DrawLeftRight("ค่าบริการอื่นๆ", $"{_bill.ExtraCharges:N2}", fontBody, fontBody, y);
-            y += 18 * scale;
+            y += DrawLeftRight("ค่าบริการอื่นๆ", $"{_bill.ExtraCharges:N2}", fontBody, fontBody, y) + 2;
         }
 
         if (_bill.DiscountAmount > 0)
         {
-            DrawLeftRight("ส่วนลดพิเศษ", $"-{_bill.DiscountAmount:N2}", fontBody, fontBody, y);
-            y += 18 * scale;
+            y += DrawLeftRight("ส่วนลดพิเศษ", $"-{_bill.DiscountAmount:N2}", fontBody, fontBody, y) + 2;
         }
 
         g.DrawLine(Pens.LightGray, leftMargin, y, rightMargin, y);
         y += 6;
 
         // 6. Grand Total
-        DrawLeftRight("ยอดรวมทั้งสิ้น (TOTAL):", $"{_bill.TotalAmount:N2} บาท", fontSubtitle, fontSubtitle, y);
+        y += DrawLeftRight("ยอดรวมทั้งสิ้น (TOTAL):", $"{_bill.TotalAmount:N2} บาท", fontSubtitle, fontSubtitle, y) + 4;
         y += 24 * scale;
         g.DrawLine(Pens.Black, leftMargin, y, rightMargin, y);
         y += 8;
@@ -464,6 +456,7 @@ public class UtilityInvoicePrinter
         var fontBody = new Font("Tahoma", 10.5F, FontStyle.Regular);
         var fontBodyBold = new Font("Tahoma", 10.5F, FontStyle.Bold);
         var fontSmall = new Font("Tahoma", 9.5F, FontStyle.Regular);
+        var fontSigHeader = new Font("Tahoma", 9.5F, FontStyle.Bold);
 
         // Pens & Brushes
         var penDark = new Pen(Color.FromArgb(30, 41, 59), 1.5F);
@@ -495,7 +488,7 @@ public class UtilityInvoicePrinter
             catch { }
         }
 
-        string shopName = string.IsNullOrWhiteSpace(_settings.ShopName) ? "อพาร์ทเม้นท์ / ห้องเช่า" : _settings.ShopName;
+        string shopName = string.IsNullOrWhiteSpace(_settings.ShopName) ? "ชื่อร้าน/ที่พักของคุณ" : _settings.ShopName;
         g.DrawString(shopName, fontTitle, brushDark, logoOffsetX, currentY);
         currentY += 32;
 
@@ -512,7 +505,10 @@ public class UtilityInvoicePrinter
         g.DrawRectangle(penLight, rectHeaderBox.X, rectHeaderBox.Y, rectHeaderBox.Width, rectHeaderBox.Height);
 
         g.DrawString("ใบแจ้งหนี้ค่าเช่าและค่าบริการประจำเดือน (MONTHLY INVOICE)", fontSubtitle, brushDark, leftMargin + 12, currentY + 8);
-        g.DrawString($"เลขที่บิล: {_bill.BillCode}", fontBodyBold, brushDark, rightMargin - 220, currentY + 10);
+        using (var sfTitleRight = new StringFormat { Alignment = StringAlignment.Far })
+        {
+            g.DrawString($"เลขที่บิล: {_bill.BillCode}", fontBodyBold, brushDark, new RectangleF(leftMargin, currentY + 10, contentWidth - 12, 30), sfTitleRight);
+        }
         currentY += 55;
 
         // 3. Info Table (Room & Tenant Details)
@@ -705,7 +701,7 @@ public class UtilityInvoicePrinter
             var sig1Rect = new RectangleF(sig1X, currentY, sigBoxWidth, 130);
             g.DrawRectangle(penLight, sig1Rect.X, sig1Rect.Y, sig1Rect.Width, sig1Rect.Height);
 
-            g.DrawString("ลงลายมือชื่อผู้เช่า / Tenant Signature", fontHeader, brushDark, sig1X + 10, currentY + 8);
+            g.DrawString("ลงลายมือชื่อผู้เช่า / Tenant Signature", fontSigHeader, brushDark, sig1X + 10, currentY + 8);
             g.DrawLine(penLight, sig1X + 15, currentY + 75, sig1X + sigBoxWidth - 15, currentY + 75);
             g.DrawString($"({(_customer?.FullName ?? "_________________________")})", fontSmall, Brushes.DimGray, sig1X + 20, currentY + 85);
             g.DrawString("วันที่ / Date: _____ / _____ / ________", fontSmall, Brushes.DimGray, sig1X + 20, currentY + 105);
@@ -715,7 +711,7 @@ public class UtilityInvoicePrinter
             var sig2Rect = new RectangleF(sig2X, currentY, sigBoxWidth, 130);
             g.DrawRectangle(penLight, sig2Rect.X, sig2Rect.Y, sig2Rect.Width, sig2Rect.Height);
 
-            g.DrawString("ลงลายมือชื่อผู้รับเงิน / Receiver Signature", fontHeader, brushDark, sig2X + 10, currentY + 8);
+            g.DrawString("ลงลายมือชื่อผู้รับเงิน / Receiver Signature", fontSigHeader, brushDark, sig2X + 10, currentY + 8);
             g.DrawLine(penLight, sig2X + 15, currentY + 75, sig2X + sigBoxWidth - 15, currentY + 75);
             g.DrawString($"({_staffName})", fontSmall, Brushes.DimGray, sig2X + 45, currentY + 85);
             g.DrawString("วันที่ / Date: _____ / _____ / ________", fontSmall, Brushes.DimGray, sig2X + 20, currentY + 105);
@@ -739,6 +735,7 @@ public class UtilityInvoicePrinter
             fontBody.Dispose();
             fontBodyBold.Dispose();
             fontSmall.Dispose();
+            fontSigHeader.Dispose();
             penDark.Dispose();
             penLight.Dispose();
             brushDark.Dispose();

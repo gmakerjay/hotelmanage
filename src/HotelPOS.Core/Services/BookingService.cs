@@ -12,19 +12,22 @@ public class BookingService : IBookingService
     private readonly ICustomerRepository _customerRepository;
     private readonly IFolioRepository _folioRepository;
     private readonly IAppLogger _logger;
+    private readonly IAuditService? _auditService;
 
     public BookingService(
         IBookingRepository bookingRepository,
         IRoomRepository roomRepository,
         ICustomerRepository customerRepository,
         IFolioRepository folioRepository,
-        IAppLogger logger)
+        IAppLogger logger,
+        IAuditService? auditService = null)
     {
         _bookingRepository = bookingRepository;
         _roomRepository = roomRepository;
         _customerRepository = customerRepository;
         _folioRepository = folioRepository;
         _logger = logger;
+        _auditService = auditService;
     }
 
     public async Task<IEnumerable<Booking>> GetBookingsAsync(DateTime? startDate = null, DateTime? endDate = null, BookingStatus? status = null, int? roomId = null)
@@ -111,6 +114,11 @@ public class BookingService : IBookingService
         await _roomRepository.UpdateRoomStatusAsync(roomId, RoomStatus.Occupied, notes);
         _logger.Info(LogCategory.Booking, $"Walk-in เช็คอินห้อง {room.RoomNumber} (BookingCode: {bookingCode}) สำเร็จ", correlationId);
 
+        if (_auditService != null)
+        {
+            await _auditService.LogAsync("CHECK_IN", "rooms", roomId.ToString(), $"Walk-in เช็คอินเข้าพักห้อง {room.RoomNumber} ผู้เช่า: {customer.FullName} ประเภทเรทราคา: {ratePlan}");
+        }
+
         return booking;
     }
 
@@ -162,6 +170,12 @@ public class BookingService : IBookingService
         }
 
         _logger.Info(LogCategory.Booking, $"สร้างการจองล่วงหน้าห้อง {room.RoomNumber} (BookingCode: {bookingCode}) สำเร็จ", correlationId);
+
+        if (_auditService != null)
+        {
+            await _auditService.LogAsync("CREATE_RESERVATION", "rooms", roomId.ToString(), $"จองห้องพักล่วงหน้าห้อง {room.RoomNumber} ผู้เช่า: {customer.FullName} วันเช็คอินแผน: {checkInPlanned:dd/MM/yyyy}");
+        }
+
         return booking;
     }
 
@@ -181,6 +195,11 @@ public class BookingService : IBookingService
         await _roomRepository.UpdateRoomStatusAsync(booking.RoomId, RoomStatus.Occupied);
 
         _logger.Info(LogCategory.Booking, $"เช็คอินจากการจองล่วงหน้า Code '{booking.BookingCode}' สำเร็จ", correlationId);
+
+        if (_auditService != null)
+        {
+            await _auditService.LogAsync("CHECK_IN", "rooms", booking.RoomId.ToString(), $"เช็คอินจากการจองล่วงหน้า เลขที่การจอง: {booking.BookingCode}");
+        }
     }
 
     public async Task<Folio> CheckOutAsync(int bookingId, decimal extraCharges = 0, decimal discountAmount = 0, string? notes = null)
@@ -229,6 +248,12 @@ public class BookingService : IBookingService
         await _roomRepository.UpdateRoomStatusAsync(booking.RoomId, RoomStatus.Cleaning, "เช็คเอาท์แล้ว - รอทำความสะอาด");
 
         _logger.Info(LogCategory.Booking, $"เช็คเอาท์ Booking Code '{booking.BookingCode}' รวมยอดบิล = {totalAmount} บาท สำเร็จ", correlationId);
+
+        if (_auditService != null)
+        {
+            await _auditService.LogAsync("CHECK_OUT", "rooms", booking.RoomId.ToString(), $"เช็คเอาท์ห้องพัก ยอดสุทธิ: {totalAmount:N2} บาท เลขที่การจอง: {booking.BookingCode}");
+        }
+
         return folio;
     }
 
@@ -246,6 +271,11 @@ public class BookingService : IBookingService
         }
 
         _logger.Info(LogCategory.Booking, $"ยกเลิกการจอง Code '{booking.BookingCode}' สำเร็จ", correlationId);
+
+        if (_auditService != null)
+        {
+            await _auditService.LogAsync("CANCEL_BOOKING", "rooms", booking.RoomId.ToString(), $"ยกเลิกการจองห้องพัก เลขที่การจอง: {booking.BookingCode} เหตุผล: {reason ?? "-"}");
+        }
     }
 
     private static decimal CalculateRoomCharges(RatePlanType ratePlan, decimal agreedRate, DateTime start, DateTime end)

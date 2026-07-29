@@ -35,7 +35,7 @@ public class BackupService : IBackupService
         {
             var backupDir = Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-                "HotelPOS",
+                "PSoftRestRentManager",
                 "Backups");
             if (!Directory.Exists(backupDir))
             {
@@ -43,7 +43,7 @@ public class BackupService : IBackupService
             }
 
             var timeStamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
-            targetFilePath = Path.Combine(backupDir, $"HotelPOS_Backup_{timeStamp}.db");
+            targetFilePath = Path.Combine(backupDir, $"PSoftRestRent_Backup_{timeStamp}.db");
         }
 
         var dir = Path.GetDirectoryName(targetFilePath);

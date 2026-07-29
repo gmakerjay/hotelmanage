@@ -19,6 +19,8 @@ public class SystemBackupControl : UserControl
     private Button _btnImportCustomers = null!;
     private Button _btnExportRooms = null!;
     private Button _btnImportRooms = null!;
+    private Button _btnExportProducts = null!;
+    private Button _btnImportProducts = null!;
 
     public SystemBackupControl(IBackupService backupService, IExportImportService exportImportService)
     {
@@ -93,7 +95,7 @@ public class SystemBackupControl : UserControl
         var grpCsv = new GroupBox
         {
             Text = "นำเข้าและส่งออกข้อมูล (CSV Import & Export)",
-            Size = new Size(780, 220),
+            Size = new Size(780, 235),
             Font = new Font("Segoe UI", 11F, FontStyle.Bold),
             Margin = new Padding(0, 0, 0, 20)
         };
@@ -101,7 +103,7 @@ public class SystemBackupControl : UserControl
         _btnExportRooms = new Button
         {
             Text = "ส่งออกห้องพัก (Rooms.csv)",
-            Location = new Point(20, 45),
+            Location = new Point(20, 40),
             Size = new Size(250, 40),
             Font = new Font("Segoe UI", 10.5F, FontStyle.Bold)
         };
@@ -110,7 +112,7 @@ public class SystemBackupControl : UserControl
         _btnImportRooms = new Button
         {
             Text = "นำเข้าห้องพัก (Rooms.csv)",
-            Location = new Point(290, 45),
+            Location = new Point(290, 40),
             Size = new Size(250, 40),
             Font = new Font("Segoe UI", 10.5F, FontStyle.Bold)
         };
@@ -119,7 +121,7 @@ public class SystemBackupControl : UserControl
         _btnExportCustomers = new Button
         {
             Text = "ส่งออกลูกค้า (Customers.csv)",
-            Location = new Point(20, 105),
+            Location = new Point(20, 98),
             Size = new Size(250, 40),
             Font = new Font("Segoe UI", 10.5F, FontStyle.Bold)
         };
@@ -128,13 +130,31 @@ public class SystemBackupControl : UserControl
         _btnImportCustomers = new Button
         {
             Text = "นำเข้าลูกค้า (Customers.csv)",
-            Location = new Point(290, 105),
+            Location = new Point(290, 98),
             Size = new Size(250, 40),
             Font = new Font("Segoe UI", 10.5F, FontStyle.Bold)
         };
         _btnImportCustomers.Click += BtnImportCustomers_Click;
 
-        grpCsv.Controls.AddRange(new Control[] { _btnExportRooms, _btnImportRooms, _btnExportCustomers, _btnImportCustomers });
+        _btnExportProducts = new Button
+        {
+            Text = "ส่งออกสินค้า/สต็อก (Products.csv)",
+            Location = new Point(20, 156),
+            Size = new Size(250, 40),
+            Font = new Font("Segoe UI", 10.5F, FontStyle.Bold)
+        };
+        _btnExportProducts.Click += BtnExportProducts_Click;
+
+        _btnImportProducts = new Button
+        {
+            Text = "นำเข้าสินค้า/สต็อก (Products.csv)",
+            Location = new Point(290, 156),
+            Size = new Size(250, 40),
+            Font = new Font("Segoe UI", 10.5F, FontStyle.Bold)
+        };
+        _btnImportProducts.Click += BtnImportProducts_Click;
+
+        grpCsv.Controls.AddRange(new Control[] { _btnExportRooms, _btnImportRooms, _btnExportCustomers, _btnImportCustomers, _btnExportProducts, _btnImportProducts });
 
         // ToolTips Guide (Large readable font & clipping safety)
         var tt = new AppToolTip();
@@ -148,8 +168,9 @@ public class SystemBackupControl : UserControl
         container.Controls.Add(grpBackup);
         container.Controls.Add(grpCsv);
 
-        Controls.Add(container);
         Controls.Add(pnlHeader);
+        Controls.Add(container);
+        container.BringToFront();
     }
 
     private async void BtnBackup_Click(object? sender, EventArgs e)
@@ -258,6 +279,40 @@ public class SystemBackupControl : UserControl
             {
                 int count = await _exportImportService.ImportCustomersFromCsvAsync(ofd.FileName);
                 MessageBox.Show($"นำเข้าข้อมูลลูกค้าเรียบร้อยแล้ว จำนวน {count} รายการ", "สำเร็จ", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"นำเข้าไม่สำเร็จ: {ex.Message}", "ข้อผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+    }
+
+    private async void BtnExportProducts_Click(object? sender, EventArgs e)
+    {
+        using var sfd = new SaveFileDialog { Filter = "CSV File (*.csv)|*.csv", FileName = "Products.csv" };
+        if (sfd.ShowDialog() == DialogResult.OK)
+        {
+            try
+            {
+                await _exportImportService.ExportProductsToCsvAsync(sfd.FileName);
+                MessageBox.Show("ส่งออกข้อมูลสินค้าและสต็อกเรียบร้อยแล้ว", "สำเร็จ", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"ส่งออกไม่สำเร็จ: {ex.Message}", "ข้อผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+    }
+
+    private async void BtnImportProducts_Click(object? sender, EventArgs e)
+    {
+        using var ofd = new OpenFileDialog { Filter = "CSV File (*.csv)|*.csv" };
+        if (ofd.ShowDialog() == DialogResult.OK)
+        {
+            try
+            {
+                int count = await _exportImportService.ImportProductsFromCsvAsync(ofd.FileName);
+                MessageBox.Show($"นำเข้าข้อมูลสินค้าและสต็อกเรียบร้อยแล้ว จำนวน {count} รายการ", "สำเร็จ", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
             catch (Exception ex)
             {

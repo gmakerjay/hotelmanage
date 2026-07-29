@@ -189,7 +189,7 @@ public class POSControl : UserControl
         var pnlRight = new Panel
         {
             Dock = DockStyle.Fill,
-            Padding = new Padding(12),
+            Padding = new Padding(10),
             BackColor = Color.White
         };
         mainSplit.Panel2.Controls.Add(pnlRight);
@@ -197,25 +197,30 @@ public class POSControl : UserControl
         var lblRightTitle = new Label
         {
             Text = "ตะกร้าสินค้า (Cart)",
-            Font = new Font("Segoe UI", 12F, FontStyle.Bold),
+            Font = new Font("Segoe UI", 12.5F, FontStyle.Bold),
             ForeColor = Color.FromArgb(15, 23, 42),
-            Location = new Point(12, 10),
-            AutoSize = true
+            Dock = DockStyle.Top,
+            Height = 35
         };
-        pnlRight.Controls.Add(lblRightTitle);
+
+        var pnlCartBottom = new Panel
+        {
+            Dock = DockStyle.Bottom,
+            Height = 225,
+            Padding = new Padding(0, 6, 0, 0),
+            BackColor = Color.FromArgb(248, 250, 252)
+        };
 
         // Cart DataGridView
         _dgvCart = new DataGridView
         {
-            Location = new Point(12, 45),
-            Size = new Size(pnlRight.Width - 24, Math.Max(150, pnlRight.Height - 280)),
-            Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right,
+            Dock = DockStyle.Fill,
             AllowUserToAddRows = false,
             AllowUserToDeleteRows = false,
             ReadOnly = true,
             SelectionMode = DataGridViewSelectionMode.FullRowSelect,
             BackgroundColor = Color.White,
-            BorderStyle = BorderStyle.None,
+            BorderStyle = BorderStyle.FixedSingle,
             RowHeadersVisible = false,
             GridColor = Color.FromArgb(241, 245, 249),
             AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
@@ -246,92 +251,89 @@ public class POSControl : UserControl
         _dgvCart.Columns["Total"]!.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
 
         _dgvCart.CellDoubleClick += DgvCart_CellDoubleClick;
-        pnlRight.Controls.Add(_dgvCart);
 
-        int bottomY = 410;
+        // Bottom Summary & Checkout Controls
+        int bottomY = 6;
 
-        // Discount box
         var lblDiscount = new Label
         {
             Text = "ส่วนลด (บาท):",
-            Location = new Point(12, bottomY + 3),
-            Size = new Size(100, 25),
+            Location = new Point(8, bottomY + 3),
+            Size = new Size(95, 25),
             ForeColor = Color.FromArgb(71, 85, 105)
         };
         _txtDiscount = new TextBox
         {
-            Location = new Point(120, bottomY),
-            Size = new Size(120, 28),
+            Location = new Point(105, bottomY),
+            Size = new Size(110, 28),
             Text = "0",
             TextAlign = HorizontalAlignment.Right
         };
         _txtDiscount.TextChanged += (s, e) => CalculateSummary();
-        pnlRight.Controls.Add(lblDiscount);
-        pnlRight.Controls.Add(_txtDiscount);
-        
-        // SubTotal Label
+
         _lblSubTotal = new Label
         {
             Text = "รวมเงินหลัก: 0.00 บาท",
-            Location = new Point(255, bottomY + 3),
+            Location = new Point(225, bottomY + 3),
             Size = new Size(200, 25),
             TextAlign = ContentAlignment.MiddleRight,
-            Font = new Font("Segoe UI", 10F, FontStyle.Regular),
-            ForeColor = Color.FromArgb(100, 116, 139)
+            Font = new Font("Segoe UI", 9.5F, FontStyle.Regular),
+            ForeColor = Color.FromArgb(100, 116, 139),
+            Anchor = AnchorStyles.Top | AnchorStyles.Right
         };
-        pnlRight.Controls.Add(_lblSubTotal);
-        bottomY += 40;
+        pnlCartBottom.Controls.AddRange(new Control[] { lblDiscount, _txtDiscount, _lblSubTotal });
+        bottomY += 34;
 
-        // Folio Routing Option
         _chkChargeRoom = new CheckBox
         {
             Text = "ชาร์จค่าใช้จ่ายเข้าบัญชีห้องพัก (Folio)",
-            Location = new Point(12, bottomY),
+            Location = new Point(8, bottomY),
             Size = new Size(280, 25),
+            Font = new Font("Segoe UI", 9.5F, FontStyle.Bold),
             ForeColor = Color.FromArgb(30, 41, 59)
         };
         _chkChargeRoom.CheckedChanged += (s, e) => ToggleFolioSelection();
-        pnlRight.Controls.Add(_chkChargeRoom);
-        bottomY += 30;
+        pnlCartBottom.Controls.Add(_chkChargeRoom);
+        bottomY += 28;
 
         _cboFolio = new ComboBox
         {
-            Location = new Point(12, bottomY),
-            Size = new Size(320, 28),
+            Location = new Point(8, bottomY),
+            Size = new Size(340, 28),
             DropDownStyle = ComboBoxStyle.DropDownList,
-            Enabled = false
+            Enabled = false,
+            Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
         };
-        pnlRight.Controls.Add(_cboFolio);
-        bottomY += 40;
+        pnlCartBottom.Controls.Add(_cboFolio);
+        bottomY += 36;
 
-        // Total amount highlight
         _lblTotal = new Label
         {
             Text = "ยอดสุทธิ: 0.00 บาท",
-            Font = new Font("Segoe UI", 16F, FontStyle.Bold),
+            Font = new Font("Segoe UI", 15F, FontStyle.Bold),
             ForeColor = Color.FromArgb(37, 99, 235),
-            Location = new Point(12, bottomY),
-            Size = new Size(460, 40),
-            TextAlign = ContentAlignment.MiddleLeft
+            Location = new Point(8, bottomY),
+            Size = new Size(400, 36),
+            TextAlign = ContentAlignment.MiddleLeft,
+            Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
         };
-        pnlRight.Controls.Add(_lblTotal);
-        bottomY += 45;
+        pnlCartBottom.Controls.Add(_lblTotal);
+        bottomY += 40;
 
-        // Primary Buttons
         _btnCheckout = new Button
         {
-            Text = "ชำระเงิน / ปิดบิลขาย",
+            Text = "คิดเงิน / ชำระเงิน (F10)",
             BackColor = Color.FromArgb(22, 163, 74),
             ForeColor = Color.White,
             FlatStyle = FlatStyle.Flat,
-            Font = new Font("Segoe UI", 12F, FontStyle.Bold),
-            Location = new Point(12, bottomY),
-            Size = new Size(220, 45),
+            Font = new Font("Segoe UI", 11.5F, FontStyle.Bold),
+            Location = new Point(8, bottomY),
+            Size = new Size(230, 44),
             Cursor = Cursors.Hand
         };
         _btnCheckout.FlatAppearance.BorderSize = 0;
         _btnCheckout.Click += BtnCheckout_Click;
-        pnlRight.Controls.Add(_btnCheckout);
+        pnlCartBottom.Controls.Add(_btnCheckout);
 
         _btnClearCart = new Button
         {
@@ -339,16 +341,22 @@ public class POSControl : UserControl
             BackColor = Color.White,
             ForeColor = Color.FromArgb(220, 38, 38),
             FlatStyle = FlatStyle.Flat,
-            Font = new Font("Segoe UI", 10.5F, FontStyle.Bold),
+            Font = new Font("Segoe UI", 10F, FontStyle.Bold),
             Location = new Point(245, bottomY),
-            Size = new Size(110, 45),
+            Size = new Size(110, 44),
             Cursor = Cursors.Hand
         };
+        _btnClearCart.FlatAppearance.BorderColor = Color.FromArgb(220, 38, 38);
         _btnClearCart.Click += (s, e) => ClearCart();
-        pnlRight.Controls.Add(_btnClearCart);
+        pnlCartBottom.Controls.Add(_btnClearCart);
+
+        // Add controls in Dock order (Controls added first will fill space remaining)
+        pnlRight.Controls.Add(_dgvCart);
+        pnlRight.Controls.Add(pnlCartBottom);
+        pnlRight.Controls.Add(lblRightTitle);
     }
 
-    private async Task LoadInitialDataAsync()
+    public async Task LoadInitialDataAsync()
     {
         try
         {
@@ -605,12 +613,12 @@ public class POSControl : UserControl
         _cboFolio.Enabled = _chkChargeRoom.Checked;
         if (_chkChargeRoom.Checked)
         {
-            _btnCheckout.Text = "ชาร์จเข้าบัญชีห้องพัก (Folio)";
+            _btnCheckout.Text = "⚡ ชาร์จเข้าบัญชีห้องพัก (Folio)";
             _btnCheckout.BackColor = Color.FromArgb(15, 23, 42);
         }
         else
         {
-            _btnCheckout.Text = "ชำระเงิน / ปิดบิลขาย";
+            _btnCheckout.Text = "⚡ คิดเงิน / ชำระเงิน (F10)";
             _btnCheckout.BackColor = Color.FromArgb(22, 163, 74);
         }
     }
@@ -706,7 +714,8 @@ public class POSControl : UserControl
         }
         catch (Exception ex)
         {
-            MessageBox.Show($"ชำระเงินล้มเหลว: {ex.Message}", "ข้อผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            _logger.Error(LogCategory.Pos, "กระบวนการชำระเงิน/ปิดบิลขาย POS ล้มเหลว", ex);
+            Program.ShowDetailedErrorPopup(ex, "ชำระเงิน/บันทึกการขายหน้าร้าน POS ล้มเหลวเนื่องจากข้อผิดพลาดของระบบ");
         }
     }
 
@@ -779,7 +788,7 @@ public class POSControl : UserControl
 
             // Generate receipt document & rasterize Thai Unicode to bitmap format
             var printerEngine = new ReceiptInvoicePrinter(
-                settings?.ShopName ?? "โรงแรม HotelPOS TH",
+                settings?.ShopName ?? "ชื่อร้าน/ที่พักของคุณ",
                 settings?.ShopAddress ?? "123/45 ถนนสุขุมวิท กรุงเทพฯ",
                 settings?.ShopPhone ?? "02-123-4567",
                 settings?.ShopTaxId ?? "0105560000000",
@@ -798,7 +807,7 @@ public class POSControl : UserControl
         catch (Exception ex)
         {
             _logger.Error(LogCategory.Printing, "พิมพ์ใบเสร็จขาย POS ล้มเหลว", ex);
-            MessageBox.Show($"พิมพ์ใบเสร็จล้มเหลว: {ex.Message}", "ข้อผิดพลาดเครื่องพิมพ์", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            Program.ShowDetailedErrorPopup(ex, "พิมพ์ใบเสร็จรับเงินอย่างย่อ POS ล้มเหลวเนื่องจากข้อผิดพลาดของระบบหรือไดรเวอร์เครื่องพิมพ์");
         }
     }
 
@@ -877,6 +886,11 @@ public class POSControl : UserControl
         var btnDelProd = new Button { Text = "ลบสินค้า", Location = new Point(145, iy), Size = new Size(125, 36), BackColor = Color.White, ForeColor = Color.Red, FlatStyle = FlatStyle.Flat, Cursor = Cursors.Hand };
         btnDelProd.FlatAppearance.BorderColor = Color.Red;
         pnlProdInputs.Controls.AddRange(new Control[] { btnSaveProd, btnDelProd });
+
+        iy += 46;
+        var btnExportProds = new Button { Text = "ส่งออก (CSV)", Location = new Point(12, iy), Size = new Size(125, 34), BackColor = Color.White, ForeColor = Color.FromArgb(30, 41, 59), FlatStyle = FlatStyle.Flat, Cursor = Cursors.Hand };
+        var btnImportProds = new Button { Text = "นำเข้า (CSV)", Location = new Point(145, iy), Size = new Size(125, 34), BackColor = Color.White, ForeColor = Color.FromArgb(30, 41, 59), FlatStyle = FlatStyle.Flat, Cursor = Cursors.Hand };
+        pnlProdInputs.Controls.AddRange(new Control[] { btnExportProds, btnImportProds });
 
         // Tab 2: Categories CRUD
         var tabCats = new TabPage("ประเภทสินค้า (Categories)");
@@ -1020,6 +1034,45 @@ public class POSControl : UserControl
             }
         };
 
+        btnExportProds.Click += async (s, ev) =>
+        {
+            using var sfd = new SaveFileDialog { Filter = "CSV File (*.csv)|*.csv", FileName = "Products.csv" };
+            if (sfd.ShowDialog() == DialogResult.OK)
+            {
+                try
+                {
+                    var expImpService = new ExportImportService(null!, null!, _auditService ?? new AuditService(null!, _logger), _posService);
+                    await expImpService.ExportProductsToCsvAsync(sfd.FileName);
+                    MessageBox.Show("ส่งออกข้อมูลสินค้าและสต็อกเรียบร้อยแล้ว", "สำเร็จ", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"ส่งออกไม่สำเร็จ: {ex.Message}", "ข้อผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
+            }
+        };
+
+        btnImportProds.Click += async (s, ev) =>
+        {
+            using var ofd = new OpenFileDialog { Filter = "CSV File (*.csv)|*.csv" };
+            if (ofd.ShowDialog() == DialogResult.OK)
+            {
+                try
+                {
+                    var expImpService = new ExportImportService(null!, null!, _auditService ?? new AuditService(null!, _logger), _posService);
+                    int count = await expImpService.ImportProductsFromCsvAsync(ofd.FileName);
+                    _products = (await _posService.GetProductsAsync()).ToList();
+                    _categories = (await _posService.GetCategoriesAsync()).ToList();
+                    reloadGrids();
+                    MessageBox.Show($"นำเข้าข้อมูลสินค้าและสต็อกเรียบร้อยแล้ว จำนวน {count} รายการ", "สำเร็จ", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"นำเข้าไม่สำเร็จ: {ex.Message}", "ข้อผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
+            }
+        };
+
         // Category Form select
         ProductCategory? selectedCategory = null;
         dgvCats.SelectionChanged += (s, ev) =>
@@ -1096,5 +1149,20 @@ public class POSControl : UserControl
 
         // Refresh main view lists after closing dialog
         LoadInitialDataAsync().GetAwaiter().GetResult();
+    }
+
+    public void SetRoomCharge(string roomNumber)
+    {
+        _chkChargeRoom.Checked = true;
+        
+        // Find the index of the folio matching roomNumber
+        for (int i = 0; i < _activeFolios.Count; i++)
+        {
+            if (_activeFolios[i].RoomNumber == roomNumber)
+            {
+                _cboFolio.SelectedIndex = i;
+                break;
+            }
+        }
     }
 }

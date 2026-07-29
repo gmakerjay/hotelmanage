@@ -254,16 +254,18 @@ public class BookingForm : Form
             {
                 _cboRatePlan.Items.Add(new RatePlanItem { RatePlan = RatePlanType.Monthly, DisplayName = "รายเดือน (Monthly)" });
             }
-            else
+            if (t.DailyRate > 0)
             {
-                if (t.DailyRate > 0 || (t.DailyRate == 0 && t.HourlyRate == 0))
-                {
-                    _cboRatePlan.Items.Add(new RatePlanItem { RatePlan = RatePlanType.Daily, DisplayName = "รายวัน (Daily)" });
-                }
-                if (t.HourlyRate > 0)
-                {
-                    _cboRatePlan.Items.Add(new RatePlanItem { RatePlan = RatePlanType.Hourly, DisplayName = "รายชั่วโมง (Hourly)" });
-                }
+                _cboRatePlan.Items.Add(new RatePlanItem { RatePlan = RatePlanType.Daily, DisplayName = "รายวัน (Daily)" });
+            }
+            if (t.HourlyRate > 0)
+            {
+                _cboRatePlan.Items.Add(new RatePlanItem { RatePlan = RatePlanType.Hourly, DisplayName = "รายชั่วโมง (Hourly)" });
+            }
+
+            if (_cboRatePlan.Items.Count == 0)
+            {
+                _cboRatePlan.Items.Add(new RatePlanItem { RatePlan = RatePlanType.Daily, DisplayName = "รายวัน (Daily)" });
             }
 
             if (_cboRatePlan.Items.Count > 0)

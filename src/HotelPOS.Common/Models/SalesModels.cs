@@ -36,6 +36,10 @@ public class Sale
     public int CreatedBy { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.Now;
     public bool IsDeleted { get; set; } = false;
+
+    // Extended properties for UI joined display
+    public string? RoomNumber { get; set; }
+    public string? CustomerName { get; set; }
 }
 
 public class SaleItem

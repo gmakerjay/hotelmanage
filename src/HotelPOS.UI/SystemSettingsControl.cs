@@ -1,4 +1,6 @@
 using System.Drawing.Printing;
+using System.Security.Cryptography;
+using System.Text;
 using HotelPOS.Common.Models;
 using HotelPOS.Core.Services;
 
@@ -7,6 +9,7 @@ namespace HotelPOS.UI;
 public class SystemSettingsControl : UserControl
 {
     private readonly ISettingsService _settingsService;
+    private readonly IAuditService? _auditService;
 
     // Section 1: Shop & Invoice
     private TextBox _txtShopName = null!;
@@ -51,9 +54,10 @@ public class SystemSettingsControl : UserControl
     private Button _btnSave = null!;
     private Button _btnReload = null!;
 
-    public SystemSettingsControl(ISettingsService settingsService)
+    public SystemSettingsControl(ISettingsService settingsService, IAuditService? auditService = null)
     {
         _settingsService = settingsService;
+        _auditService = auditService;
 
         InitializeUI();
         Load += async (s, e) => await LoadSettingsAsync();
@@ -113,9 +117,9 @@ public class SystemSettingsControl : UserControl
         currentY += 175;
 
         // Group 5: Security & Set Zero
-        var grpSecurity = CreateGroupPanel("5. ความปลอดภัยและล้างข้อมูลเริ่มใช้งานจริง (Security & Set Zero)", currentY, 170);
+        var grpSecurity = CreateGroupPanel("5. ความปลอดภัย ประวัติระบบ และการล้างข้อมูล (Security, Audit Log & Set Zero)", currentY, 215);
         BuildSecurityFields(grpSecurity);
-        currentY += 185;
+        currentY += 230;
 
         // Bottom Action Bar
         var pnlActions = new Panel
@@ -529,10 +533,51 @@ public class SystemSettingsControl : UserControl
             ForeColor = Color.DimGray
         };
 
+        var btnOpenAuditLog = new Button
+        {
+            Text = "เปิดดูบันทึกประวัติระบบ (Open Audit Log)",
+            BackColor = Color.FromArgb(79, 70, 229),
+            ForeColor = Color.White,
+            FlatStyle = FlatStyle.Flat,
+            Font = new Font("Segoe UI", 9.5F, FontStyle.Bold),
+            Location = new Point(20, 160),
+            Size = new Size(320, 36),
+            Cursor = Cursors.Hand
+        };
+        btnOpenAuditLog.FlatAppearance.BorderSize = 0;
+        btnOpenAuditLog.Click += (s, e) =>
+        {
+            using var form = new Form
+            {
+                Text = "ประวัติการทำงานระบบ (Audit Log Trail)",
+                Width = 1050,
+                Height = 680,
+                StartPosition = FormStartPosition.CenterParent,
+                Font = new Font("Segoe UI", 10.5F),
+                MinimizeBox = false,
+                MaximizeBox = true
+            };
+            try { form.Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath); } catch { }
+
+            var auditCtrl = new AuditLogControl(_auditService ?? new AuditService(null!, null!)) { Dock = DockStyle.Fill };
+            form.Controls.Add(auditCtrl);
+            form.Load += async (sender, ev) => await auditCtrl.LoadLogsAsync();
+            form.ShowDialog(this);
+        };
+
+        var lblAuditLogInfo = new Label
+        {
+            Text = "* สำหรับเจ้าของร้าน/ผู้ตรวจสอบในการเช็คประวัติการเช็คอิน เช็คเอาท์ บันทึกมิเตอร์ หรือล้างระบบย้อนหลัง",
+            Location = new Point(350, 167),
+            AutoSize = true,
+            Font = new Font("Segoe UI", 9F, FontStyle.Italic),
+            ForeColor = Color.DimGray
+        };
+
         pnl.Controls.AddRange(new Control[]
         {
             lblPassword, _txtAdminPassword, lblConfirm, _txtConfirmPassword, lblPasswordInfo,
-            _btnZetZero, lblZetZeroInfo
+            _btnZetZero, lblZetZeroInfo, btnOpenAuditLog, lblAuditLogInfo
         });
     }
 
@@ -574,7 +619,18 @@ public class SystemSettingsControl : UserControl
                 var currentPwd = await _settingsService.GetAsync("admin_password") ?? "psoft123";
                 if (string.IsNullOrWhiteSpace(currentPwd)) currentPwd = "psoft123";
 
-                if (inputPwd != currentPwd)
+                string inputHash = ComputeSha256Hash(inputPwd);
+                bool matches = false;
+                if (inputHash == currentPwd || inputPwd == currentPwd)
+                {
+                    matches = true;
+                    if (inputPwd == currentPwd)
+                    {
+                        await _settingsService.SetAsync("admin_password", inputHash);
+                    }
+                }
+
+                if (!matches)
                 {
                     MessageBox.Show("รหัสผ่านไม่ถูกต้อง การทำรายการล้มเหลว", "ข้อผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Error);
                     return;
@@ -583,6 +639,10 @@ public class SystemSettingsControl : UserControl
                 try
                 {
                     await _settingsService.ZetZeroDatabaseAsync();
+                    if (_auditService != null)
+                    {
+                        await _auditService.LogAsync("SYSTEM_RESET", "database", "settings", "เคลียร์ระบบข้อมูลทั้งหมดเพื่อเริ่มใช้งานจริง (Set Zero) และรีสตาร์ทแอปพลิเคชัน");
+                    }
                     MessageBox.Show("ทำความสะอาดและเคลียร์ระบบเป็น 0 (Set Zero) เรียบร้อยแล้ว\n\nระบบจะทำการรีสตาร์ทแอปพลิเคชันเพื่อโหลดข้อมูลใหม่ทั้งหมด", "สำเร็จ", MessageBoxButtons.OK, MessageBoxIcon.Information);
                     Application.Restart();
                 }
@@ -601,6 +661,10 @@ public class SystemSettingsControl : UserControl
             try
             {
                 await _settingsService.ResetDatabaseSequencesAsync();
+                if (_auditService != null)
+                {
+                    await _auditService.LogAsync("RESET_SEQUENCES", "database", "settings", "รีเซ็ตลำดับคีย์หลักและเลขรันบิลเริ่มต้นใหม่");
+                }
                 MessageBox.Show("รีเซ็ตลำดับคีย์หลักและเลขรันบิลเรียบร้อยแล้ว", "สำเร็จ", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 await LoadSettingsAsync();
             }
@@ -742,5 +806,13 @@ public class SystemSettingsControl : UserControl
         {
             _btnSave.Enabled = true;
         }
+    }
+
+    private static string ComputeSha256Hash(string rawData)
+    {
+        byte[] bytes = SHA256.HashData(Encoding.UTF8.GetBytes(rawData));
+        var sb = new StringBuilder();
+        foreach (var b in bytes) sb.Append(b.ToString("x2"));
+        return sb.ToString();
     }
 }
