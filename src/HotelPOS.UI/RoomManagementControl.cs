@@ -30,6 +30,13 @@ public class RoomManagementControl : UserControl
     private NumericUpDown _numHourlyRate = null!;
     private NumericUpDown _numMonthlyRate = null!;
     private TextBox _txtTypeDesc = null!;
+    private RadioButton _rbElecMeter = null!;
+    private RadioButton _rbElecFlat = null!;
+    private NumericUpDown _numElecFlatRate = null!;
+    private RadioButton _rbWaterMeter = null!;
+    private RadioButton _rbWaterFlat = null!;
+    private NumericUpDown _numWaterFlatRate = null!;
+    private Panel _panelSelectedColor = null!;
     private Button _btnSaveType = null!;
     private Button _btnDeleteType = null!;
     private Button _btnClearType = null!;
@@ -145,7 +152,7 @@ public class RoomManagementControl : UserControl
             SelectionForeColor = Color.White,
             WrapMode = DataGridViewTriState.True
         };
-        _dgvRoomTypes.DefaultCellStyle.Font = new Font("Segoe UI", 10F);
+        _dgvRoomTypes.ApplyZebraStyle();
         _dgvRoomTypes.CellClick += DgvRoomTypes_CellContentClick;
         _dgvRoomTypes.CellDoubleClick += (s, e) => UpdateRoomTypeSelectionFromGrid();
         _dgvRoomTypes.DataBindingComplete += (s, e) =>
@@ -205,23 +212,83 @@ public class RoomManagementControl : UserControl
         _numMonthlyRate = new NumericUpDown { Location = new Point(160, 182), Width = 180, Font = new Font("Segoe UI", 10.5F), Maximum = 1000000, DecimalPlaces = 2 };
 
         var lblDesc = new Label { Text = "รายละเอียด:", Location = new Point(15, 225), Font = new Font("Segoe UI", 10.5F), AutoSize = true };
-        _txtTypeDesc = new TextBox { Location = new Point(160, 222), Width = 265, Font = new Font("Segoe UI", 10.5F), Multiline = true, Height = 60 };
+        _txtTypeDesc = new TextBox { Location = new Point(160, 222), Width = 265, Font = new Font("Segoe UI", 10.5F), Multiline = true, Height = 50 };
 
-        _btnSaveType = new Button { Text = "บันทึกประเภทห้อง", Location = new Point(160, 295), Size = new Size(150, 40), Font = new Font("Segoe UI", 10.5F, FontStyle.Bold), BackColor = Color.ForestGreen, ForeColor = Color.White, FlatStyle = FlatStyle.Flat, Cursor = Cursors.Hand };
+        // Color Picker UI
+        var lblColor = new Label { Text = "สีประจำประเภทห้อง:", Location = new Point(15, 282), Font = new Font("Segoe UI", 10F, FontStyle.Bold), AutoSize = true };
+        _panelSelectedColor = new Panel { Location = new Point(160, 279), Size = new Size(32, 28), BackColor = Color.FromArgb(2, 132, 199), BorderStyle = BorderStyle.FixedSingle };
+        var btnPickColor = new Button { Text = "เลือกสี...", Location = new Point(198, 279), Size = new Size(68, 28), Font = new Font("Segoe UI", 8.5F), Cursor = Cursors.Hand };
+        btnPickColor.Click += (s, e) =>
+        {
+            using var dlg = new ColorDialog { Color = _panelSelectedColor.BackColor };
+            if (dlg.ShowDialog() == DialogResult.OK)
+            {
+                _panelSelectedColor.BackColor = dlg.Color;
+            }
+        };
+
+        var presetColors = new (string hex, Color col)[]
+        {
+            ("#0284C7", ColorTranslator.FromHtml("#0284C7")),
+            ("#059669", ColorTranslator.FromHtml("#059669")),
+            ("#7C3AED", ColorTranslator.FromHtml("#7C3AED")),
+            ("#D97706", ColorTranslator.FromHtml("#D97706")),
+            ("#DB2777", ColorTranslator.FromHtml("#DB2777")),
+            ("#DC2626", ColorTranslator.FromHtml("#DC2626"))
+        };
+        int presetX = 272;
+        var presetBtns = new List<Control>();
+        foreach (var (hex, col) in presetColors)
+        {
+            var pBtn = new Button
+            {
+                Location = new Point(presetX, 280),
+                Size = new Size(22, 25),
+                BackColor = col,
+                FlatStyle = FlatStyle.Flat,
+                Cursor = Cursors.Hand,
+                Tag = hex
+            };
+            pBtn.FlatAppearance.BorderSize = 0;
+            pBtn.Click += (s, e) => { if (s is Button b && b.Tag is string h) _panelSelectedColor.BackColor = ColorTranslator.FromHtml(h); };
+            presetBtns.Add(pBtn);
+            presetX += 25;
+        }
+
+        // --- Electric Billing Mode ---
+        var groupElec = new GroupBox { Text = "รูปแบบค่าไฟฟ้า", Location = new Point(15, 318), Size = new Size(410, 75), Font = new Font("Segoe UI", 10F, FontStyle.Bold), ForeColor = Color.FromArgb(6, 95, 70) };
+        _rbElecMeter = new RadioButton { Text = "คิดตามมิเตอร์", Location = new Point(15, 26), AutoSize = true, Font = new Font("Segoe UI", 9.5F), Checked = true };
+        _rbElecFlat = new RadioButton { Text = "เหมาจ่าย/เดือน:", Location = new Point(140, 26), AutoSize = true, Font = new Font("Segoe UI", 9.5F) };
+        _numElecFlatRate = new NumericUpDown { Location = new Point(275, 24), Width = 110, Font = new Font("Segoe UI", 9.5F), Maximum = 100000, DecimalPlaces = 2, Enabled = false };
+        _rbElecFlat.CheckedChanged += (s, e) => _numElecFlatRate.Enabled = _rbElecFlat.Checked;
+        groupElec.Controls.AddRange(new Control[] { _rbElecMeter, _rbElecFlat, _numElecFlatRate });
+
+        // --- Water Billing Mode ---
+        var groupWater = new GroupBox { Text = "รูปแบบค่าน้ำประปา", Location = new Point(15, 400), Size = new Size(410, 75), Font = new Font("Segoe UI", 10F, FontStyle.Bold), ForeColor = Color.FromArgb(14, 116, 144) };
+        _rbWaterMeter = new RadioButton { Text = "คิดตามมิเตอร์", Location = new Point(15, 26), AutoSize = true, Font = new Font("Segoe UI", 9.5F), Checked = true };
+        _rbWaterFlat = new RadioButton { Text = "เหมาจ่าย/เดือน:", Location = new Point(140, 26), AutoSize = true, Font = new Font("Segoe UI", 9.5F) };
+        _numWaterFlatRate = new NumericUpDown { Location = new Point(275, 24), Width = 110, Font = new Font("Segoe UI", 9.5F), Maximum = 100000, DecimalPlaces = 2, Enabled = false };
+        _rbWaterFlat.CheckedChanged += (s, e) => _numWaterFlatRate.Enabled = _rbWaterFlat.Checked;
+        groupWater.Controls.AddRange(new Control[] { _rbWaterMeter, _rbWaterFlat, _numWaterFlatRate });
+
+        _btnSaveType = new Button { Text = "บันทึกประเภทห้อง", Location = new Point(160, 488), Size = new Size(150, 38), Font = new Font("Segoe UI", 10.5F, FontStyle.Bold), BackColor = Color.ForestGreen, ForeColor = Color.White, FlatStyle = FlatStyle.Flat, Cursor = Cursors.Hand };
         _btnSaveType.Click += BtnSaveType_Click;
 
-        _btnClearType = new Button { Text = "ล้างฟอร์ม", Location = new Point(318, 295), Size = new Size(107, 40), Font = new Font("Segoe UI", 10.5F), Cursor = Cursors.Hand };
+        _btnClearType = new Button { Text = "ล้างฟอร์ม", Location = new Point(318, 488), Size = new Size(107, 38), Font = new Font("Segoe UI", 10.5F), Cursor = Cursors.Hand };
         _btnClearType.Click += (s, e) => ClearTypeForm();
 
-        _btnDeleteType = new Button { Text = "ลบประเภทห้องพักนี้", Location = new Point(160, 348), Size = new Size(265, 36), Font = new Font("Segoe UI", 10F), ForeColor = Color.Red, Cursor = Cursors.Hand };
+        _btnDeleteType = new Button { Text = "ลบประเภทห้องพักนี้", Location = new Point(160, 532), Size = new Size(265, 34), Font = new Font("Segoe UI", 9.5F), ForeColor = Color.Red, Cursor = Cursors.Hand };
         _btnDeleteType.Click += BtnDeleteType_Click;
 
-        panelInput.Controls.AddRange(new Control[]
+        var typeInputControls = new List<Control>
         {
             _panelTypeModeBanner, lblName, _txtTypeName, lblDaily, _numDailyRate,
             lblHourly, _numHourlyRate, lblMonthly, _numMonthlyRate,
-            lblDesc, _txtTypeDesc, _btnSaveType, _btnClearType, _btnDeleteType
-        });
+            lblDesc, _txtTypeDesc, lblColor, _panelSelectedColor, btnPickColor,
+            groupElec, groupWater, _btnSaveType, _btnClearType, _btnDeleteType
+        };
+        typeInputControls.AddRange(presetBtns);
+        panelInput.Controls.AddRange(typeInputControls.ToArray());
 
         var searchPanel = new Panel { Dock = DockStyle.Top, Height = 48, Padding = new Padding(8), BackColor = Color.White };
         var lblSearch = new Label { Text = "ค้นหาประเภทห้อง:", Font = new Font("Segoe UI", 10F, FontStyle.Bold), Location = new Point(10, 12), AutoSize = true };
@@ -278,7 +345,7 @@ public class RoomManagementControl : UserControl
             ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize,
             RowTemplate = { Height = 38 }
         };
-        _dgvRooms.EnableHeadersVisualStyles = false;
+        _dgvRooms.ApplyZebraStyle();
         _dgvRooms.ColumnHeadersDefaultCellStyle = new DataGridViewCellStyle
         {
             Font = new Font("Segoe UI", 10.5F, FontStyle.Bold),
@@ -610,6 +677,23 @@ public class RoomManagementControl : UserControl
                 _numMonthlyRate.Value = type.MonthlyRate;
                 _txtTypeDesc.Text = type.Description;
 
+                try
+                {
+                    _panelSelectedColor.BackColor = ColorTranslator.FromHtml(type.ColorHex ?? "#0284C7");
+                }
+                catch
+                {
+                    _panelSelectedColor.BackColor = Color.FromArgb(2, 132, 199);
+                }
+
+                _rbElecMeter.Checked = type.ElectricBillingMode == UtilityBillingMode.Meter;
+                _rbElecFlat.Checked = type.ElectricBillingMode == UtilityBillingMode.FlatRate;
+                _numElecFlatRate.Value = type.ElectricFlatRate;
+
+                _rbWaterMeter.Checked = type.WaterBillingMode == UtilityBillingMode.Meter;
+                _rbWaterFlat.Checked = type.WaterBillingMode == UtilityBillingMode.FlatRate;
+                _numWaterFlatRate.Value = type.WaterFlatRate;
+
                 // Update Mode Banner
                 _panelTypeModeBanner.BackColor = Color.FromArgb(254, 243, 199); // Soft Amber
                 _lblTypeModeText.Text = $"โหมด: แก้ไขประเภท '{type.Name}'";
@@ -657,6 +741,12 @@ public class RoomManagementControl : UserControl
         _numHourlyRate.Value = 0;
         _numMonthlyRate.Value = 0;
         _txtTypeDesc.Clear();
+        _panelSelectedColor.BackColor = Color.FromArgb(2, 132, 199);
+
+        _rbElecMeter.Checked = true;
+        _numElecFlatRate.Value = 0;
+        _rbWaterMeter.Checked = true;
+        _numWaterFlatRate.Value = 0;
 
         // Reset Mode Banner
         _panelTypeModeBanner.BackColor = Color.FromArgb(240, 253, 244);
@@ -696,8 +786,21 @@ public class RoomManagementControl : UserControl
                 HourlyRate = _numHourlyRate.Value,
                 MonthlyRate = _numMonthlyRate.Value,
                 Description = _txtTypeDesc.Text.Trim(),
-                IsActive = true
+                ColorHex = ColorTranslator.ToHtml(_panelSelectedColor.BackColor),
+                IsActive = true,
+                ElectricBillingMode = _rbElecFlat.Checked ? UtilityBillingMode.FlatRate : UtilityBillingMode.Meter,
+                ElectricFlatRate = _numElecFlatRate.Value,
+                WaterBillingMode = _rbWaterFlat.Checked ? UtilityBillingMode.FlatRate : UtilityBillingMode.Meter,
+                WaterFlatRate = _numWaterFlatRate.Value
             };
+
+            if (_selectedTypeId > 0)
+            {
+                if (MessageBox.Show("คุณแน่ใจหรือไม่ที่จะบันทึกการแก้ไขนี้?", "ยืนยันการบันทึก", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
+                {
+                    return;
+                }
+            }
             await _roomService.SaveRoomTypeAsync(roomType);
             ClearTypeForm();
             await LoadAllDataAsync();

@@ -43,4 +43,16 @@ public static class UIExtensions
         }
         catch { }
     }
+
+    /// <summary>
+    /// กำหนดรูปแบบสลับสีบรรทัด (Zebra Striping: ขาว สลับ ฟ้าเทาอ่อน) ให้กับตารางข้อมูล DataGridView
+    /// </summary>
+    public static void ApplyZebraStyle(this DataGridView dgv)
+    {
+        if (dgv == null) return;
+        dgv.EnableDoubleBuffering();
+        dgv.AlternatingRowsDefaultCellStyle.BackColor = Color.FromArgb(243, 246, 251); // ริ้วบรรทัดสลับ
+        dgv.DefaultCellStyle.SelectionBackColor = Color.FromArgb(14, 116, 144);
+        dgv.DefaultCellStyle.SelectionForeColor = Color.White;
+    }
 }

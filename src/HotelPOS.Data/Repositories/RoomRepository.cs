@@ -25,6 +25,9 @@ public class RoomRepository : IRoomRepository
             var sql = @"
                 SELECT id AS Id, name AS Name, daily_rate AS DailyRate, hourly_rate AS HourlyRate, 
                        monthly_rate AS MonthlyRate, description AS Description, is_active AS IsActive,
+                       electric_billing_mode AS ElectricBillingMode, electric_flat_rate AS ElectricFlatRate,
+                       water_billing_mode AS WaterBillingMode, water_flat_rate AS WaterFlatRate,
+                       color_hex AS ColorHex,
                        created_at AS CreatedAt, updated_at AS UpdatedAt
                 FROM room_types";
             if (activeOnly)
@@ -50,6 +53,9 @@ public class RoomRepository : IRoomRepository
             const string sql = @"
                 SELECT id AS Id, name AS Name, daily_rate AS DailyRate, hourly_rate AS HourlyRate, 
                        monthly_rate AS MonthlyRate, description AS Description, is_active AS IsActive,
+                       electric_billing_mode AS ElectricBillingMode, electric_flat_rate AS ElectricFlatRate,
+                       water_billing_mode AS WaterBillingMode, water_flat_rate AS WaterFlatRate,
+                       color_hex AS ColorHex,
                        created_at AS CreatedAt, updated_at AS UpdatedAt
                 FROM room_types
                 WHERE id = @Id";
@@ -71,8 +77,12 @@ public class RoomRepository : IRoomRepository
             if (roomType.Id == 0)
             {
                 const string sql = @"
-                    INSERT INTO room_types (name, daily_rate, hourly_rate, monthly_rate, description, is_active, created_at, updated_at)
-                    VALUES (@Name, @DailyRate, @HourlyRate, @MonthlyRate, @Description, @IsActive, datetime('now','localtime'), datetime('now','localtime'));
+                    INSERT INTO room_types (name, daily_rate, hourly_rate, monthly_rate, description, is_active, 
+                                            electric_billing_mode, electric_flat_rate, water_billing_mode, water_flat_rate, color_hex,
+                                            created_at, updated_at)
+                    VALUES (@Name, @DailyRate, @HourlyRate, @MonthlyRate, @Description, @IsActive, 
+                            @ElectricBillingMode, @ElectricFlatRate, @WaterBillingMode, @WaterFlatRate, @ColorHex,
+                            datetime('now','localtime'), datetime('now','localtime'));
                     SELECT last_insert_rowid();";
                 var id = await connection.ExecuteScalarAsync<long>(sql, roomType);
                 roomType.Id = (int)id;
@@ -85,6 +95,9 @@ public class RoomRepository : IRoomRepository
                     UPDATE room_types 
                     SET name = @Name, daily_rate = @DailyRate, hourly_rate = @HourlyRate, 
                         monthly_rate = @MonthlyRate, description = @Description, is_active = @IsActive,
+                        electric_billing_mode = @ElectricBillingMode, electric_flat_rate = @ElectricFlatRate,
+                        water_billing_mode = @WaterBillingMode, water_flat_rate = @WaterFlatRate,
+                        color_hex = @ColorHex,
                         updated_at = datetime('now','localtime')
                     WHERE id = @Id;";
                 await connection.ExecuteAsync(sql, roomType);

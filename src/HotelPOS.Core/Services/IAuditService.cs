@@ -9,4 +9,5 @@ public interface IAuditService
 {
     Task LogAsync(string action, string? entityName = null, string? entityId = null, string? details = null, int? userId = null);
     Task<IEnumerable<AuditLogEntry>> GetLogsAsync(DateTime? startDate = null, DateTime? endDate = null, string? search = null);
+    Task<(IEnumerable<AuditLogEntry> Logs, int TotalCount)> GetLogsPaginatedAsync(DateTime? startDate = null, DateTime? endDate = null, string? search = null, int page = 1, int pageSize = 25);
 }

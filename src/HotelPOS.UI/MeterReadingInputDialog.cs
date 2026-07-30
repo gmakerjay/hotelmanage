@@ -58,6 +58,7 @@ public class MeterReadingInputDialog : Form
     private readonly string _tenantName;
     private readonly string _billingMonth;
     private readonly SystemSettingsDto _settings;
+    private readonly ISettingsService _settingsService;
 
     private NumericUpDown _numElecPrev = null!;
     private NumericUpDown _numElecCurr = null!;
@@ -93,12 +94,14 @@ public class MeterReadingInputDialog : Form
         decimal extraCharges,
         decimal discountAmount,
         string notes,
-        SystemSettingsDto settings)
+        SystemSettingsDto settings,
+        ISettingsService settingsService)
     {
         _room = room;
         _tenantName = tenantName;
         _billingMonth = billingMonth;
         _settings = settings;
+        _settingsService = settingsService;
 
         InitializeUI(roomRate, elecPrev, elecCurr, waterPrev, waterCurr, waterPersons, extraCharges, discountAmount, notes);
         CalculateTotal();
@@ -152,8 +155,36 @@ public class MeterReadingInputDialog : Form
             AutoSize = true
         };
 
+        var btnAdminOverride = new Button
+        {
+            Text = "ปลดล็อคมิเตอร์ก่อนหน้า (Admin)",
+            Font = new Font("Segoe UI", 9F, FontStyle.Bold),
+            BackColor = Color.FromArgb(239, 68, 68),
+            ForeColor = Color.White,
+            FlatStyle = FlatStyle.Flat,
+            Size = new Size(180, 28),
+            Location = new Point(485, 15),
+            Cursor = Cursors.Hand
+        };
+        btnAdminOverride.FlatAppearance.BorderSize = 0;
+        btnAdminOverride.Click += async (s, e) =>
+        {
+            if (await PromptAdminPasswordAsync())
+            {
+                if (_numElecPrev != null) { _numElecPrev.Enabled = true; _numElecPrev.ReadOnly = false; _numElecPrev.BackColor = Color.White; }
+                if (_numWaterPrev != null) { _numWaterPrev.Enabled = true; _numWaterPrev.ReadOnly = false; _numWaterPrev.BackColor = Color.White; }
+                MessageBox.Show("ปลดล็อคมิเตอร์ก่อนหน้าสำเร็จ คุณสามารถแก้ไขตัวเลขก่อนหน้าได้แล้ว", "สำเร็จ", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                btnAdminOverride.Enabled = false;
+            }
+            else
+            {
+                MessageBox.Show("รหัสผ่านไม่ถูกต้อง", "ล้มเหลว", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
+        };
+
         pnlHeader.Controls.Add(lblHeaderRoom);
         pnlHeader.Controls.Add(lblHeaderMonth);
+        pnlHeader.Controls.Add(btnAdminOverride);
 
         // Main Container (Explicitly placed below pnlHeader Y=70)
         var pnlBody = new Panel
@@ -488,5 +519,40 @@ public class MeterReadingInputDialog : Form
 
         // Grand Total
         _lblTotalAmount.Text = $"{TotalAmount:N2} บาท";
+    }
+
+    private async Task<bool> PromptAdminPasswordAsync()
+    {
+        using var frm = new Form
+        {
+            Width = 300,
+            Height = 150,
+            FormBorderStyle = FormBorderStyle.FixedDialog,
+            Text = "ยืนยันรหัสผ่าน Admin",
+            StartPosition = FormStartPosition.CenterParent,
+            MaximizeBox = false,
+            MinimizeBox = false
+        };
+
+        var lbl = new Label { Left = 20, Top = 20, Text = "รหัสผ่าน Admin:" };
+        var txt = new TextBox { Left = 20, Top = 45, Width = 240, UseSystemPasswordChar = true };
+        var btnOk = new Button { Text = "ตกลง", Left = 100, Top = 75, Width = 80, DialogResult = DialogResult.OK };
+        var btnCancel = new Button { Text = "ยกเลิก", Left = 180, Top = 75, Width = 80, DialogResult = DialogResult.Cancel };
+
+        frm.Controls.AddRange(new Control[] { lbl, txt, btnOk, btnCancel });
+        frm.AcceptButton = btnOk;
+        frm.CancelButton = btnCancel;
+
+        if (frm.ShowDialog() == DialogResult.OK)
+        {
+            string input = txt.Text;
+            string dbPassword = await _settingsService.GetAsync("admin_password") ?? "psoft123";
+            if (string.IsNullOrWhiteSpace(dbPassword)) dbPassword = "psoft123";
+
+            var (isMatch, _) = PasswordHelper.VerifyPassword(input, dbPassword);
+            return isMatch;
+        }
+
+        return false;
     }
 }

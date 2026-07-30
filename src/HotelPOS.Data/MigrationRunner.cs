@@ -39,6 +39,7 @@ public class MigrationRunner
             // Auto-Migrate missing columns for existing SQLite databases
             EnsureUtilityBillColumnsExist(connection);
             EnsureCustomerColumnsExist(connection);
+            EnsureRoomTypeBillingColumnsExist(connection);
 
             transaction.Commit();
 
@@ -74,7 +75,8 @@ public class MigrationRunner
             ("water_prev", "NUMERIC NOT NULL DEFAULT 0"),
             ("water_curr", "NUMERIC NOT NULL DEFAULT 0"),
             ("water_units", "NUMERIC NOT NULL DEFAULT 0"),
-            ("water_rate", "NUMERIC NOT NULL DEFAULT 0")
+            ("water_rate", "NUMERIC NOT NULL DEFAULT 0"),
+            ("electric_billing_mode", "TEXT NOT NULL DEFAULT 'METER'")
         };
 
         foreach (var (colName, colDef) in columnsToAdd)
@@ -113,6 +115,39 @@ public class MigrationRunner
                 using var copyCmd = connection.CreateCommand();
                 copyCmd.CommandText = "UPDATE customers SET id_card_or_passport = id_card_number WHERE id_card_or_passport IS NULL;";
                 copyCmd.ExecuteNonQuery();
+            }
+        }
+    }
+
+    private static void EnsureRoomTypeBillingColumnsExist(System.Data.IDbConnection connection)
+    {
+        var existingColumns = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        using (var cmd = connection.CreateCommand())
+        {
+            cmd.CommandText = "PRAGMA table_info(room_types);";
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read())
+            {
+                existingColumns.Add(reader.GetString(1));
+            }
+        }
+
+        var columnsToAdd = new (string colName, string colDef)[]
+        {
+            ("electric_billing_mode", "INTEGER NOT NULL DEFAULT 0"),
+            ("electric_flat_rate", "NUMERIC NOT NULL DEFAULT 0"),
+            ("water_billing_mode", "INTEGER NOT NULL DEFAULT 0"),
+            ("water_flat_rate", "NUMERIC NOT NULL DEFAULT 0"),
+            ("color_hex", "TEXT DEFAULT '#3B82F6'")
+        };
+
+        foreach (var (colName, colDef) in columnsToAdd)
+        {
+            if (!existingColumns.Contains(colName))
+            {
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = $"ALTER TABLE room_types ADD COLUMN {colName} {colDef};";
+                cmd.ExecuteNonQuery();
             }
         }
     }

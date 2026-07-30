@@ -130,7 +130,7 @@ public class MeterReadingControl : UserControl
         }
         for (int i = 0; i < _cmbBillingMonth.Items.Count; i++)
         {
-            if (((MonthItem)_cmbBillingMonth.Items[i]).Value == DateTime.Now.ToString("yyyy-MM"))
+            if (_cmbBillingMonth.Items[i] is MonthItem mi && mi.Value == DateTime.Now.ToString("yyyy-MM"))
             {
                 _cmbBillingMonth.SelectedIndex = i;
                 break;
@@ -881,7 +881,7 @@ public class MeterReadingControl : UserControl
         using var dlg = new MeterReadingInputDialog(
             room, tenantName, billingMonth, roomRate,
             elecPrev, elecCurr, waterPrev, waterCurr, waterPersons,
-            extraCharges, discountAmount, notes, _settings);
+            extraCharges, discountAmount, notes, _settings, _settingsService);
 
         if (dlg.ShowDialog() == DialogResult.OK)
         {

@@ -48,6 +48,7 @@ public class MainForm : Form
     private SystemBackupControl _backupControl = null!;
     private SystemSettingsControl _systemSettingsControl = null!;
     private POSControl _posControl = null!;
+    private SummaryReportControl _summaryReportControl = null!;
 
     private readonly List<Button> _navButtons = new();
     private Control? _activeControl;
@@ -121,7 +122,7 @@ public class MainForm : Form
 
     private void InitializeViews(IAuditService auditService, IBackupService backupService, IExportImportService exportImportService, IPOSService posService)
     {
-        _roomGridControl = new RoomGridControl(_roomService, _bookingService, _customerService, _settingsService) { Dock = DockStyle.Fill };
+        _roomGridControl = new RoomGridControl(_roomService, _bookingService, _customerService, _settingsService, _utilityBillService) { Dock = DockStyle.Fill };
         _bookingListControl = new BookingListControl(_bookingService, _roomService, _customerService, _settingsService, _utilityBillService) { Dock = DockStyle.Fill };
         _roomManagementControl = new RoomManagementControl(_roomService) { Dock = DockStyle.Fill };
         _customerManagementControl = new CustomerManagementControl(_customerService, _bookingService, _roomService, _settingsService, _utilityBillService, posService) { Dock = DockStyle.Fill };
@@ -129,6 +130,7 @@ public class MainForm : Form
         _backupControl = new SystemBackupControl(backupService, exportImportService) { Dock = DockStyle.Fill };
         _systemSettingsControl = new SystemSettingsControl(_settingsService, auditService) { Dock = DockStyle.Fill };
         _posControl = new POSControl(posService, _settingsService, _logger, auditService) { Dock = DockStyle.Fill };
+        _summaryReportControl = new SummaryReportControl(_utilityBillService, _settingsService) { Dock = DockStyle.Fill };
     }
 
     private void InitializeLayout()
@@ -241,6 +243,7 @@ public class MainForm : Form
             ("การจัดการห้องพัก", _roomManagementControl, null),
             ("ข้อมูลลูกค้า", _customerManagementControl, null),
             ("ระบบบิลค่าไฟ/ค่าน้ำ", _meterReadingControl, async () => await _meterReadingControl.LoadMeterDataAsync()),
+            ("รายงานสรุป", _summaryReportControl, null),
             ("สำรอง/คืนค่าข้อมูล", _backupControl, null),
             ("ตั้งค่าระบบ", _systemSettingsControl, null)
         };

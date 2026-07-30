@@ -35,6 +35,7 @@ public class UtilityBill
     public decimal ElectricUnits { get; set; }
     public decimal ElectricRate { get; set; }
     public decimal ElectricAmount { get; set; }              // ค่าไฟรวม
+    public string ElectricBillingMode { get; set; } = "METER"; // METER / FLAT
 
     // Snapshot มิเตอร์น้ำ ณ วันที่ออกบิล
     public decimal WaterPrev { get; set; }

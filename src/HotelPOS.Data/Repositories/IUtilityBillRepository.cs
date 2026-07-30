@@ -11,6 +11,9 @@ public interface IUtilityBillRepository
     /// <summary>ดึงใบแจ้งหนี้ทุกห้องในรอบบิลเดียวกัน</summary>
     Task<IEnumerable<UtilityBill>> GetByMonthAsync(string billingMonth);
 
+    /// <summary>ดึงใบแจ้งหนี้ที่ชำระแล้วในช่วงเวลาที่กำหนด (สำหรับรายงานสรุป)</summary>
+    Task<IEnumerable<UtilityBill>> GetPaidBillsByDateRangeAsync(DateTime startDate, DateTime endDate);
+
     /// <summary>ดึงใบแจ้งหนี้ตาม ID</summary>
     Task<UtilityBill?> GetByIdAsync(int id);
 

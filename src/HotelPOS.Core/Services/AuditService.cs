@@ -37,4 +37,9 @@ public class AuditService : IAuditService
     {
         return await _auditRepository.GetLogsAsync(startDate, endDate, search);
     }
+
+    public async Task<(IEnumerable<AuditLogEntry> Logs, int TotalCount)> GetLogsPaginatedAsync(DateTime? startDate = null, DateTime? endDate = null, string? search = null, int page = 1, int pageSize = 25)
+    {
+        return await _auditRepository.GetLogsPaginatedAsync(startDate, endDate, search, page, pageSize);
+    }
 }

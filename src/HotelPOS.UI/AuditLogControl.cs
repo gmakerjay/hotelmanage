@@ -189,7 +189,7 @@ public class AuditLogControl : UserControl
         detailsPanel.Controls.Add(lblDetailsHeader);
         detailsPanel.Controls.Add(txtDetails);
 
-        _pgPanel = new GridPaginationPanel(() => UpdatePagination());
+        _pgPanel = new GridPaginationPanel(() => { _ = UpdatePaginationAsync(); });
         splitContainer.Panel1.Controls.Add(_pgPanel);
         splitContainer.Panel1.Controls.Add(_dgvLogs);
         _dgvLogs.BringToFront();
@@ -200,7 +200,8 @@ public class AuditLogControl : UserControl
             if (_dgvLogs.SelectedRows.Count > 0)
             {
                 var row = _dgvLogs.SelectedRows[0];
-                var cols = row.DataGridView.Columns;
+                var cols = row.DataGridView?.Columns;
+                if (cols == null) return;
                 
                 string time = cols.Contains("วันเวลา") ? (row.Cells["วันเวลา"].Value?.ToString() ?? "-") : "-";
                 string action = cols.Contains("กิจกรรม") ? (row.Cells["กิจกรรม"].Value?.ToString() ?? "-") : "-";
@@ -225,35 +226,34 @@ public class AuditLogControl : UserControl
         topPanel.BringToFront();
     }
 
-    private void UpdatePagination()
-    {
-        _pgPanel.UpdateState(_loadedLogs.Count);
-        var pageData = _pgPanel.GetPageData(_loadedLogs).ToList();
-
-        _dgvLogs.DataSource = pageData.Select(l => new
-        {
-            l.Id,
-            วันเวลา = l.CreatedAt.ToString("dd/MM/yyyy HH:mm:ss"),
-            กิจกรรม = l.Action,
-            ข้อมูล = l.EntityName ?? "-",
-            รหัส = l.EntityId ?? "-",
-            รายละเอียด = l.DetailJson ?? "-"
-        }).ToList();
-    }
-
-    public async Task LoadLogsAsync()
+    private async Task UpdatePaginationAsync()
     {
         try
         {
-            var logs = await _auditService.GetLogsAsync(_dtpStart.Value, _dtpEnd.Value, _txtSearch.Text);
-            _loadedLogs = logs.ToList();
-            _pgPanel.Reset();
-            UpdatePagination();
+            var result = await _auditService.GetLogsPaginatedAsync(_dtpStart.Value, _dtpEnd.Value, _txtSearch.Text, _pgPanel.CurrentPage, _pgPanel.PageSize);
+            _loadedLogs = result.Logs.ToList();
+            _pgPanel.UpdateState(result.TotalCount);
+
+            _dgvLogs.DataSource = _loadedLogs.Select(l => new
+            {
+                l.Id,
+                วันเวลา = l.CreatedAt.ToString("dd/MM/yyyy HH:mm:ss"),
+                กิจกรรม = l.Action,
+                ข้อมูล = l.EntityName ?? "-",
+                รหัส = l.EntityId ?? "-",
+                รายละเอียด = l.DetailJson ?? "-"
+            }).ToList();
         }
         catch (Exception ex)
         {
             MessageBox.Show($"อ่าน Audit Log ไม่สำเร็จ: {ex.Message}", "ข้อผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
+    }
+
+    public async Task LoadLogsAsync()
+    {
+        _pgPanel.Reset();
+        await UpdatePaginationAsync();
     }
 
     private void BtnExport_Click(object? sender, EventArgs e)

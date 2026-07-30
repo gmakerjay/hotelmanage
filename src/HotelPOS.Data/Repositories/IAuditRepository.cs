@@ -19,4 +19,6 @@ public interface IAuditRepository
 {
     Task AddLogAsync(AuditLogEntry entry);
     Task<IEnumerable<AuditLogEntry>> GetLogsAsync(DateTime? startDate = null, DateTime? endDate = null, string? search = null);
+    Task<(IEnumerable<AuditLogEntry> Logs, int TotalCount)> GetLogsPaginatedAsync(DateTime? startDate = null, DateTime? endDate = null, string? search = null, int page = 1, int pageSize = 25);
+    Task<int> GetLogsCountAsync(DateTime? startDate = null, DateTime? endDate = null, string? search = null);
 }

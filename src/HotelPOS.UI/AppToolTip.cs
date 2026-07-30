@@ -42,7 +42,7 @@ public class AppToolTip : ToolTip
     {
         if (e.AssociatedControl == null) return;
 
-        string text = GetToolTip(e.AssociatedControl);
+        string? text = GetToolTip(e.AssociatedControl);
         if (string.IsNullOrWhiteSpace(text)) return;
 
         // Calculate size using large 11.5pt font

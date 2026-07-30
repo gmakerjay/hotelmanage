@@ -27,7 +27,7 @@ public class UtilityBillRepository : IUtilityBillRepository
                        ub.billing_month AS BillingMonth, ub.room_charge AS RoomCharge,
                        ub.electric_prev AS ElectricPrev, ub.electric_curr AS ElectricCurr,
                        ub.electric_units AS ElectricUnits, ub.electric_rate AS ElectricRate,
-                       ub.electric_amount AS ElectricAmount,
+                       ub.electric_amount AS ElectricAmount, ub.electric_billing_mode AS ElectricBillingMode,
                        ub.water_prev AS WaterPrev, ub.water_curr AS WaterCurr,
                        ub.water_units AS WaterUnits, ub.water_rate AS WaterRate,
                        ub.water_amount AS WaterAmount,
@@ -61,7 +61,7 @@ public class UtilityBillRepository : IUtilityBillRepository
                        ub.billing_month AS BillingMonth, ub.room_charge AS RoomCharge,
                        ub.electric_prev AS ElectricPrev, ub.electric_curr AS ElectricCurr,
                        ub.electric_units AS ElectricUnits, ub.electric_rate AS ElectricRate,
-                       ub.electric_amount AS ElectricAmount,
+                       ub.electric_amount AS ElectricAmount, ub.electric_billing_mode AS ElectricBillingMode,
                        ub.water_prev AS WaterPrev, ub.water_curr AS WaterCurr,
                        ub.water_units AS WaterUnits, ub.water_rate AS WaterRate,
                        ub.water_amount AS WaterAmount,
@@ -85,6 +85,41 @@ public class UtilityBillRepository : IUtilityBillRepository
         }
     }
 
+    public async Task<IEnumerable<UtilityBill>> GetPaidBillsByDateRangeAsync(DateTime startDate, DateTime endDate)
+    {
+        var correlationId = _logger.NewCorrelationId();
+        try
+        {
+            using var conn = _connectionFactory.CreateConnection();
+            const string sql = @"
+                SELECT ub.id AS Id, ub.bill_code AS BillCode, ub.room_id AS RoomId,
+                       ub.billing_month AS BillingMonth, ub.room_charge AS RoomCharge,
+                       ub.electric_prev AS ElectricPrev, ub.electric_curr AS ElectricCurr,
+                       ub.electric_units AS ElectricUnits, ub.electric_rate AS ElectricRate,
+                       ub.electric_amount AS ElectricAmount, ub.electric_billing_mode AS ElectricBillingMode,
+                       ub.water_prev AS WaterPrev, ub.water_curr AS WaterCurr,
+                       ub.water_units AS WaterUnits, ub.water_rate AS WaterRate,
+                       ub.water_amount AS WaterAmount,
+                       ub.water_billing_mode AS WaterBillingMode, ub.water_person_count AS WaterPersonCount,
+                       ub.common_area_fee AS CommonAreaFee, ub.garbage_fee AS GarbageFee,
+                       ub.extra_charges AS ExtraCharges, ub.discount_amount AS DiscountAmount,
+                       ub.total_amount AS TotalAmount, ub.is_paid AS IsPaid, ub.paid_at AS PaidAt,
+                       ub.payment_method AS PaymentMethod, ub.created_by AS CreatedBy,
+                       ub.created_at AS CreatedAt, ub.notes AS Notes,
+                       r.room_number AS RoomNumber
+                FROM utility_bills ub
+                JOIN rooms r ON r.id = ub.room_id
+                WHERE ub.is_paid = 1 AND ub.paid_at >= @StartDate AND ub.paid_at <= @EndDate
+                ORDER BY ub.paid_at ASC";
+            return await conn.QueryAsync<UtilityBill>(sql, new { StartDate = startDate.ToString("yyyy-MM-dd 00:00:00"), EndDate = endDate.ToString("yyyy-MM-dd 23:59:59") });
+        }
+        catch (Exception ex)
+        {
+            _logger.Error(LogCategory.Utility, $"ดึงใบแจ้งหนี้ที่ชำระแล้วในช่วง {startDate:yyyy-MM-dd} ถึง {endDate:yyyy-MM-dd} ไม่สำเร็จ", ex, correlationId);
+            throw;
+        }
+    }
+
     public async Task<UtilityBill?> GetByIdAsync(int id)
     {
         var correlationId = _logger.NewCorrelationId();
@@ -96,7 +131,7 @@ public class UtilityBillRepository : IUtilityBillRepository
                        ub.billing_month AS BillingMonth, ub.room_charge AS RoomCharge,
                        ub.electric_prev AS ElectricPrev, ub.electric_curr AS ElectricCurr,
                        ub.electric_units AS ElectricUnits, ub.electric_rate AS ElectricRate,
-                       ub.electric_amount AS ElectricAmount,
+                       ub.electric_amount AS ElectricAmount, ub.electric_billing_mode AS ElectricBillingMode,
                        ub.water_prev AS WaterPrev, ub.water_curr AS WaterCurr,
                        ub.water_units AS WaterUnits, ub.water_rate AS WaterRate,
                        ub.water_amount AS WaterAmount,
@@ -132,13 +167,13 @@ public class UtilityBillRepository : IUtilityBillRepository
                 const string sql = @"
                     INSERT INTO utility_bills (
                         bill_code, room_id, billing_month, room_charge,
-                        electric_prev, electric_curr, electric_units, electric_rate, electric_amount,
+                        electric_prev, electric_curr, electric_units, electric_rate, electric_amount, electric_billing_mode,
                         water_prev, water_curr, water_units, water_rate, water_amount,
                         water_billing_mode, water_person_count, common_area_fee, garbage_fee,
                         extra_charges, discount_amount, total_amount, is_paid, paid_at, payment_method, created_by, notes
                     ) VALUES (
                         @BillCode, @RoomId, @BillingMonth, @RoomCharge,
-                        @ElectricPrev, @ElectricCurr, @ElectricUnits, @ElectricRate, @ElectricAmount,
+                        @ElectricPrev, @ElectricCurr, @ElectricUnits, @ElectricRate, @ElectricAmount, @ElectricBillingMode,
                         @WaterPrev, @WaterCurr, @WaterUnits, @WaterRate, @WaterAmount,
                         @WaterBillingMode, @WaterPersonCount, @CommonAreaFee, @GarbageFee,
                         @ExtraCharges, @DiscountAmount, @TotalAmount, @IsPaid, @PaidAt, @PaymentMethod, @CreatedBy, @Notes
@@ -150,6 +185,7 @@ public class UtilityBillRepository : IUtilityBillRepository
                         electric_units = excluded.electric_units,
                         electric_rate = excluded.electric_rate,
                         electric_amount = excluded.electric_amount,
+                        electric_billing_mode = excluded.electric_billing_mode,
                         water_prev = excluded.water_prev,
                         water_curr = excluded.water_curr,
                         water_units = excluded.water_units,
@@ -167,7 +203,7 @@ public class UtilityBillRepository : IUtilityBillRepository
                 bill.Id = await conn.ExecuteScalarAsync<int>(sql, new
                 {
                     bill.BillCode, bill.RoomId, bill.BillingMonth, bill.RoomCharge,
-                    bill.ElectricPrev, bill.ElectricCurr, bill.ElectricUnits, bill.ElectricRate, bill.ElectricAmount,
+                    bill.ElectricPrev, bill.ElectricCurr, bill.ElectricUnits, bill.ElectricRate, bill.ElectricAmount, bill.ElectricBillingMode,
                     bill.WaterPrev, bill.WaterCurr, bill.WaterUnits, bill.WaterRate, bill.WaterAmount,
                     bill.WaterBillingMode, bill.WaterPersonCount,
                     bill.CommonAreaFee, bill.GarbageFee,
@@ -185,7 +221,7 @@ public class UtilityBillRepository : IUtilityBillRepository
                 const string sql = @"
                     UPDATE utility_bills SET
                         room_charge = @RoomCharge,
-                        electric_prev = @ElectricPrev, electric_curr = @ElectricCurr, electric_units = @ElectricUnits, electric_rate = @ElectricRate, electric_amount = @ElectricAmount,
+                        electric_prev = @ElectricPrev, electric_curr = @ElectricCurr, electric_units = @ElectricUnits, electric_rate = @ElectricRate, electric_amount = @ElectricAmount, electric_billing_mode = @ElectricBillingMode,
                         water_prev = @WaterPrev, water_curr = @WaterCurr, water_units = @WaterUnits, water_rate = @WaterRate, water_amount = @WaterAmount,
                         water_billing_mode = @WaterBillingMode, water_person_count = @WaterPersonCount,
                         common_area_fee = @CommonAreaFee, garbage_fee = @GarbageFee,
@@ -195,7 +231,7 @@ public class UtilityBillRepository : IUtilityBillRepository
                 await conn.ExecuteAsync(sql, new
                 {
                     bill.Id, bill.RoomCharge,
-                    bill.ElectricPrev, bill.ElectricCurr, bill.ElectricUnits, bill.ElectricRate, bill.ElectricAmount,
+                    bill.ElectricPrev, bill.ElectricCurr, bill.ElectricUnits, bill.ElectricRate, bill.ElectricAmount, bill.ElectricBillingMode,
                     bill.WaterPrev, bill.WaterCurr, bill.WaterUnits, bill.WaterRate, bill.WaterAmount,
                     bill.WaterBillingMode, bill.WaterPersonCount,
                     bill.CommonAreaFee, bill.GarbageFee,

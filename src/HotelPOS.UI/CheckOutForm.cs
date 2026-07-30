@@ -271,7 +271,8 @@ public class CheckOutForm : Form
                 _numExtraCharges.Value,
                 _numDiscount.Value,
                 _txtNotes.Text,
-                settings
+                settings,
+                _settingsService
             );
 
             if (dlg.ShowDialog() == DialogResult.OK)

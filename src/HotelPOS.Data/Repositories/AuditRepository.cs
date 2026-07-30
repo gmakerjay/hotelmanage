@@ -74,4 +74,84 @@ public class AuditRepository : IAuditRepository
             return Array.Empty<AuditLogEntry>();
         }
     }
+
+    public async Task<(IEnumerable<AuditLogEntry> Logs, int TotalCount)> GetLogsPaginatedAsync(DateTime? startDate = null, DateTime? endDate = null, string? search = null, int page = 1, int pageSize = 25)
+    {
+        try
+        {
+            int totalCount = await GetLogsCountAsync(startDate, endDate, search);
+            if (totalCount == 0) return (Array.Empty<AuditLogEntry>(), 0);
+
+            using var connection = _connectionFactory.CreateConnection();
+            var sql = @"
+                SELECT id AS Id, user_id AS UserId, action AS Action, 
+                       entity_name AS EntityName, entity_id AS EntityId, 
+                       detail_json AS DetailJson, created_at AS CreatedAt
+                FROM audit_logs
+                WHERE 1=1";
+
+            var parameters = new DynamicParameters();
+            if (startDate.HasValue)
+            {
+                sql += " AND created_at >= @Start";
+                parameters.Add("Start", startDate.Value.ToString("yyyy-MM-dd 00:00:00"));
+            }
+            if (endDate.HasValue)
+            {
+                sql += " AND created_at <= @End";
+                parameters.Add("End", endDate.Value.ToString("yyyy-MM-dd 23:59:59"));
+            }
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                sql += " AND (action LIKE @Search OR entity_name LIKE @Search OR detail_json LIKE @Search)";
+                parameters.Add("Search", $"%{search.Trim()}%");
+            }
+
+            int offset = (page - 1) * pageSize;
+            sql += " ORDER BY created_at DESC LIMIT @PageSize OFFSET @Offset";
+            parameters.Add("PageSize", pageSize);
+            parameters.Add("Offset", offset);
+
+            var logs = await connection.QueryAsync<AuditLogEntry>(sql, parameters);
+            return (logs, totalCount);
+        }
+        catch (Exception ex)
+        {
+            _logger.Error(LogCategory.Database, "อ่าน Audit Log Paginated ไม่สำเร็จ", ex);
+            return (Array.Empty<AuditLogEntry>(), 0);
+        }
+    }
+
+    public async Task<int> GetLogsCountAsync(DateTime? startDate = null, DateTime? endDate = null, string? search = null)
+    {
+        try
+        {
+            using var connection = _connectionFactory.CreateConnection();
+            var sql = "SELECT COUNT(1) FROM audit_logs WHERE 1=1";
+            var parameters = new DynamicParameters();
+            
+            if (startDate.HasValue)
+            {
+                sql += " AND created_at >= @Start";
+                parameters.Add("Start", startDate.Value.ToString("yyyy-MM-dd 00:00:00"));
+            }
+            if (endDate.HasValue)
+            {
+                sql += " AND created_at <= @End";
+                parameters.Add("End", endDate.Value.ToString("yyyy-MM-dd 23:59:59"));
+            }
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                sql += " AND (action LIKE @Search OR entity_name LIKE @Search OR detail_json LIKE @Search)";
+                parameters.Add("Search", $"%{search.Trim()}%");
+            }
+
+            return await connection.ExecuteScalarAsync<int>(sql, parameters);
+        }
+        catch (Exception ex)
+        {
+            _logger.Error(LogCategory.Database, "นับจำนวน Audit Log ไม่สำเร็จ", ex);
+            return 0;
+        }
+    }
 }

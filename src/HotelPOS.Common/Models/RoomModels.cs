@@ -9,8 +9,19 @@ public class RoomType
     public decimal MonthlyRate { get; set; }
     public string? Description { get; set; }
     public bool IsActive { get; set; } = true;
+    public UtilityBillingMode ElectricBillingMode { get; set; } = UtilityBillingMode.Meter;
+    public decimal ElectricFlatRate { get; set; }
+    public UtilityBillingMode WaterBillingMode { get; set; } = UtilityBillingMode.Meter;
+    public decimal WaterFlatRate { get; set; }
+    public string ColorHex { get; set; } = "#3B82F6";           // สีประจำประเภทห้อง (Hex Code เช่น #3B82F6)
     public DateTime CreatedAt { get; set; } = DateTime.Now;
     public DateTime UpdatedAt { get; set; } = DateTime.Now;
+}
+
+public enum UtilityBillingMode
+{
+    Meter = 0,
+    FlatRate = 1
 }
 
 public class Room

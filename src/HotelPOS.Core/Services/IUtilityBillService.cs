@@ -23,6 +23,9 @@ public interface IUtilityBillService
     /// <summary>ดึงเลขมิเตอร์ทุกห้องในรอบบิลเดียวกัน (สำหรับ DataGridView)</summary>
     Task<IEnumerable<MeterReading>> GetMeterReadingsByMonthAsync(string billingMonth);
 
+    /// <summary>ดึงใบแจ้งหนี้ที่ชำระแล้วในช่วงเวลาที่กำหนด (สำหรับรายงานสรุป)</summary>
+    Task<IEnumerable<UtilityBill>> GetPaidBillsByDateRangeAsync(DateTime startDate, DateTime endDate);
+
     /// <summary>ดึงเลขมิเตอร์เดือนก่อนหน้า (เติมช่อง "ก่อน" อัตโนมัติ)</summary>
     Task<decimal> GetPreviousMeterValueAsync(int roomId, UtilityType type, string currentBillingMonth);
 

@@ -349,7 +349,11 @@ public class UtilityInvoicePrinter
 
         y += DrawLeftRight("ค่าเช่าห้องพักรายเดือน", $"{_bill.RoomCharge:N2}", fontBody, fontBodyBold, y) + 2;
 
-        if (_bill.ElectricUnits > 0 || _bill.ElectricAmount > 0)
+        if (_bill.ElectricBillingMode == "FLAT")
+        {
+            y += DrawLeftRight("ค่าไฟ (เหมาจ่าย)", $"{_bill.ElectricAmount:N2}", fontBody, fontBody, y) + 2;
+        }
+        else if (_bill.ElectricUnits > 0 || _bill.ElectricAmount > 0)
         {
             y += DrawLeftRight($"ค่าไฟ ({_bill.ElectricPrev:N0}->{_bill.ElectricCurr:N0} = {_bill.ElectricUnits:N0} หน่วย)", $"{_bill.ElectricAmount:N2}", fontBody, fontBody, y) + 2;
         }
@@ -550,8 +554,17 @@ public class UtilityInvoicePrinter
         g.DrawString($"{_bill.RoomCharge:N2}", fontBodyBold, Brushes.Black, col5X, currentY);
         currentY += 28;
 
-        // 2) ค่าไฟ (ตามมิเตอร์)
-        if (_bill.ElectricUnits > 0 || _bill.ElectricAmount > 0)
+        // 2) ค่าไฟ (ตามมิเตอร์ หรือ เหมาจ่าย)
+        if (_bill.ElectricBillingMode == "FLAT")
+        {
+            g.DrawString("ค่าไฟฟ้า (เหมาจ่าย)", fontBody, Brushes.Black, col1X + 8, currentY);
+            g.DrawString("-", fontBody, Brushes.Gray, col2X, currentY);
+            g.DrawString("-", fontBody, Brushes.Gray, col3X, currentY);
+            g.DrawString("เหมาจ่าย", fontBody, Brushes.Black, col4X, currentY);
+            g.DrawString($"{_bill.ElectricAmount:N2}", fontBody, Brushes.Black, col5X, currentY);
+            currentY += 28;
+        }
+        else if (_bill.ElectricUnits > 0 || _bill.ElectricAmount > 0)
         {
             g.DrawString($"ค่าไฟฟ้า ({_bill.ElectricRate:N2} ฿/หน่วย)", fontBody, Brushes.Black, col1X + 8, currentY);
             g.DrawString($"{_bill.ElectricPrev:N0}", fontBody, Brushes.Black, col2X, currentY);

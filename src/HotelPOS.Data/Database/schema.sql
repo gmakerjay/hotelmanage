@@ -40,6 +40,11 @@ CREATE TABLE IF NOT EXISTS room_types (
     monthly_rate NUMERIC NOT NULL DEFAULT 0,
     description  TEXT,
     is_active    INTEGER NOT NULL DEFAULT 1,
+    electric_billing_mode INTEGER NOT NULL DEFAULT 0, -- 0=Meter, 1=FlatRate
+    electric_flat_rate NUMERIC NOT NULL DEFAULT 0,
+    water_billing_mode INTEGER NOT NULL DEFAULT 0,    -- 0=Meter, 1=FlatRate
+    water_flat_rate NUMERIC NOT NULL DEFAULT 0,
+    color_hex    TEXT DEFAULT '#3B82F6',
     created_at   TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
     updated_at   TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
 );
@@ -251,6 +256,7 @@ CREATE TABLE IF NOT EXISTS utility_bills (
     electric_units      NUMERIC NOT NULL DEFAULT 0,  -- หน่วยไฟที่ใช้
     electric_rate       NUMERIC NOT NULL DEFAULT 0,  -- อัตราค่าไฟ/หน่วย
     electric_amount     NUMERIC NOT NULL DEFAULT 0,  -- ค่าไฟรวม
+    electric_billing_mode TEXT NOT NULL DEFAULT 'METER', -- METER / FLAT
     
     -- มิเตอร์น้ำ snapshot
     water_prev          NUMERIC NOT NULL DEFAULT 0,  -- เลขอ้นก่อน

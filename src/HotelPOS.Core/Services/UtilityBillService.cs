@@ -87,18 +87,19 @@ public class UtilityBillService : IUtilityBillService
         var electricReading = readings.FirstOrDefault(r => r.UtilityType == UtilityType.Electric);
         var waterReading = readings.FirstOrDefault(r => r.UtilityType == UtilityType.Water);
 
-        // คำนวณค่าไฟตามโหมด
-        decimal electricAmount = settings.ElectricBillingMode == "FLAT"
-            ? settings.ElectricFlatRate
+        // คำนวณค่าไฟตามโหมดของประเภทห้อง
+        string electricBillingMode = roomType?.ElectricBillingMode == UtilityBillingMode.FlatRate ? "FLAT" : "METER";
+        decimal electricAmount = electricBillingMode == "FLAT"
+            ? (roomType?.ElectricFlatRate ?? 0)
             : (electricReading?.TotalAmount ?? 0);
 
-        // คำนวณค่าน้ำตามโหมด
+        // คำนวณค่าน้ำตามโหมดของประเภทห้อง
         decimal waterAmount;
-        string waterBillingMode = settings.WaterBillingMode;
+        string waterBillingMode = roomType?.WaterBillingMode == UtilityBillingMode.FlatRate ? "FLAT" : "METER";
         if (waterBillingMode == "FLAT")
         {
-            // เหมาจ่ายรายคน
-            waterAmount = settings.WaterFlatRatePerPerson * waterPersonCount;
+            // เหมาจ่ายตามที่ตั้งไว้ใน RoomType
+            waterAmount = roomType?.WaterFlatRate ?? 0;
         }
         else
         {
@@ -129,6 +130,8 @@ public class UtilityBillService : IUtilityBillService
         bill.ElectricUnits = electricReading?.UnitsUsed ?? 0;
         bill.ElectricRate = electricReading?.RatePerUnit ?? settings.ElectricRatePerUnit;
         bill.ElectricAmount = electricAmount;
+
+        bill.ElectricBillingMode = electricBillingMode;
 
         bill.WaterPrev = waterReading?.ReadingPrev ?? 0;
         bill.WaterCurr = waterReading?.ReadingCurr ?? 0;
@@ -172,14 +175,15 @@ public class UtilityBillService : IUtilityBillService
         var electricReading = readings.FirstOrDefault(r => r.UtilityType == UtilityType.Electric);
         var waterReading = readings.FirstOrDefault(r => r.UtilityType == UtilityType.Water);
 
-        decimal electricAmount = settings.ElectricBillingMode == "FLAT"
-            ? settings.ElectricFlatRate
+        string electricBillingMode = roomType?.ElectricBillingMode == UtilityBillingMode.FlatRate ? "FLAT" : "METER";
+        decimal electricAmount = electricBillingMode == "FLAT"
+            ? (roomType?.ElectricFlatRate ?? 0)
             : (electricReading?.TotalAmount ?? 0);
 
-        string waterBillingMode = settings.WaterBillingMode;
+        string waterBillingMode = roomType?.WaterBillingMode == UtilityBillingMode.FlatRate ? "FLAT" : "METER";
         decimal waterAmount = waterBillingMode == "FLAT"
-            ? settings.WaterFlatRatePerPerson * waterPersonCount
-            : waterReading?.TotalAmount ?? 0;
+            ? (roomType?.WaterFlatRate ?? 0)
+            : (waterReading?.TotalAmount ?? 0);
 
         decimal commonAreaFee = settings.CommonAreaFee;
         decimal garbageFee = settings.GarbageFee;
@@ -196,13 +200,13 @@ public class UtilityBillService : IUtilityBillService
             ElectricUnits = electricReading?.UnitsUsed ?? 0,
             ElectricRate = electricReading?.RatePerUnit ?? settings.ElectricRatePerUnit,
             ElectricAmount = electricAmount,
+            ElectricBillingMode = electricBillingMode,
 
             WaterPrev = waterReading?.ReadingPrev ?? 0,
             WaterCurr = waterReading?.ReadingCurr ?? 0,
             WaterUnits = waterReading?.UnitsUsed ?? 0,
             WaterRate = waterReading?.RatePerUnit ?? settings.WaterRatePerUnit,
             WaterAmount = waterAmount,
-
             WaterBillingMode = waterBillingMode,
             WaterPersonCount = waterPersonCount,
             CommonAreaFee = commonAreaFee,
@@ -227,6 +231,11 @@ public class UtilityBillService : IUtilityBillService
     public async Task<IEnumerable<MeterReading>> GetMeterReadingsByMonthAsync(string billingMonth)
     {
         return await _meterRepo.GetByMonthAsync(billingMonth);
+    }
+
+    public async Task<IEnumerable<UtilityBill>> GetPaidBillsByDateRangeAsync(DateTime startDate, DateTime endDate)
+    {
+        return await _billRepo.GetPaidBillsByDateRangeAsync(startDate, endDate);
     }
 
     public async Task<decimal> GetPreviousMeterValueAsync(int roomId, UtilityType type, string currentBillingMonth)

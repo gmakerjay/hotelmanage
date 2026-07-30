@@ -402,7 +402,12 @@ public class ReceiptInvoicePrinter
 
         if (_utilityBill != null)
         {
-            if (_utilityBill.ElectricUnits > 0 || _utilityBill.ElectricAmount > 0)
+            if (_utilityBill.ElectricBillingMode == "FLAT")
+            {
+                y += DrawLeftRight("ค่าไฟ (เหมาจ่าย)", $"{_utilityBill.ElectricAmount:N2}", fontBody, fontBody, y) + 2;
+                subTotal += _utilityBill.ElectricAmount;
+            }
+            else if (_utilityBill.ElectricUnits > 0 || _utilityBill.ElectricAmount > 0)
             {
                 y += DrawLeftRight($"ค่าไฟ ({_utilityBill.ElectricUnits:N0} หน่วย)", $"{_utilityBill.ElectricAmount:N2}", fontBody, fontBody, y) + 2;
                 subTotal += _utilityBill.ElectricAmount;
@@ -633,8 +638,16 @@ public class ReceiptInvoicePrinter
 
         if (_utilityBill != null)
         {
-            // 2) ค่าไฟ (ตามมิเตอร์)
-            if (_utilityBill.ElectricUnits > 0 || _utilityBill.ElectricAmount > 0)
+            // 2) ค่าไฟ (ตามมิเตอร์ หรือ เหมาจ่าย)
+            if (_utilityBill.ElectricBillingMode == "FLAT")
+            {
+                g.DrawString("ค่าไฟฟ้า (เหมาจ่าย)", fontBody, brushText, col1X + 8, currentY);
+                g.DrawString("เหมาจ่าย", fontBody, brushText, col2X, currentY);
+                g.DrawString($"{_utilityBill.ElectricAmount:N2}", fontBody, brushText, col3X, currentY);
+                currentY += 34;
+                subTotal += _utilityBill.ElectricAmount;
+            }
+            else if (_utilityBill.ElectricUnits > 0 || _utilityBill.ElectricAmount > 0)
             {
                 g.DrawString($"ค่าไฟฟ้า ({_utilityBill.ElectricRate:N2} ฿/หน่วย: {_utilityBill.ElectricPrev:N0}->{_utilityBill.ElectricCurr:N0})", fontBody, brushText, col1X + 8, currentY);
                 g.DrawString($"{_utilityBill.ElectricUnits:N0} หน่วย", fontBody, brushText, col2X, currentY);

@@ -172,6 +172,7 @@ public class UtilityBillHistoryForm : Form
             RowTemplate = { Height = 40 },
             GridColor = Color.FromArgb(226, 232, 240)
         };
+        _dgvBills.ApplyZebraStyle();
 
         _dgvBills.DataBindingComplete += (s, e) =>
         {
@@ -264,8 +265,8 @@ public class UtilityBillHistoryForm : Form
             if (!matchStatus) return false;
             if (string.IsNullOrWhiteSpace(query)) return true;
 
-            bool matchCode = b.BillCode.Contains(query, StringComparison.OrdinalIgnoreCase);
-            bool matchRoom = b.RoomNumber.Contains(query, StringComparison.OrdinalIgnoreCase);
+            bool matchCode = b.BillCode?.Contains(query, StringComparison.OrdinalIgnoreCase) == true;
+            bool matchRoom = b.RoomNumber?.Contains(query, StringComparison.OrdinalIgnoreCase) == true;
             bool matchNotes = !string.IsNullOrEmpty(b.Notes) && b.Notes.Contains(query, StringComparison.OrdinalIgnoreCase);
 
             return matchCode || matchRoom || matchNotes;

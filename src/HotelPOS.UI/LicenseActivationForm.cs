@@ -8,11 +8,11 @@ namespace HotelPOS.UI;
 
 public class LicenseActivationForm : Form
 {
-    private TextBox _tbHardwareId;
-    private TextBox _tbLicenseKey;
-    private Label _lblStatus;
-    private Button _btnActivate;
-    private Button _btnCancel;
+    private TextBox _tbHardwareId = null!;
+    private TextBox _tbLicenseKey = null!;
+    private Label _lblStatus = null!;
+    private Button _btnActivate = null!;
+    private Button _btnCancel = null!;
 
     public LicenseActivationForm(string currentStatusText)
     {
