@@ -96,7 +96,7 @@ public static class TrialManager
     }
 
     /// <summary>
-    /// บันทึกว่าพบ USB Dongle เสียบอยู่ → หยุดนับ Trial ทันที
+    /// บันทึกว่าพบ USB Dongle เสียบอยู่ (สำหรับ Audit/Logging เท่านั้น — Trial ไม่หยุดนับ)
     /// เรียก method นี้ทุกครั้งที่ CheckLicense พบ Dongle
     /// </summary>
     public static void RecordDonglePresent(string? dbPath = null)
