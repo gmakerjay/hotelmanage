@@ -172,7 +172,10 @@ public class UtilityBillService : IUtilityBillService
         var electricReading = readings.FirstOrDefault(r => r.UtilityType == UtilityType.Electric);
         var waterReading = readings.FirstOrDefault(r => r.UtilityType == UtilityType.Water);
 
-        decimal electricAmount = electricReading?.TotalAmount ?? 0;
+        decimal electricAmount = settings.ElectricBillingMode == "FLAT"
+            ? settings.ElectricFlatRate
+            : (electricReading?.TotalAmount ?? 0);
+
         string waterBillingMode = settings.WaterBillingMode;
         decimal waterAmount = waterBillingMode == "FLAT"
             ? settings.WaterFlatRatePerPerson * waterPersonCount
@@ -187,8 +190,19 @@ public class UtilityBillService : IUtilityBillService
             RoomId = roomId,
             BillingMonth = billingMonth,
             RoomCharge = roomCharge,
+
+            ElectricPrev = electricReading?.ReadingPrev ?? 0,
+            ElectricCurr = electricReading?.ReadingCurr ?? 0,
+            ElectricUnits = electricReading?.UnitsUsed ?? 0,
+            ElectricRate = electricReading?.RatePerUnit ?? settings.ElectricRatePerUnit,
             ElectricAmount = electricAmount,
+
+            WaterPrev = waterReading?.ReadingPrev ?? 0,
+            WaterCurr = waterReading?.ReadingCurr ?? 0,
+            WaterUnits = waterReading?.UnitsUsed ?? 0,
+            WaterRate = waterReading?.RatePerUnit ?? settings.WaterRatePerUnit,
             WaterAmount = waterAmount,
+
             WaterBillingMode = waterBillingMode,
             WaterPersonCount = waterPersonCount,
             CommonAreaFee = commonAreaFee,

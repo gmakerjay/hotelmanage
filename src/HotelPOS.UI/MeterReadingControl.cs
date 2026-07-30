@@ -214,6 +214,8 @@ public class MeterReadingControl : UserControl
                 Font = new Font("Segoe UI", 10F, FontStyle.Bold),
                 BackColor = Color.FromArgb(30, 41, 59),
                 ForeColor = Color.White,
+                SelectionBackColor = Color.FromArgb(30, 41, 59),
+                SelectionForeColor = Color.White,
                 Padding = new Padding(6, 8, 6, 8),
                 Alignment = DataGridViewContentAlignment.MiddleCenter,
                 WrapMode = DataGridViewTriState.True

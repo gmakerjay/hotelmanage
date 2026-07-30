@@ -106,16 +106,22 @@ public class RoomManagementControl : UserControl
         };
         split.Resize += (s, e) =>
         {
-            if (split.Width > 770)
+            try
             {
-                try
+                if (split.Width < 800)
                 {
+                    split.Orientation = Orientation.Horizontal;
+                    split.SplitterDistance = Math.Max(150, split.Height - 320);
+                }
+                else
+                {
+                    split.Orientation = Orientation.Vertical;
                     split.Panel1MinSize = 300;
                     split.Panel2MinSize = 380;
                     split.SplitterDistance = Math.Max(300, split.Width - 460);
                 }
-                catch { }
             }
+            catch { }
         };
 
         _dgvRoomTypes = new DataGridView
@@ -129,10 +135,18 @@ public class RoomManagementControl : UserControl
             ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize,
             RowTemplate = { Height = 38 }
         };
-        _dgvRoomTypes.ColumnHeadersDefaultCellStyle.Font = new Font("Segoe UI", 10.5F, FontStyle.Bold);
-        _dgvRoomTypes.ColumnHeadersDefaultCellStyle.WrapMode = DataGridViewTriState.True;
+        _dgvRoomTypes.EnableHeadersVisualStyles = false;
+        _dgvRoomTypes.ColumnHeadersDefaultCellStyle = new DataGridViewCellStyle
+        {
+            Font = new Font("Segoe UI", 10.5F, FontStyle.Bold),
+            BackColor = Color.FromArgb(30, 41, 59),
+            ForeColor = Color.White,
+            SelectionBackColor = Color.FromArgb(30, 41, 59),
+            SelectionForeColor = Color.White,
+            WrapMode = DataGridViewTriState.True
+        };
         _dgvRoomTypes.DefaultCellStyle.Font = new Font("Segoe UI", 10F);
-        _dgvRoomTypes.CellContentClick += DgvRoomTypes_CellContentClick;
+        _dgvRoomTypes.CellClick += DgvRoomTypes_CellContentClick;
         _dgvRoomTypes.CellDoubleClick += (s, e) => UpdateRoomTypeSelectionFromGrid();
         _dgvRoomTypes.DataBindingComplete += (s, e) =>
         {
@@ -235,16 +249,22 @@ public class RoomManagementControl : UserControl
         };
         split.Resize += (s, e) =>
         {
-            if (split.Width > 770)
+            try
             {
-                try
+                if (split.Width < 800)
                 {
+                    split.Orientation = Orientation.Horizontal;
+                    split.SplitterDistance = Math.Max(150, split.Height - 320);
+                }
+                else
+                {
+                    split.Orientation = Orientation.Vertical;
                     split.Panel1MinSize = 300;
                     split.Panel2MinSize = 380;
                     split.SplitterDistance = Math.Max(300, split.Width - 460);
                 }
-                catch { }
             }
+            catch { }
         };
 
         _dgvRooms = new DataGridView
@@ -258,10 +278,18 @@ public class RoomManagementControl : UserControl
             ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize,
             RowTemplate = { Height = 38 }
         };
-        _dgvRooms.ColumnHeadersDefaultCellStyle.Font = new Font("Segoe UI", 10.5F, FontStyle.Bold);
-        _dgvRooms.ColumnHeadersDefaultCellStyle.WrapMode = DataGridViewTriState.True;
+        _dgvRooms.EnableHeadersVisualStyles = false;
+        _dgvRooms.ColumnHeadersDefaultCellStyle = new DataGridViewCellStyle
+        {
+            Font = new Font("Segoe UI", 10.5F, FontStyle.Bold),
+            BackColor = Color.FromArgb(30, 41, 59),
+            ForeColor = Color.White,
+            SelectionBackColor = Color.FromArgb(30, 41, 59),
+            SelectionForeColor = Color.White,
+            WrapMode = DataGridViewTriState.True
+        };
         _dgvRooms.DefaultCellStyle.Font = new Font("Segoe UI", 10F);
-        _dgvRooms.CellContentClick += DgvRooms_CellContentClick;
+        _dgvRooms.CellClick += DgvRooms_CellContentClick;
         _dgvRooms.CellDoubleClick += (s, e) => UpdateRoomSelectionFromGrid();
         _dgvRooms.DataBindingComplete += (s, e) =>
         {

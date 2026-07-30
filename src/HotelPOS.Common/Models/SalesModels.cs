@@ -33,7 +33,7 @@ public class Sale
     public decimal DiscountAmount { get; set; }
     public decimal TaxAmount { get; set; }
     public decimal TotalAmount { get; set; }
-    public int CreatedBy { get; set; }
+    public int? CreatedBy { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.Now;
     public bool IsDeleted { get; set; } = false;
 
@@ -61,7 +61,7 @@ public class Payment
     public decimal Amount { get; set; }
     public string? ReferenceNo { get; set; }   // เลขอ้างอิงการโอน/สลิป
     public DateTime PaidAt { get; set; } = DateTime.Now;
-    public int ReceivedBy { get; set; }
+    public int? ReceivedBy { get; set; }
 }
 
 /// <summary>เอกสารที่พิมพ์ออกจริง เก็บเลขที่เอกสารรันต่อเนื่อง</summary>
@@ -73,6 +73,6 @@ public class InvoiceDocument
     public string DocumentNumber { get; set; } = string.Empty;
     public PaperSize PrintedPaperSize { get; set; }
     public DateTime PrintedAt { get; set; } = DateTime.Now;
-    public int PrintedBy { get; set; }
+    public int? PrintedBy { get; set; }
     public int PrintCount { get; set; } = 1;    // นับจำนวนครั้งที่พิมพ์ซ้ำ (ใบแทน)
 }

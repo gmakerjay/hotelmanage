@@ -324,31 +324,20 @@ public class ReceiptInvoicePrinter
 
         float DrawLeftRight(string left, string right, Font fLeft, Font fRight, float drawY)
         {
-            var sizeRight = g.MeasureString(right, fRight);
-            float maxLeftWidth = Math.Max(30f, contentWidth - sizeRight.Width - 6f);
-            var sizeLeft = g.MeasureString(left, fLeft, (int)maxLeftWidth);
-            float rowHeight = Math.Max(sizeLeft.Height, sizeRight.Height);
-
-            g.DrawString(left, fLeft, Brushes.Black, new RectangleF(leftMargin, drawY, maxLeftWidth, rowHeight));
-            g.DrawString(right, fRight, Brushes.Black, new RectangleF(rightMargin - sizeRight.Width, drawY, sizeRight.Width + 4f, rowHeight));
-            return Math.Max(18f * scale, rowHeight);
+            return PrintLayoutHelper.DrawLeftRight(g, left, right, fLeft, fRight, drawY, leftMargin, rightMargin, contentWidth, scale);
         }
 
         // 1. Logo
-        if (!string.IsNullOrEmpty(_settings?.LogoImagePath) && File.Exists(_settings.LogoImagePath))
+        using var logoImg = PrintLayoutHelper.LoadImageSafe(_settings?.LogoImagePath);
+        if (logoImg != null)
         {
-            try
-            {
-                using var logoImg = Image.FromFile(_settings.LogoImagePath);
-                float maxW = (paperType == "58mm") ? 90f : 120f;
-                float maxH = 50f;
-                float scaleImg = Math.Min(maxW / logoImg.Width, maxH / logoImg.Height);
-                float drawW = logoImg.Width * scaleImg;
-                float drawH = logoImg.Height * scaleImg;
-                g.DrawImage(logoImg, center - drawW / 2, y, drawW, drawH);
-                y += drawH + 8;
-            }
-            catch { }
+            float maxW = (paperType == "58mm") ? 90f : 120f;
+            float maxH = 50f;
+            float scaleImg = Math.Min(maxW / logoImg.Width, maxH / logoImg.Height);
+            float drawW = logoImg.Width * scaleImg;
+            float drawH = logoImg.Height * scaleImg;
+            g.DrawImage(logoImg, center - drawW / 2, y, drawW, drawH);
+            y += drawH + 8;
         }
 
         // 2. Shop Header
@@ -475,18 +464,14 @@ public class ReceiptInvoicePrinter
         y += 8;
 
         // 7. QR Code
-        if (!string.IsNullOrEmpty(_settings?.QrCodeImagePath) && File.Exists(_settings.QrCodeImagePath))
+        using var qrImg = PrintLayoutHelper.LoadImageSafe(_settings?.QrCodeImagePath);
+        if (qrImg != null)
         {
-            try
-            {
-                using var qrImg = Image.FromFile(_settings.QrCodeImagePath);
-                float maxW = (paperType == "58mm") ? 90f : 110f;
-                g.DrawImage(qrImg, center - maxW / 2, y, maxW, maxW);
-                y += maxW + 4;
-                g.DrawString("สแกนจ่าย PromptPay", fontSmall, Brushes.DimGray, new RectangleF(leftMargin, y, contentWidth, 20), sfCenter);
-                y += 18 * scale + 10;
-            }
-            catch { }
+            float maxW = (paperType == "58mm") ? 90f : 110f;
+            g.DrawImage(qrImg, center - maxW / 2, y, maxW, maxW);
+            y += maxW + 4;
+            g.DrawString("สแกนจ่าย PromptPay", fontSmall, Brushes.DimGray, new RectangleF(leftMargin, y, contentWidth, 20), sfCenter);
+            y += 18 * scale + 10;
         }
 
         // 8. Lobby Terms
@@ -546,21 +531,17 @@ public class ReceiptInvoicePrinter
 
         // 1. Logo & Header
         float logoOffsetX = leftMargin;
-        if (!string.IsNullOrEmpty(_settings?.LogoImagePath) && File.Exists(_settings.LogoImagePath))
+        using var logoImg = PrintLayoutHelper.LoadImageSafe(_settings?.LogoImagePath);
+        if (logoImg != null)
         {
-            try
-            {
-                using var logoImg = Image.FromFile(_settings.LogoImagePath);
-                float maxW = 140f;
-                float maxH = 55f;
-                float scale = Math.Min(maxW / logoImg.Width, maxH / logoImg.Height);
-                float drawW = logoImg.Width * scale;
-                float drawH = logoImg.Height * scale;
+            float maxW = 140f;
+            float maxH = 55f;
+            float scale = Math.Min(maxW / logoImg.Width, maxH / logoImg.Height);
+            float drawW = logoImg.Width * scale;
+            float drawH = logoImg.Height * scale;
 
-                g.DrawImage(logoImg, leftMargin, currentY, drawW, drawH);
-                logoOffsetX += drawW + 15;
-            }
-            catch { }
+            g.DrawImage(logoImg, leftMargin, currentY, drawW, drawH);
+            logoOffsetX += drawW + 15;
         }
 
         g.DrawString(_shopName, fontTitle, brushDark, logoOffsetX, currentY);
@@ -785,23 +766,19 @@ public class ReceiptInvoicePrinter
         }
 
         // 6. QR Code & Signature Boxes Container
-        if (!string.IsNullOrEmpty(_settings?.QrCodeImagePath) && File.Exists(_settings.QrCodeImagePath))
+        using var qrImg = PrintLayoutHelper.LoadImageSafe(_settings?.QrCodeImagePath);
+        if (qrImg != null)
         {
-            try
-            {
-                using var qrImg = Image.FromFile(_settings.QrCodeImagePath);
-                float maxW = 90f;
-                float maxH = 90f;
-                float scale = Math.Min(maxW / qrImg.Width, maxH / qrImg.Height);
-                float drawW = qrImg.Width * scale;
-                float drawH = qrImg.Height * scale;
+            float maxW = 90f;
+            float maxH = 90f;
+            float scale = Math.Min(maxW / qrImg.Width, maxH / qrImg.Height);
+            float drawW = qrImg.Width * scale;
+            float drawH = qrImg.Height * scale;
 
-                float qrX = leftMargin + 10;
-                float qrY = currentY;
-                g.DrawImage(qrImg, qrX, qrY, drawW, drawH);
-                g.DrawString("สแกนชำระเงิน PromptPay", fontSmall, Brushes.DimGray, qrX, qrY + drawH + 4);
-            }
-            catch { }
+            float qrX = leftMargin + 10;
+            float qrY = currentY;
+            g.DrawImage(qrImg, qrX, qrY, drawW, drawH);
+            g.DrawString("สแกนชำระเงิน PromptPay", fontSmall, Brushes.DimGray, qrX, qrY + drawH + 4);
         }
 
         bool showSignature = _settings?.ShowSignatureBox ?? true;

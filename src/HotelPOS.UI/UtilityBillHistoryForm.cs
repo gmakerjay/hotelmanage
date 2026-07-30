@@ -161,6 +161,8 @@ public class UtilityBillHistoryForm : Form
                 Font = new Font("Segoe UI", 10F, FontStyle.Bold),
                 BackColor = Color.FromArgb(30, 41, 59),
                 ForeColor = Color.White,
+                SelectionBackColor = Color.FromArgb(30, 41, 59),
+                SelectionForeColor = Color.White,
                 Padding = new Padding(6),
                 Alignment = DataGridViewContentAlignment.MiddleCenter,
                 WrapMode = DataGridViewTriState.True
@@ -222,6 +224,14 @@ public class UtilityBillHistoryForm : Form
         Controls.Add(headerPanel);
         Controls.Add(_dgvBills);
         _dgvBills.BringToFront();
+
+        _dgvBills.CellDoubleClick += async (s, e) =>
+        {
+            if (e.RowIndex >= 0)
+            {
+                await PrintSelectedBillAsync();
+            }
+        };
 
         Load += async (s, e) => await LoadBillsAsync();
     }

@@ -1,5 +1,3 @@
-using System.Security.Cryptography;
-using System.Text;
 using HotelPOS.Core.Services;
 
 namespace HotelPOS.UI;
@@ -112,14 +110,14 @@ public class AdminAuthForm : Form
                 string dbPassword = await _settingsService.GetAsync("admin_password") ?? "psoft123";
                 if (string.IsNullOrWhiteSpace(dbPassword)) dbPassword = "psoft123";
 
-                string inputHash = ComputeSha256Hash(inputPassword);
-                if (inputHash == dbPassword || inputPassword == dbPassword)
+                // ตรวจสอบด้วย PBKDF2 (รองรับ SHA256 และ Plain Text เดิม)
+                var (isMatch, upgradedHash) = PasswordHelper.VerifyPassword(inputPassword, dbPassword);
+                isOk = isMatch;
+
+                if (isMatch && upgradedHash != null)
                 {
-                    isOk = true;
-                    if (inputPassword == dbPassword)
-                    {
-                        await _settingsService.SetAsync("admin_password", inputHash);
-                    }
+                    // Auto-upgrade: ปรับ SHA256/Plain Text → PBKDF2
+                    await _settingsService.SetAsync("admin_password", upgradedHash);
                 }
             }
             catch
@@ -147,13 +145,5 @@ public class AdminAuthForm : Form
             _txtAdminPassword.SelectAll();
             _txtAdminPassword.Focus();
         }
-    }
-
-    private static string ComputeSha256Hash(string rawData)
-    {
-        byte[] bytes = SHA256.HashData(Encoding.UTF8.GetBytes(rawData));
-        var sb = new StringBuilder();
-        foreach (var b in bytes) sb.Append(b.ToString("x2"));
-        return sb.ToString();
     }
 }

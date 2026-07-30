@@ -124,7 +124,7 @@ public class POSSalesHistoryForm : Form
 
         var btnSearch = new Button
         {
-            Text = "🔍 ค้นหา",
+            Text = "ค้นหา",
             Location = new Point(598, 14),
             Size = new Size(85, 31),
             BackColor = Color.FromArgb(37, 99, 235),
@@ -159,8 +159,14 @@ public class POSSalesHistoryForm : Form
         {
             try
             {
-                if (mainSplit.Width > 700)
+                if (mainSplit.Width < 800)
                 {
+                    mainSplit.Orientation = Orientation.Horizontal;
+                    mainSplit.SplitterDistance = Math.Max(150, mainSplit.Height - 250);
+                }
+                else
+                {
+                    mainSplit.Orientation = Orientation.Vertical;
                     mainSplit.Panel1MinSize = 400;
                     mainSplit.Panel2MinSize = 380;
                     mainSplit.SplitterDistance = (int)(mainSplit.Width * 0.58);
@@ -173,8 +179,14 @@ public class POSSalesHistoryForm : Form
         {
             try
             {
-                if (mainSplit.Width > 700)
+                if (mainSplit.Width < 800)
                 {
+                    mainSplit.Orientation = Orientation.Horizontal;
+                    mainSplit.SplitterDistance = Math.Max(150, mainSplit.Height - 250);
+                }
+                else
+                {
+                    mainSplit.Orientation = Orientation.Vertical;
                     mainSplit.Panel1MinSize = 400;
                     mainSplit.Panel2MinSize = 380;
                     int targetDist = (int)(mainSplit.Width * 0.58);
@@ -215,6 +227,8 @@ public class POSSalesHistoryForm : Form
             {
                 BackColor = Color.FromArgb(30, 41, 59),
                 ForeColor = Color.White,
+                SelectionBackColor = Color.FromArgb(30, 41, 59),
+                SelectionForeColor = Color.White,
                 Font = new Font("Segoe UI", 9.5F, FontStyle.Bold),
                 Padding = new Padding(6, 8, 6, 8),
                 Alignment = DataGridViewContentAlignment.MiddleCenter
@@ -223,6 +237,7 @@ public class POSSalesHistoryForm : Form
             RowTemplate = { Height = 36 },
             ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize
         };
+        _dgvSales.EnableDoubleBuffering();
         _dgvSales.Columns.Add("Id", "ID");
         _dgvSales.Columns["Id"]!.Visible = false;
 
@@ -304,6 +319,8 @@ public class POSSalesHistoryForm : Form
             {
                 BackColor = Color.FromArgb(241, 245, 249),
                 ForeColor = Color.FromArgb(51, 65, 85),
+                SelectionBackColor = Color.FromArgb(241, 245, 249),
+                SelectionForeColor = Color.FromArgb(51, 65, 85),
                 Font = new Font("Segoe UI", 9.5F, FontStyle.Bold),
                 Padding = new Padding(6, 8, 6, 8),
                 Alignment = DataGridViewContentAlignment.MiddleCenter
@@ -312,6 +329,7 @@ public class POSSalesHistoryForm : Form
             RowTemplate = { Height = 36 },
             ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize
         };
+        _dgvSaleItems.EnableDoubleBuffering();
         _dgvSaleItems.Columns.Add("ProductName", "ชื่อสินค้า");
         _dgvSaleItems.Columns["ProductName"]!.MinimumWidth = 140;
         _dgvSaleItems.Columns["ProductName"]!.FillWeight = 45;
@@ -344,7 +362,7 @@ public class POSSalesHistoryForm : Form
 
         _btnReprint = new Button
         {
-            Text = "🖨️ พิมพ์ใบเสร็จย้อนหลัง",
+            Text = "พิมพ์ใบเสร็จย้อนหลัง",
             BackColor = Color.FromArgb(37, 99, 235),
             ForeColor = Color.White,
             FlatStyle = FlatStyle.Flat,
@@ -359,7 +377,7 @@ public class POSSalesHistoryForm : Form
 
         _btnVoidSale = new Button
         {
-            Text = "🗑️ ยกเลิกบิลขาย",
+            Text = "ยกเลิกบิลขาย",
             BackColor = Color.White,
             ForeColor = Color.Red,
             FlatStyle = FlatStyle.Flat,
@@ -503,7 +521,8 @@ public class POSSalesHistoryForm : Form
 
         try
         {
-            var printerName = await _settingsService.GetAsync("default_printer_name");
+            var settings = await _settingsService.GetAllSettingsAsync();
+            var printerName = settings.PrinterName;
             if (string.IsNullOrEmpty(printerName))
             {
                 MessageBox.Show("ไม่ได้ตั้งค่าเครื่องพิมพ์เริ่มต้นไว้ กรุณาไปตั้งค่าที่เมนูตั้งค่าระบบ", "ไม่พบเครื่องพิมพ์", MessageBoxButtons.OK, MessageBoxIcon.Warning);
@@ -530,10 +549,7 @@ public class POSSalesHistoryForm : Form
                 var cust = await _posService.GetCustomerByIdAsync(sale.CustomerId.Value);
                 if (cust != null) customer = cust;
             }
-
-            var settings = await _settingsService.GetAllSettingsAsync();
             
-            // ใช้ ReceiptInvoicePrinter ในการจัดทำใบเสร็จรับเงิน
             var dummyBooking = new Booking
             {
                 BookingCode = sale.SaleCode,
@@ -570,7 +586,6 @@ public class POSSalesHistoryForm : Form
         {
             try
             {
-                // Call database void sale operation
                 await _posService.VoidSaleAsync(_selectedSale.Id);
 
                 _logger.Info(LogCategory.Pos, $"ยกเลิกบิลขายเลขที่ '{_selectedSale.SaleCode}' เรียบร้อยแล้ว");

@@ -15,7 +15,7 @@ public static class TrialManager
 
     private const int TrialDaysLimit = 30;
 
-    // Settings keys สำหรับ Dongle pause/resume
+    // Settings keys สำหรับ Dongle pause/resume (deprecated — เก็บไว้ compat)
     private const string KeyDaysConsumed = "trial_days_consumed";
     private const string KeyDongleLastSeen = "dongle_last_seen_at";
     private const string KeyTrialLastActive = "trial_last_active_date";
@@ -70,7 +70,9 @@ public static class TrialManager
 
     /// <summary>
     /// ตรวจสอบสถานะการใช้งานระบบทดลอง และวันใช้งานที่เหลือ
-    /// รองรับ Dongle pause/resume: นับเฉพาะวันที่ไม่มี Dongle เสียบอยู่
+    /// คำนวณตามวันปฏิทิน (Calendar Days) นับจากวันที่เริ่มใช้งานครั้งแรก
+    /// โดยนับต่อเนื่องทุกวันรวมวันที่ไม่ได้เปิดโปรแกรม 
+    /// และนับรวมวันที่เสียบ USB Dongle ด้วย (ไม่มีการ Pause)
     /// </summary>
     public static (bool IsActive, int DaysRemaining) GetTrialStatus(string? dbPath = null, string? hiddenFileFolder = null)
     {
@@ -78,35 +80,16 @@ public static class TrialManager
         DateTime startDate = GetOrInitializeTrialStartDate(dbPath, hiddenFileFolder);
         DateTime today = DateTime.Now.Date;
 
-        // ตรวจสอบ clock rollback
+        // ตรวจสอบ clock rollback (การย้อนเวลาเครื่อง)
         int calendarDays = (today - startDate).Days;
         if (calendarDays < 0)
         {
             return (false, 0);
         }
 
-        // อ่านจำนวนวันที่ใช้จริง (ไม่นับวันที่เสียบ Dongle)
-        int? storedDays = ReadDaysConsumed(dbPath);
-        int daysConsumed = storedDays ?? calendarDays;
-
-        // อ่านวันที่ trial ทำงานครั้งล่าสุด (วันที่ไม่มี Dongle)
-        DateTime? lastActiveDate = ReadTrialLastActiveDate(dbPath);
-
-        if (!lastActiveDate.HasValue)
-        {
-            WriteTrialLastActiveDate(dbPath, today);
-            WriteDaysConsumed(dbPath, daysConsumed);
-        }
-        else if (today > lastActiveDate.Value.Date)
-        {
-            int diff = (today - lastActiveDate.Value.Date).Days;
-            daysConsumed += diff;
-            daysConsumed = Math.Max(daysConsumed, calendarDays);
-            WriteDaysConsumed(dbPath, daysConsumed);
-            WriteTrialLastActiveDate(dbPath, today);
-        }
-
-        int daysRemaining = Math.Max(0, TrialDaysLimit - daysConsumed);
+        // คำนวณวันคงเหลือตาม Calendar Days (30 - วันที่ผ่านไปตั้งแต่เริ่ม)
+        // ไม่ต้องสนใจ Dongle Pause/Resume — Trial นับตามปฏิทินล้วน
+        int daysRemaining = Math.Max(0, TrialDaysLimit - calendarDays);
         bool isActive = daysRemaining > 0;
 
         return (isActive, daysRemaining);
@@ -133,8 +116,8 @@ public static class TrialManager
             cmd.Parameters.AddWithValue("@value", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
             cmd.ExecuteNonQuery();
 
-            // อัปเดต trial_last_active_date เป็นวันนี้ เพื่อไม่ให้นับวันที่เสียบ Dongle เป็นวัน Trial
-            WriteTrialLastActiveDate(dbPath, DateTime.Now.Date);
+            // บันทึก timestamp ล่าสุดที่พบ Dongle (สำหรับ Audit/Logging เท่านั้น)
+            // หมายเหตุ: Trial ไม่ได้หยุดนับเมื่อเสียบ Dongle แล้ว (นับตามปฏิทินล้วน)
         }
         catch { }
     }

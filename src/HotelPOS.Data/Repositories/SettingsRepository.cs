@@ -114,56 +114,38 @@ public class SettingsRepository : ISettingsRepository
         var correlationId = _logger.NewCorrelationId();
         try
         {
-            using var connection = _connectionFactory.CreateConnection();
-            connection.Open();
+            // เคลียร์ pool ของ SQLite connections เพื่อให้ Windows ปล่อยล็อกไฟล์ฐานข้อมูล
+            Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
 
-            // ปิดการตรวจสอบ Foreign Key ชั่วคราวเพื่อทำการล้างข้อมูลธุรกรรมทั้งหมด
-            await connection.ExecuteAsync("PRAGMA foreign_keys = OFF;");
+            var dbFile = _connectionFactory.DatabaseFilePath;
+            var walFile = dbFile + "-wal";
+            var shmFile = dbFile + "-shm";
 
-            using var transaction = connection.BeginTransaction();
+            // ลบไฟล์ฐานข้อมูลและไฟล์ล็อกชั่วคราวทั้งหมด
+            if (System.IO.File.Exists(dbFile)) System.IO.File.Delete(dbFile);
+            if (System.IO.File.Exists(walFile)) System.IO.File.Delete(walFile);
+            if (System.IO.File.Exists(shmFile)) System.IO.File.Delete(shmFile);
 
-            // ลบตารางธุรกรรมและประวัติในฐานข้อมูล (เก็บข้อมูลประเภทห้อง ห้องพัก สินค้า หมวดหมู่สินค้า และผู้ใช้/ตั้งค่าไว้)
-            var tablesToClean = new[]
+            // ล้างข้อมูลโฟลเดอร์ assets (โลโก้ / QR Code ของระบบ)
+            var appDataFolder = System.IO.Path.GetDirectoryName(dbFile);
+            if (!string.IsNullOrEmpty(appDataFolder))
             {
-                "invoice_documents", "payments", "sale_items", "sales",
-                "folios", "bookings", "customers", 
-                "meter_readings", "utility_bills",
-                "audit_logs", "backup_history"
-            };
-
-            foreach (var table in tablesToClean)
-            {
-                await connection.ExecuteAsync($"DELETE FROM {table};", transaction: transaction);
+                var assetsDir = System.IO.Path.Combine(appDataFolder, "assets");
+                if (System.IO.Directory.Exists(assetsDir))
+                {
+                    System.IO.Directory.Delete(assetsDir, true);
+                }
             }
 
-            // รีเซ็ตสถานะห้องพักทั้งหมดเป็นว่าง (Available = 0)
-            await connection.ExecuteAsync("UPDATE rooms SET status = 0;", transaction: transaction);
+            // สร้างฐานข้อมูลและโครงสร้างตารางใหม่โดยอัตโนมัติเพื่อให้พร้อมใช้งานทันที
+            var runner = new MigrationRunner(_connectionFactory, _logger);
+            runner.EnsureDatabaseIsReady();
 
-            // รีเซ็ตจำนวนสินค้าในคลังสินค้าทั้งหมดเป็น 0
-            await connection.ExecuteAsync("UPDATE products SET stock_qty = 0;", transaction: transaction);
-
-            // รีเซ็ต sequences สำหรับตารางที่ถูกล้างข้อมูลทั้งหมดให้เริ่มนับใหม่จาก 0
-            var allTables = new[]
-            {
-                "bookings", "customers", "sales", "sale_items", 
-                "payments", "invoice_documents", "folios", "audit_logs"
-            };
-
-            foreach (var table in allTables)
-            {
-                await connection.ExecuteAsync($"DELETE FROM sqlite_sequence WHERE name = '{table}';", transaction: transaction);
-            }
-
-            transaction.Commit();
-
-            // เปิดการตรวจสอบ Foreign Key กลับคืนตามเดิม
-            await connection.ExecuteAsync("PRAGMA foreign_keys = ON;");
-
-            _logger.Info(LogCategory.Database, "ทำรายการล้างข้อมูลธุรกรรมระบบเป็น 0 (Set Zero) สำเร็จ", correlationId);
+            _logger.Info(LogCategory.Database, "ล้างระบบฐานข้อมูลและสร้างฐานข้อมูลเริ่มต้นใหม่ (Set Zero) สำเร็จ", correlationId);
         }
         catch (Exception ex)
         {
-            _logger.Error(LogCategory.Database, "ล้างข้อมูลระบบเป็น 0 ไม่สำเร็จ", ex, correlationId);
+            _logger.Error(LogCategory.Database, "ล้างข้อมูลระบบเป็น 0 (Set Zero) ล้มเหลว", ex, correlationId);
             throw;
         }
     }

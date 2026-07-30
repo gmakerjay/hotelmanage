@@ -182,7 +182,9 @@ public class AdminPasswordSetupForm : Form
 
         try
         {
-            await _settingsService.SetAsync("admin_password", newPwd);
+            // Hash รหัสผ่านด้วย PBKDF2 ก่อนบันทึก
+            string hashedPassword = PasswordHelper.HashPassword(newPwd);
+            await _settingsService.SetAsync("admin_password", hashedPassword);
             await _settingsService.SetAsync("is_custom_admin_password_set", "1");
             MessageBox.Show("ตั้งค่ารหัสผ่านผู้ดูแลระบบใหม่เรียบร้อยแล้ว", "สำเร็จ", MessageBoxButtons.OK, MessageBoxIcon.Information);
             DialogResult = DialogResult.OK;
@@ -199,7 +201,9 @@ public class AdminPasswordSetupForm : Form
         try
         {
             // ตรึงค่าว่าเคยแสดงถามและผู้ใช้กดข้าม เพื่อใช้ default
-            await _settingsService.SetAsync("admin_password", "psoft123");
+            // ถึงจะกดข้าม ก็ Hash รหัสผ่านเริ่มต้นด้วย PBKDF2
+            string hashedDefault = PasswordHelper.HashPassword("psoft123");
+            await _settingsService.SetAsync("admin_password", hashedDefault);
             await _settingsService.SetAsync("is_custom_admin_password_set", "1");
             DialogResult = DialogResult.Ignore;
             Close();

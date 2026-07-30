@@ -88,7 +88,6 @@ public class AuditLogControl : UserControl
         btnExport.FlatAppearance.BorderSize = 0;
         btnExport.Click += BtnExport_Click;
 
-        // ToolTips Guide (Large readable font & clipping safety)
         var tt = new AppToolTip();
         tt.SetToolTip(_txtSearch, "พิมพ์ค้นหาชื่อกิจกรรม หรือรายละเอียดใน Audit Log");
         tt.SetToolTip(_dtpStart, "เลือกวันที่เริ่มต้นในการค้นหาประวัติกิจกรรม");
@@ -113,8 +112,17 @@ public class AuditLogControl : UserControl
             ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize,
             RowTemplate = { Height = 35 }
         };
-        _dgvLogs.ColumnHeadersDefaultCellStyle.Font = new Font("Segoe UI", 11F, FontStyle.Bold);
-        _dgvLogs.ColumnHeadersDefaultCellStyle.WrapMode = DataGridViewTriState.True;
+        _dgvLogs.EnableDoubleBuffering();
+        _dgvLogs.EnableHeadersVisualStyles = false;
+        _dgvLogs.ColumnHeadersDefaultCellStyle = new DataGridViewCellStyle
+        {
+            Font = new Font("Segoe UI", 11F, FontStyle.Bold),
+            BackColor = Color.FromArgb(30, 41, 59),
+            ForeColor = Color.White,
+            SelectionBackColor = Color.FromArgb(30, 41, 59),
+            SelectionForeColor = Color.White,
+            WrapMode = DataGridViewTriState.True
+        };
         _dgvLogs.DefaultCellStyle.Font = new Font("Segoe UI", 10.5F);
         _dgvLogs.DataBindingComplete += (s, e) =>
         {
@@ -134,15 +142,14 @@ public class AuditLogControl : UserControl
             string entityId = row.Cells["รหัส"].Value?.ToString() ?? "-";
             string detail = row.Cells["รายละเอียด"].Value?.ToString() ?? "-";
 
-            string msg = $"🗓️ วันเวลา: {time}\n" +
-                         $"📌 กิจกรรม: {action}\n" +
-                         $"📁 ข้อมูลหลัก: {entity} (ID: {entityId})\n\n" +
-                         $"📝 รายละเอียด:\n{detail}";
+            string msg = $"วันเวลา: {time}\n" +
+                         $"กิจกรรม: {action}\n" +
+                         $"ข้อมูลหลัก: {entity} (ID: {entityId})\n\n" +
+                         $"รายละเอียด:\n{detail}";
 
             MessageBox.Show(msg, "รายละเอียดประวัติระบบ (Audit Log Detail)", MessageBoxButtons.OK, MessageBoxIcon.Information);
         };
 
-        // Create Master-Detail layout using SplitContainer
         var splitContainer = new SplitContainer
         {
             Dock = DockStyle.Fill,
@@ -160,7 +167,7 @@ public class AuditLogControl : UserControl
 
         var lblDetailsHeader = new Label
         {
-            Text = "🔎 รายละเอียดประวัติกิจกรรมที่เลือก (คลิกแถวในตารางด้านบนเพื่ออ่านแบบเต็ม)",
+            Text = "รายละเอียดประวัติกิจกรรมที่เลือก (คลิกแถวในตารางด้านบนเพื่ออ่านแบบเต็ม)",
             Font = new Font("Segoe UI", 11F, FontStyle.Bold),
             ForeColor = Color.FromArgb(37, 99, 235),
             Dock = DockStyle.Top,
@@ -201,11 +208,11 @@ public class AuditLogControl : UserControl
                 string entityId = cols.Contains("รหัส") ? (row.Cells["รหัส"].Value?.ToString() ?? "-") : "-";
                 string detail = cols.Contains("รายละเอียด") ? (row.Cells["รายละเอียด"].Value?.ToString() ?? "-") : "-";
 
-                txtDetails.Text = $"🗓️ วันเวลา: {time}\r\n" +
-                                  $"📌 กิจกรรม: {action}\r\n" +
-                                  $"📁 ข้อมูลหลัก: {entity} (ID: {entityId})\r\n" +
+                txtDetails.Text = $"วันเวลา: {time}\r\n" +
+                                  $"กิจกรรม: {action}\r\n" +
+                                  $"ข้อมูลหลัก: {entity} (ID: {entityId})\r\n" +
                                   $"--------------------------------------------------\r\n" +
-                                  $"📝 รายละเอียดกิจกรรม:\r\n{detail}";
+                                  $"รายละเอียดกิจกรรม:\r\n{detail}";
             }
             else
             {
@@ -268,7 +275,7 @@ public class AuditLogControl : UserControl
         {
             try
             {
-                if (sfd.FilterIndex == 1) // HTML (A4 Print Layout)
+                if (sfd.FilterIndex == 1)
                 {
                     var sb = new System.Text.StringBuilder();
                     foreach (var log in _loadedLogs)
@@ -343,7 +350,7 @@ public class AuditLogControl : UserControl
                     };
                     System.Diagnostics.Process.Start(psi);
                 }
-                else // CSV
+                else
                 {
                     var sb = new System.Text.StringBuilder();
                     sb.AppendLine("วันเวลา,กิจกรรม,ข้อมูลหลัก,รหัส,รายละเอียด");

@@ -98,11 +98,9 @@ public class SettingsServiceTests : IDisposable
             Assert.Equal(0, await Dapper.SqlMapper.ExecuteScalarAsync<int>(conn, "SELECT COUNT(*) FROM audit_logs"));
             Assert.Equal(0, await Dapper.SqlMapper.ExecuteScalarAsync<int>(conn, "SELECT COUNT(*) FROM backup_history"));
 
-            // ตารางมาสเตอร์ (rooms, room_types) ต้องอยู่ครบ
-            Assert.Equal(1, await Dapper.SqlMapper.ExecuteScalarAsync<int>(conn, "SELECT COUNT(*) FROM rooms"));
-            Assert.Equal(1, await Dapper.SqlMapper.ExecuteScalarAsync<int>(conn, "SELECT COUNT(*) FROM room_types"));
-            // สถานะห้องต้องถูกรีเซ็ตเป็น Available (0)
-            Assert.Equal(0, await Dapper.SqlMapper.ExecuteScalarAsync<int>(conn, "SELECT status FROM rooms WHERE id = 1"));
+            // ตารางมาสเตอร์ (rooms, room_types) ต้องถูกล้างด้วยตามนโยบาย Factory Reset
+            Assert.Equal(0, await Dapper.SqlMapper.ExecuteScalarAsync<int>(conn, "SELECT COUNT(*) FROM rooms"));
+            Assert.Equal(0, await Dapper.SqlMapper.ExecuteScalarAsync<int>(conn, "SELECT COUNT(*) FROM room_types"));
         }
 
         var runningNo = await _settingsService.GetAsync("receipt_doc_running_number");

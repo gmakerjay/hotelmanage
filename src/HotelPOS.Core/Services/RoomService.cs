@@ -70,7 +70,15 @@ public class RoomService : IRoomService
         var existing = await _roomRepository.GetRoomByNumberAsync(room.RoomNumber.Trim());
         if (existing != null && existing.Id != room.Id)
         {
-            throw new InvalidOperationException($"เลขห้อง '{room.RoomNumber}' มีในระบบแล้ว");
+            if (existing.IsActive)
+            {
+                throw new InvalidOperationException($"เลขห้อง '{room.RoomNumber}' มีในระบบแล้ว");
+            }
+            else
+            {
+                // หากห้องเดิมถูกยกเลิก (soft delete) ไว้ ให้เปิดกลับมาใช้งานโดยใช้ ID เดิม
+                room.Id = existing.Id;
+            }
         }
 
         room.RoomNumber = room.RoomNumber.Trim();

@@ -1,7 +1,5 @@
 using HotelPOS.Logging;
 using HotelPOS.Core.Services;
-using System.Security.Cryptography;
-using System.Text;
 
 namespace HotelPOS.UI;
 
@@ -198,22 +196,17 @@ public class LoginForm : Form
         string dbPassword = await _settingsService.GetAsync("admin_password") ?? "psoft123";
         if (string.IsNullOrWhiteSpace(dbPassword)) dbPassword = "psoft123";
 
-        // เปรียบเทียบรหัสผ่าน: รองรับทั้งแบบ plain text (เดิม) และแบบ SHA256 hash (ใหม่)
+        // ตรวจสอบรหัสผ่านด้วย PBKDF2 (รองรับ backward compatibility: SHA256 และ Plain Text)
         bool passwordMatch = false;
         if (username.Equals("admin", StringComparison.OrdinalIgnoreCase))
         {
-            // ตรวจสอบแบบ hash ก่อน (SHA256)
-            string inputHash = ComputeSha256Hash(password);
-            if (inputHash == dbPassword)
+            var (isMatch, upgradedHash) = PasswordHelper.VerifyPassword(password, dbPassword);
+            passwordMatch = isMatch;
+
+            if (isMatch && upgradedHash != null)
             {
-                passwordMatch = true;
-            }
-            // Fallback: รองรับแบบ plain text เดิม (สำหรับการอัปเกรดจากระบบเดิม)
-            else if (password == dbPassword)
-            {
-                passwordMatch = true;
-                // อัปเกรดเป็น hash อัตโนมัติ
-                await _settingsService.SetAsync("admin_password", inputHash);
+                // Auto-upgrade: ปรับ SHA256/Plain Text → PBKDF2 อัตโนมัติ
+                await _settingsService.SetAsync("admin_password", upgradedHash);
             }
         }
 
@@ -239,13 +232,5 @@ public class LoginForm : Form
             _txtPassword.SelectAll();
             _txtPassword.Focus();
         }
-    }
-
-    private static string ComputeSha256Hash(string rawData)
-    {
-        byte[] bytes = SHA256.HashData(Encoding.UTF8.GetBytes(rawData));
-        var sb = new StringBuilder();
-        foreach (var b in bytes) sb.Append(b.ToString("x2"));
-        return sb.ToString();
     }
 }

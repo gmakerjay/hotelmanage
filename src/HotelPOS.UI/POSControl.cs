@@ -228,10 +228,13 @@ public class POSControl : UserControl
             {
                 BackColor = Color.FromArgb(241, 245, 249),
                 ForeColor = Color.FromArgb(51, 65, 85),
+                SelectionBackColor = Color.FromArgb(241, 245, 249),
+                SelectionForeColor = Color.FromArgb(51, 65, 85),
                 Font = new Font("Segoe UI", 9.5F, FontStyle.Bold)
             },
             EnableHeadersVisualStyles = false
         };
+        _dgvCart.EnableDoubleBuffering();
         _dgvCart.Columns.Add("Id", "ID");
         _dgvCart.Columns["Id"]!.Visible = false;
         
@@ -613,12 +616,12 @@ public class POSControl : UserControl
         _cboFolio.Enabled = _chkChargeRoom.Checked;
         if (_chkChargeRoom.Checked)
         {
-            _btnCheckout.Text = "⚡ ชาร์จเข้าบัญชีห้องพัก (Folio)";
+            _btnCheckout.Text = "ชาร์จเข้าบัญชีห้องพัก (Folio)";
             _btnCheckout.BackColor = Color.FromArgb(15, 23, 42);
         }
         else
         {
-            _btnCheckout.Text = "⚡ คิดเงิน / ชำระเงิน (F10)";
+            _btnCheckout.Text = "คิดเงิน / ชำระเงิน (F10)";
             _btnCheckout.BackColor = Color.FromArgb(22, 163, 74);
         }
     }
@@ -723,18 +726,15 @@ public class POSControl : UserControl
     {
         try
         {
-            var printerName = await _settingsService.GetAsync("default_printer_name");
+            var settings = await _settingsService.GetAllSettingsAsync();
+            var printerName = settings.PrinterName;
             if (string.IsNullOrEmpty(printerName))
             {
                 MessageBox.Show("ไม่ได้ตั้งค่าเครื่องพิมพ์เริ่มต้นไว้ กรุณาไปตั้งค่าที่เมนูตั้งค่าระบบ", "ไม่พบเครื่องพิมพ์", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
 
-            var paperSizeStr = await _settingsService.GetAsync("default_paper_size");
-            int.TryParse(paperSizeStr, out var paperSizeVal);
-            var paperSize = (PaperSize)paperSizeVal;
-
-            if (paperSize == PaperSize.A4)
+            if (settings.PaperType == "A4")
             {
                 MessageBox.Show("การพิมพ์ใบเสร็จ POS หน้าร้านรองรับกระดาษม้วนแบบ Slip 80mm หรือ 58mm เท่านั้น", "ขนาดกระดาษไม่ตรง", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
@@ -766,8 +766,6 @@ public class POSControl : UserControl
                 if (folioDetails != null) customer = folioDetails;
             }
 
-            var settings = await _settingsService.GetAllSettingsAsync();
-
             var booking = new Booking
             {
                 BookingCode = sale.SaleCode,
@@ -788,17 +786,12 @@ public class POSControl : UserControl
 
             // Generate receipt document & rasterize Thai Unicode to bitmap format
             var printerEngine = new ReceiptInvoicePrinter(
-                settings?.ShopName ?? "ชื่อร้าน/ที่พักของคุณ",
-                settings?.ShopAddress ?? "123/45 ถนนสุขุมวิท กรุงเทพฯ",
-                settings?.ShopPhone ?? "02-123-4567",
-                settings?.ShopTaxId ?? "0105560000000",
                 booking,
                 room,
                 customer,
                 folio,
-                "admin",
                 settings,
-                null
+                "admin"
             );
             
             // Custom printer task trigger

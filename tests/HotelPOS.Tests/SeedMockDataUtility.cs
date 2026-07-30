@@ -15,11 +15,20 @@ public class SeedMockDataUtility
     public async Task SeedDataIntoActiveDatabase()
     {
         var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-        var dbPath = Path.Combine(appData, "PSoftRestRentManager", "restrent.db");
+        var dbFolder = Path.Combine(appData, "PSoftRestRentManager");
+        var dbPath = Path.Combine(dbFolder, "restrent.db");
         
-        Assert.True(File.Exists(dbPath), $"Active database file not found at: {dbPath}");
+        if (!Directory.Exists(dbFolder))
+        {
+            Directory.CreateDirectory(dbFolder);
+        }
 
         var connectionFactory = new DbConnectionFactory(dbPath);
+        var logFolder = Path.Combine(dbFolder, "logs");
+        var appLogger = new HotelPOS.Logging.AppLogger(logFolder);
+        var migrationRunner = new MigrationRunner(connectionFactory, appLogger);
+        migrationRunner.EnsureDatabaseIsReady();
+
         using var conn = connectionFactory.CreateConnection();
         await conn.OpenAsync();
 
@@ -296,11 +305,12 @@ public class SeedMockDataUtility
             }
         }
 
-        // 8. Utility Bills over 3 months for all monthly stays (102, 202, 302, 402, 502)
+        // 8. Utility Bills over 4 months for all monthly stays (102, 202, 302, 402, 502)
         var now = DateTime.Now;
         var month0 = now.ToString("yyyy-MM");
         var month1 = now.AddMonths(-1).ToString("yyyy-MM");
         var month2 = now.AddMonths(-2).ToString("yyyy-MM");
+        var month3 = now.AddMonths(-3).ToString("yyyy-MM");
 
         for (int floor = 1; floor <= 5; floor++)
         {
@@ -310,29 +320,95 @@ public class SeedMockDataUtility
                 1 => 4500, 2 => 4800, 3 => 7000, 4 => 11000, _ => 18000
             };
 
-            // Month -2: May Bill (Paid)
+            // Month -3: Bill (Paid)
+            await conn.ExecuteAsync($@"
+                INSERT INTO utility_bills (id, bill_code, room_id, billing_month, room_charge, electric_prev, electric_curr, electric_units, electric_rate, electric_amount, water_prev, water_curr, water_units, water_rate, water_amount, common_area_fee, garbage_fee, total_amount, is_paid, paid_at, created_at) 
+                VALUES (@Id3, @Code3, @RoomId, '{month3}', @RoomCharge, 50, 100, 50, 8.00, 400.00, 5, 10, 5, 18.00, 90.00, 0, 20.00, @Total3, 1, datetime('now', '-85 days', 'localtime'), datetime('now', '-85 days', 'localtime'))",
+                new { Id3 = roomTypeBillId * 10 + 4, Code3 = $"UB-{roomId}-00", RoomId = roomId, RoomCharge = roomCharge, Total3 = roomCharge + 510.00m });
+
+            // Meter Readings Month -3
+            await conn.ExecuteAsync($@"
+                INSERT INTO meter_readings (room_id, utility_type, billing_month, reading_prev, reading_curr, units_used, rate_per_unit, total_amount, recorded_at)
+                VALUES (@RoomId, 0, '{month3}', 50, 100, 50, 8.00, 400.00, datetime('now', '-85 days', 'localtime')),
+                       (@RoomId, 1, '{month3}', 5, 10, 5, 18.00, 90.00, datetime('now', '-85 days', 'localtime'));",
+                new { RoomId = roomId });
+
+            // Month -2: Bill (Paid)
             await conn.ExecuteAsync($@"
                 INSERT INTO utility_bills (id, bill_code, room_id, billing_month, room_charge, electric_prev, electric_curr, electric_units, electric_rate, electric_amount, water_prev, water_curr, water_units, water_rate, water_amount, common_area_fee, garbage_fee, total_amount, is_paid, paid_at, created_at) 
                 VALUES (@Id2, @Code2, @RoomId, '{month2}', @RoomCharge, 100, 150, 50, 8.00, 400.00, 10, 15, 5, 18.00, 90.00, 0, 20.00, @Total2, 1, datetime('now', '-55 days', 'localtime'), datetime('now', '-55 days', 'localtime'))",
-                new { Id2 = roomTypeBillId * 10 + 1, Code2 = $"UB-{roomId}-01", RoomId = roomId, RoomCharge = roomCharge, Total2 = roomCharge + 490.00m });
+                new { Id2 = roomTypeBillId * 10 + 1, Code2 = $"UB-{roomId}-01", RoomId = roomId, RoomCharge = roomCharge, Total2 = roomCharge + 510.00m });
 
-            // Month -1: June Bill (Paid)
+            // Meter Readings Month -2
+            await conn.ExecuteAsync($@"
+                INSERT INTO meter_readings (room_id, utility_type, billing_month, reading_prev, reading_curr, units_used, rate_per_unit, total_amount, recorded_at)
+                VALUES (@RoomId, 0, '{month2}', 100, 150, 50, 8.00, 400.00, datetime('now', '-55 days', 'localtime')),
+                       (@RoomId, 1, '{month2}', 10, 15, 5, 18.00, 90.00, datetime('now', '-55 days', 'localtime'));",
+                new { RoomId = roomId });
+
+            // Month -1: Bill (Overdue for Room 102 & 302, Paid for others)
+            int isPaidMonth1 = (floor == 1 || floor == 3) ? 0 : 1;
+            string createdDiffMonth1 = (floor == 1 || floor == 3) ? "-40 days" : "-25 days";
             await conn.ExecuteAsync($@"
                 INSERT INTO utility_bills (id, bill_code, room_id, billing_month, room_charge, electric_prev, electric_curr, electric_units, electric_rate, electric_amount, water_prev, water_curr, water_units, water_rate, water_amount, common_area_fee, garbage_fee, total_amount, is_paid, paid_at, created_at) 
-                VALUES (@Id1, @Code1, @RoomId, '{month1}', @RoomCharge, 150, 210, 60, 8.00, 480.00, 15, 21, 6, 18.00, 108.00, 0, 20.00, @Total1, 1, datetime('now', '-25 days', 'localtime'), datetime('now', '-25 days', 'localtime'))",
-                new { Id1 = roomTypeBillId * 10 + 2, Code1 = $"UB-{roomId}-02", RoomId = roomId, RoomCharge = roomCharge, Total1 = roomCharge + 608.00m });
+                VALUES (@Id1, @Code1, @RoomId, '{month1}', @RoomCharge, 150, 210, 60, 8.00, 480.00, 15, 21, 6, 18.00, 108.00, 0, 20.00, @Total1, @IsPaid1, @PaidAt1, datetime('now', '{createdDiffMonth1}', 'localtime'))",
+                new { 
+                    Id1 = roomTypeBillId * 10 + 2, 
+                    Code1 = $"UB-{roomId}-02", 
+                    RoomId = roomId, 
+                    RoomCharge = roomCharge, 
+                    Total1 = roomCharge + 608.00m,
+                    IsPaid1 = isPaidMonth1,
+                    PaidAt1 = isPaidMonth1 == 1 ? (object)now.AddDays(-25).ToString("yyyy-MM-dd HH:mm:ss") : DBNull.Value
+                });
 
-            // Month  0: July Bill (Unpaid - outstanding)
+            // Meter Readings Month -1
             await conn.ExecuteAsync($@"
-                INSERT INTO utility_bills (id, bill_code, room_id, billing_month, room_charge, electric_prev, electric_curr, electric_units, electric_rate, electric_amount, water_prev, water_curr, water_units, water_rate, water_amount, common_area_fee, garbage_fee, total_amount, is_paid, created_at) 
-                VALUES (@Id0, @Code0, @RoomId, '{month0}', @RoomCharge, 210, 290, 80, 8.00, 640.00, 21, 29, 8, 18.00, 144.00, 0, 20.00, @Total0, 0, datetime('now', '-1 day', 'localtime'))",
-                new { Id0 = roomTypeBillId * 10 + 3, Code0 = $"UB-{roomId}-03", RoomId = roomId, RoomCharge = roomCharge, Total0 = roomCharge + 804.00m });
+                INSERT INTO meter_readings (room_id, utility_type, billing_month, reading_prev, reading_curr, units_used, rate_per_unit, total_amount, recorded_at)
+                VALUES (@RoomId, 0, '{month1}', 150, 210, 60, 8.00, 480.00, datetime('now', '-25 days', 'localtime')),
+                       (@RoomId, 1, '{month1}', 15, 21, 6, 18.00, 108.00, datetime('now', '-25 days', 'localtime'));",
+                new { RoomId = roomId });
+
+            // Month 0: Bill
+            // Room 102: Overdue (created 25 days ago)
+            // Room 202: Due Soon (created 2 days ago)
+            // Room 302: Overdue (created 20 days ago)
+            // Room 402: Due Soon (created 1 day ago)
+            // Room 502: Paid (created 5 days ago)
+            int isPaidMonth0 = floor == 5 ? 1 : 0;
+            string createdDiffMonth0 = floor switch {
+                1 => "-25 days",
+                2 => "-2 days",
+                3 => "-20 days",
+                4 => "-1 days",
+                _ => "-5 days"
+            };
+
+            await conn.ExecuteAsync($@"
+                INSERT INTO utility_bills (id, bill_code, room_id, billing_month, room_charge, electric_prev, electric_curr, electric_units, electric_rate, electric_amount, water_prev, water_curr, water_units, water_rate, water_amount, common_area_fee, garbage_fee, total_amount, is_paid, paid_at, created_at) 
+                VALUES (@Id0, @Code0, @RoomId, '{month0}', @RoomCharge, 210, 290, 80, 8.00, 640.00, 21, 29, 8, 18.00, 144.00, 0, 20.00, @Total0, @IsPaid0, @PaidAt0, datetime('now', '{createdDiffMonth0}', 'localtime'))",
+                new { 
+                    Id0 = roomTypeBillId * 10 + 3, 
+                    Code0 = $"UB-{roomId}-03", 
+                    RoomId = roomId, 
+                    RoomCharge = roomCharge, 
+                    Total0 = roomCharge + 804.00m,
+                    IsPaid0 = isPaidMonth0,
+                    PaidAt0 = isPaidMonth0 == 1 ? (object)now.AddDays(-2).ToString("yyyy-MM-dd HH:mm:ss") : DBNull.Value
+                });
+
+            // Meter Readings Month 0
+            await conn.ExecuteAsync($@"
+                INSERT INTO meter_readings (room_id, utility_type, billing_month, reading_prev, reading_curr, units_used, rate_per_unit, total_amount, recorded_at)
+                VALUES (@RoomId, 0, '{month0}', 210, 290, 80, 8.00, 640.00, datetime('now', '{createdDiffMonth0}', 'localtime')),
+                       (@RoomId, 1, '{month0}', 21, 29, 8, 18.00, 144.00, datetime('now', '{createdDiffMonth0}', 'localtime'));",
+                new { RoomId = roomId });
         }
 
         // 9. Add Audit Trail logs corresponding to these events
         await conn.ExecuteAsync(@"
             INSERT INTO audit_logs (action, entity_name, entity_id, detail_json, created_at) 
-            VALUES ('SEED_MOCK', 'System', '0', 'จำลองข้อมูลระบบแบบครอบคลุม: ห้องพัก 50 ห้อง, ลูกค้า 50 คน, กิจกรรมเช็คอิน/เช็คเอาท์/POS และค่าน้ำไฟย้อนหลัง 3 เดือน', datetime('now', 'localtime'));
+            VALUES ('SEED_MOCK', 'System', '0', 'จำลองข้อมูลระบบแบบครอบคลุม: ผู้เช่ารายเดือนอยู่มาหลายเดือน (4 เดือนย้อนหลัง), มีสถานะใกล้ครบกำหนด และเลยกำหนดชำระ', datetime('now', 'localtime'));
         ");
     }
 }

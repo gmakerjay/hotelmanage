@@ -48,6 +48,11 @@ public static class LicenseValidator
         if (!string.IsNullOrEmpty(dongleLicense.UsbHardwareId) && dongleLicense.UsbHardwareId != currentUsbHardwareId)
             return LicenseStatus.Invalid;
 
+        // 3.1 Fail-Closed: หากอ่าน Physical USB Serial ไม่ได้เลย (WMI ล้มเหลว) ให้ถือว่า Invalid
+        //     ป้องกันการ bypass โดยการใช้ USB drive ที่ไม่มี Serial Number ให้อ่านได้
+        if (string.IsNullOrEmpty(currentUsbHardwareId))
+            return LicenseStatus.Invalid;
+
         // 4. ตรวจสอบ App Serial Watermark ประจำตัวชุดโปรแกรม .exe (ป้องกันการนำ Dongle ไปใช้ข้ามชุดโปรแกรม)
         if (!string.IsNullOrEmpty(dongleLicense.AppSerial) && dongleLicense.AppSerial != currentAppSerial)
             return LicenseStatus.Invalid;

@@ -254,8 +254,25 @@ public class UtilityBillServiceTests : IDisposable
 
         Assert.Equal(3500m, preview.RoomCharge);
         Assert.Equal(1200m, preview.ElectricAmount);
+        Assert.Equal(1200m, preview.ElectricPrev);
+        Assert.Equal(1350m, preview.ElectricCurr);
+        Assert.Equal(150m, preview.ElectricUnits);
         Assert.Equal("101", preview.RoomNumber);
         Assert.NotNull(preview.ElectricReading);
+    }
+
+    [Fact]
+    public async Task GetBillPreview_โหมดไฟเหมาจ่าย_แสดงค่ายอดเหมาจ่ายถูกต้อง()
+    {
+        var rooms = await _roomRepo.GetRoomsAsync();
+        var room = rooms.First();
+
+        await _settingsService.SetAsync("electric_billing_mode", "FLAT");
+        await _settingsService.SetAsync("electric_flat_rate", "500");
+
+        var preview = await _utilityBillService.GetMonthlyBillPreviewAsync(room.Id, "2026-07");
+
+        Assert.Equal(500m, preview.ElectricAmount);
     }
 
     #endregion

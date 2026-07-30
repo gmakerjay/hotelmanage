@@ -1,11 +1,12 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
+    <TargetFramework>net8.0-windows</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
     <RootNamespace>HotelPOS.Tests</RootNamespace>
+    <UseWindowsForms>true</UseWindowsForms>
   </PropertyGroup>
 
   <ItemGroup>
@@ -20,6 +21,7 @@
     <ProjectReference Include="..\..\src\HotelPOS.Core\HotelPOS.Core.csproj" />
     <ProjectReference Include="..\..\src\HotelPOS.Logging\HotelPOS.Logging.csproj" />
     <ProjectReference Include="..\..\src\HotelPOS.Licensing\HotelPOS.Licensing.csproj" />
+    <ProjectReference Include="..\..\src\HotelPOS.Printing\HotelPOS.Printing.csproj" />
   </ItemGroup>
 
 </Project>

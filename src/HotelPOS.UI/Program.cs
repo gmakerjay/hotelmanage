@@ -15,12 +15,6 @@ internal static class Program
     [STAThread]
     private static void Main(string[] args)
     {
-        if (args.Length > 0 && args[0] == "--pdf-sample")
-        {
-            PdfGenerator.GenerateSamplePdfs();
-            return;
-        }
-
         ApplicationConfiguration.Initialize();
 
         // ---------- 1) ตั้งค่า Logger ก่อนสิ่งอื่นใด (ต้อง log ได้ตั้งแต่บรรทัดแรก) ----------

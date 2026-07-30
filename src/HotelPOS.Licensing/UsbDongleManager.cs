@@ -159,12 +159,16 @@ public static class UsbDongleManager
         }
         catch { }
 
-        // Fallback 2: กรณี WMI อ่านไม่ได้ ให้ใช้ Drive Volume Label + Letter
-        return $"GENERIC-USB-{cleanLetter}";
+        // Fallback 2: หาก WMI อ่านค่าอะไรไม่ได้เลย → Fail Closed
+        // ไม่ return ค่า GENERIC กลับมาเด็ดขาด เพราะจะทำให้ Hardware ID ปลอมแปลงได้
+        return string.Empty;
     }
 
     public static string HashUsbSerial(string rawSerial)
     {
+        if (string.IsNullOrEmpty(rawSerial))
+            return string.Empty;
+
         string combined = $"USB_CHIP_SERIAL:{rawSerial.Trim().ToUpperInvariant()}";
         byte[] bytes = SHA256.HashData(Encoding.UTF8.GetBytes(combined));
         return Convert.ToHexString(bytes).ToLowerInvariant();

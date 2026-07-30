@@ -142,6 +142,8 @@ public class BookingListControl : UserControl
             Font = new Font("Segoe UI", 11F, FontStyle.Bold),
             BackColor = Color.FromArgb(30, 41, 59),
             ForeColor = Color.White,
+            SelectionBackColor = Color.FromArgb(30, 41, 59),
+            SelectionForeColor = Color.White,
             WrapMode = DataGridViewTriState.True
         };
         _dgvBookings.EnableHeadersVisualStyles = false;
