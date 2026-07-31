@@ -9,12 +9,25 @@ namespace HotelPOS.UI;
 
 internal static class Program
 {
-    // เก็บ logger ไว้ระดับ static เพื่อให้ Global Exception Handler เรียกใช้ได้แม้ DI container ยังไม่พร้อม
+    // เก็บ logger และ mutex ไว้ระดับ static
     private static IAppLogger? _logger;
+    private static Mutex? _appMutex;
 
     [STAThread]
     private static void Main(string[] args)
     {
+        // ---------- 0) ป้องกันการเปิดโปรแกรมซ้อนหลายตัวพร้อมกัน (Single Instance Check) ----------
+        _appMutex = new Mutex(true, "PSoftRestRentManager_SingleInstance_Mutex", out bool createdNew);
+        if (!createdNew)
+        {
+            MessageBox.Show(
+                "โปรแกรม PSoft Rest & Rent Manager กำลังทำงานอยู่ในขณะนี้\n(ไม่อนุญาตให้เปิดโปรแกรมซ้อนกันหลายหน้าต่างเพื่อป้องกันข้อมูลสับสน)",
+                "PSoft Rest & Rent Manager",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Warning);
+            return;
+        }
+
         ApplicationConfiguration.Initialize();
 
         // ---------- 1) ตั้งค่า Logger ก่อนสิ่งอื่นใด (ต้อง log ได้ตั้งแต่บรรทัดแรก) ----------
