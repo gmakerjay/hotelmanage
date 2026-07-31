@@ -1,6 +1,7 @@
 using System;
 using System.Drawing;
 using System.Windows.Forms;
+using HotelPOS.Common;
 using HotelPOS.Common.Models;
 using HotelPOS.Core.Services;
 
@@ -53,6 +54,8 @@ public class MeterReadingInputDialog : Form
     }
 
     public bool PrintBillRequested => _printRequested;
+    public bool MarkAsPaidRequested => _markAsPaidRequested;
+    public PaymentMethod SelectedPaymentMethod => _selectedPaymentMethod;
 
     private readonly Room _room;
     private readonly string _tenantName;
@@ -80,6 +83,8 @@ public class MeterReadingInputDialog : Form
 
     private Label _lblTotalAmount = null!;
     private bool _printRequested = false;
+    private bool _markAsPaidRequested = false;
+    private PaymentMethod _selectedPaymentMethod = PaymentMethod.Cash;
 
     public MeterReadingInputDialog(
         Room room,
@@ -119,8 +124,8 @@ public class MeterReadingInputDialog : Form
         string notes)
     {
         Text = $"บันทึกและคำนวณค่าน้ำ-ค่าไฟ | ห้อง {_room.RoomNumber}";
-        Size = new Size(720, 680);
-        MinimumSize = new Size(680, 620);
+        Size = new Size(720, 730);
+        MinimumSize = new Size(700, 680);
         StartPosition = FormStartPosition.CenterParent;
         FormBorderStyle = FormBorderStyle.FixedDialog;
         MaximizeBox = false;
@@ -375,20 +380,20 @@ public class MeterReadingInputDialog : Form
         pnlBody.Controls.Add(grpFees);
         curY += 170;
 
-        // Total Highlight Box
+        // High-Contrast Summary Card & Validation Banner
         var pnlTotal = new Panel
         {
             Location = new Point(15, curY),
-            Size = new Size(670, 50),
-            BackColor = Color.FromArgb(240, 253, 244),
-            BorderStyle = BorderStyle.FixedSingle
+            Size = new Size(670, 75),
+            BackColor = Color.FromArgb(15, 23, 42), // Slate 900
+            Padding = new Padding(15, 10, 15, 10)
         };
 
         var lblTotalTitle = new Label
         {
-            Text = "ยอดสุทธิที่ต้องชำระ (TOTAL DUE):",
+            Text = "สรุปยอดสุทธิที่ต้องจัดเก็บ (NET TOTAL DUE):",
             Font = new Font("Segoe UI", 11.5F, FontStyle.Bold),
-            ForeColor = Color.FromArgb(22, 101, 52),
+            ForeColor = Color.FromArgb(148, 163, 184),
             Location = new Point(15, 12),
             AutoSize = true
         };
@@ -396,15 +401,27 @@ public class MeterReadingInputDialog : Form
         _lblTotalAmount = new Label
         {
             Text = "0.00 บาท",
-            Font = new Font("Segoe UI", 16F, FontStyle.Bold),
-            ForeColor = Color.FromArgb(22, 101, 52),
-            Location = new Point(320, 8),
-            Size = new Size(335, 32),
+            Font = new Font("Segoe UI", 20F, FontStyle.Bold),
+            ForeColor = Color.FromArgb(74, 222, 128), // Bright Emerald Green
+            Location = new Point(300, 30),
+            Size = new Size(355, 38),
             TextAlign = ContentAlignment.MiddleRight
+        };
+
+        var lblValidationWarn = new Label
+        {
+            Name = "lblValidationWarn",
+            Text = "",
+            Font = new Font("Segoe UI", 9.5F, FontStyle.Bold),
+            ForeColor = Color.FromArgb(248, 113, 113),
+            Location = new Point(15, 42),
+            AutoSize = true,
+            Visible = false
         };
 
         pnlTotal.Controls.Add(lblTotalTitle);
         pnlTotal.Controls.Add(_lblTotalAmount);
+        pnlTotal.Controls.Add(lblValidationWarn);
         pnlBody.Controls.Add(pnlTotal);
 
         // Footer Actions
@@ -416,35 +433,102 @@ public class MeterReadingInputDialog : Form
             Padding = new Padding(15, 10, 15, 10)
         };
 
-        var btnSave = new Button
+        var btnSaveAndBill = new Button
         {
-            Text = "บันทึกข้อมูล",
-            Font = new Font("Segoe UI", 11F, FontStyle.Bold),
-            BackColor = Color.FromArgb(22, 163, 74),
-            ForeColor = Color.White,
-            FlatStyle = FlatStyle.Flat,
-            Size = new Size(160, 42),
-            Location = new Point(220, 10),
-            Cursor = Cursors.Hand,
-            DialogResult = DialogResult.OK
-        };
-        btnSave.FlatAppearance.BorderSize = 0;
-        btnSave.Click += (s, e) => _printRequested = false;
-
-        var btnSaveAndPrint = new Button
-        {
-            Text = "บันทึกและพิมพ์บิล",
-            Font = new Font("Segoe UI", 11F, FontStyle.Bold),
+            Text = "ออกใบแจ้งหนี้ (ค้างชำระ)",
+            Font = new Font("Segoe UI", 10.5F, FontStyle.Bold),
             BackColor = Color.FromArgb(37, 99, 235),
             ForeColor = Color.White,
             FlatStyle = FlatStyle.Flat,
             Size = new Size(185, 42),
-            Location = new Point(390, 10),
+            Location = new Point(175, 10),
             Cursor = Cursors.Hand,
             DialogResult = DialogResult.OK
         };
-        btnSaveAndPrint.FlatAppearance.BorderSize = 0;
-        btnSaveAndPrint.Click += (s, e) => _printRequested = true;
+        btnSaveAndBill.FlatAppearance.BorderSize = 0;
+        btnSaveAndBill.Click += (s, e) =>
+        {
+            if (_settings.ElectricBillingMode == "METER" && ElecCurr < ElecPrev)
+            {
+                MessageBox.Show($"เลขมิเตอร์ไฟล่าสุด ({ElecCurr:N0}) น้อยกว่าเลขก่อนหน้า ({ElecPrev:N0})\nกรุณาตรวจสอบและแก้ไขให้ถูกต้อง", "ข้อมูลไม่ถูกต้อง", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                DialogResult = DialogResult.None;
+                return;
+            }
+
+            if (_settings.WaterBillingMode == "METER" && WaterCurr < WaterPrev)
+            {
+                MessageBox.Show($"เลขมิเตอร์น้ำล่าสุด ({WaterCurr:N0}) น้อยกว่าเลขก่อนหน้า ({WaterPrev:N0})\nกรุณาตรวจสอบและแก้ไขให้ถูกต้อง", "ข้อมูลไม่ถูกต้อง", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                DialogResult = DialogResult.None;
+                return;
+            }
+
+            _printRequested = true;
+            _markAsPaidRequested = false;
+            DialogResult = DialogResult.OK;
+        };
+
+        var btnPayNow = new Button
+        {
+            Text = "รับชำระเงินทันที (ออกใบเสร็จ)",
+            Font = new Font("Segoe UI", 10.5F, FontStyle.Bold),
+            BackColor = Color.FromArgb(22, 163, 74),
+            ForeColor = Color.White,
+            FlatStyle = FlatStyle.Flat,
+            Size = new Size(210, 42),
+            Location = new Point(370, 10),
+            Cursor = Cursors.Hand
+        };
+        btnPayNow.FlatAppearance.BorderSize = 0;
+        btnPayNow.Click += (s, e) =>
+        {
+            if (_settings.ElectricBillingMode == "METER" && ElecCurr < ElecPrev)
+            {
+                MessageBox.Show($"เลขมิเตอร์ไฟล่าสุด ({ElecCurr:N0}) น้อยกว่าเลขก่อนหน้า ({ElecPrev:N0})\nกรุณาตรวจสอบและแก้ไขให้ถูกต้อง", "ข้อมูลไม่ถูกต้อง", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                DialogResult = DialogResult.None;
+                return;
+            }
+
+            if (_settings.WaterBillingMode == "METER" && WaterCurr < WaterPrev)
+            {
+                MessageBox.Show($"เลขมิเตอร์น้ำล่าสุด ({WaterCurr:N0}) น้อยกว่าเลขก่อนหน้า ({WaterPrev:N0})\nกรุณาตรวจสอบและแก้ไขให้ถูกต้อง", "ข้อมูลไม่ถูกต้อง", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                DialogResult = DialogResult.None;
+                return;
+            }
+
+            string elecDetail = isElecMeter ? $"({ElecUnits:N0} หน่วย)" : "(เหมาจ่าย)";
+            string waterDetail = isWaterMeter ? $"({WaterUnits:N0} หน่วย)" : $"(เหมาจ่าย {WaterPersons} คน)";
+
+            using var confirmDlg = new PaymentConfirmationDialog(
+                _room.RoomNumber,
+                _tenantName,
+                RoomRate,
+                ElecAmount,
+                elecDetail,
+                WaterAmount,
+                waterDetail,
+                CommonAreaFee,
+                GarbageFee,
+                ExtraCharges,
+                DiscountAmount,
+                TotalAmount
+            );
+
+            if (confirmDlg.ShowDialog() != DialogResult.Yes)
+            {
+                DialogResult = DialogResult.None;
+                return;
+            }
+
+            _markAsPaidRequested = true;
+
+            // ถามยืนยันการพิมพ์ใบเสร็จรับเงินทันที
+            var printAsk = MessageBox.Show(
+                "บันทึกรับชำระเงินสำเร็จเรียบร้อย!\n\nต้องการพิมพ์ [ใบเสร็จรับเงิน] ทันทีหรือไม่?",
+                "พิมพ์ใบเสร็จรับเงิน", MessageBoxButtons.YesNo, MessageBoxIcon.Information);
+
+            _printRequested = (printAsk == DialogResult.Yes);
+            DialogResult = DialogResult.OK;
+        };
 
         var btnCancel = new Button
         {
@@ -453,14 +537,14 @@ public class MeterReadingInputDialog : Form
             BackColor = Color.FromArgb(241, 245, 249),
             ForeColor = Color.FromArgb(71, 85, 105),
             FlatStyle = FlatStyle.Flat,
-            Size = new Size(100, 42),
-            Location = new Point(585, 10),
+            Size = new Size(90, 42),
+            Location = new Point(590, 10),
             Cursor = Cursors.Hand,
             DialogResult = DialogResult.Cancel
         };
         btnCancel.FlatAppearance.BorderColor = Color.FromArgb(203, 213, 225);
 
-        pnlFooter.Controls.AddRange(new Control[] { btnSave, btnSaveAndPrint, btnCancel });
+        pnlFooter.Controls.AddRange(new Control[] { btnSaveAndBill, btnPayNow, btnCancel });
 
         // Add controls to Form in correct Docking Order in WinForms: Top first, Bottom second, Fill LAST!
         Controls.Add(pnlHeader);
@@ -488,6 +572,33 @@ public class MeterReadingInputDialog : Form
     private void CalculateTotal()
     {
         if (_lblElecUnits == null) return;
+
+        bool elecInvalid = _settings.ElectricBillingMode == "METER" && ElecCurr < ElecPrev;
+        bool waterInvalid = _settings.WaterBillingMode == "METER" && WaterCurr < WaterPrev;
+
+        var lblWarn = Controls.Find("lblValidationWarn", true).FirstOrDefault() as Label;
+        if (lblWarn != null)
+        {
+            if (elecInvalid && waterInvalid)
+            {
+                lblWarn.Text = "⚠️ เลขมิเตอร์ไฟและน้ำล่าสุด น้อยกว่าเลขก่อนหน้า!";
+                lblWarn.Visible = true;
+            }
+            else if (elecInvalid)
+            {
+                lblWarn.Text = "⚠️ เลขมิเตอร์ไฟล่าสุด น้อยกว่าเลขก่อนหน้า!";
+                lblWarn.Visible = true;
+            }
+            else if (waterInvalid)
+            {
+                lblWarn.Text = "⚠️ เลขมิเตอร์น้ำล่าสุด น้อยกว่าเลขก่อนหน้า!";
+                lblWarn.Visible = true;
+            }
+            else
+            {
+                lblWarn.Visible = false;
+            }
+        }
 
         // Elec Units & Amount
         if (_settings.ElectricBillingMode == "METER")

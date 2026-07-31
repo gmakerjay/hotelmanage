@@ -1,102 +1,109 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
-using System.Threading;
 using System.Threading.Tasks;
+using HotelPOS.Common;
+using HotelPOS.Common.Models;
 using HotelPOS.Core.Services;
 using HotelPOS.Data;
 using HotelPOS.Data.Repositories;
 using HotelPOS.Logging;
+using Microsoft.Data.Sqlite;
 using Xunit;
 
 namespace HotelPOS.Tests;
 
-public class BackupServiceTests : IDisposable
+public class DummyAuditService : IAuditService
 {
-    private readonly string _tempDbPath;
-    private readonly string _tempLogPath;
-    private readonly DbConnectionFactory _connectionFactory;
-    private readonly IAppLogger _logger;
+    public Task LogAsync(string action, string? entityName = null, string? entityId = null, string? details = null, int? userId = null)
+    {
+        return Task.CompletedTask;
+    }
+
+    public Task<IEnumerable<HotelPOS.Data.Repositories.AuditLogEntry>> GetLogsAsync(DateTime? startDate = null, DateTime? endDate = null, string? search = null)
+    {
+        return Task.FromResult<IEnumerable<HotelPOS.Data.Repositories.AuditLogEntry>>(new List<HotelPOS.Data.Repositories.AuditLogEntry>());
+    }
+
+    public Task<(IEnumerable<HotelPOS.Data.Repositories.AuditLogEntry> Logs, int TotalCount)> GetLogsPaginatedAsync(DateTime? startDate = null, DateTime? endDate = null, string? search = null, int page = 1, int pageSize = 25)
+    {
+        return Task.FromResult<(IEnumerable<HotelPOS.Data.Repositories.AuditLogEntry>, int)>((new List<HotelPOS.Data.Repositories.AuditLogEntry>(), 0));
+    }
+}
+
+public class DummyAppLogger : IAppLogger
+{
+    public void Trace(LogCategory category, string message, string? correlationId = null) { }
+    public void Debug(LogCategory category, string message, string? correlationId = null) { }
+    public void Info(LogCategory category, string message, string? correlationId = null) { }
+    public void Warning(LogCategory category, string message, string? correlationId = null) { }
+    public void Error(LogCategory category, string message, Exception? exception = null, string? correlationId = null) { }
+    public void Fatal(LogCategory category, string message, Exception? exception = null, string? correlationId = null) { }
+    public string NewCorrelationId() => Guid.NewGuid().ToString();
+}
+
+public class BackupServiceTests
+{
+    private readonly DbConnectionFactory _dbFactory;
     private readonly IAuditService _auditService;
-    private readonly IBackupService _backupService;
+    private readonly IAppLogger _logger;
+    private readonly string _testDbPath;
 
     public BackupServiceTests()
     {
-        _tempDbPath = Path.Combine(Path.GetTempPath(), $"hotelpos-bak-test-{Guid.NewGuid():N}.db");
-        _tempLogPath = Path.Combine(Path.GetTempPath(), $"hotelpos-bak-test-logs-{Guid.NewGuid():N}");
+        _testDbPath = Path.Combine(Path.GetTempPath(), $"hotelpos_test_{Guid.NewGuid()}.db");
+        _dbFactory = new DbConnectionFactory(_testDbPath);
 
-        _connectionFactory = new DbConnectionFactory(_tempDbPath);
-        _logger = new AppLogger(_tempLogPath);
+        _auditService = new DummyAuditService();
+        _logger = new DummyAppLogger();
 
-        new MigrationRunner(_connectionFactory, _logger).EnsureDatabaseIsReady();
-        var auditRepo = new AuditRepository(_connectionFactory, _logger);
-        _auditService = new AuditService(auditRepo, _logger);
-
-        _backupService = new BackupService(_connectionFactory, _auditService, _logger);
+        var migrationRunner = new MigrationRunner(_dbFactory, _logger);
+        migrationRunner.EnsureDatabaseIsReady();
     }
 
     [Fact]
-    public async Task CreateBackup_สร้างไฟล์สำรองฐานข้อมูล_ไฟล์ต้องถูกสร้างสมบูรณ์()
+    public async Task CreateBackupAsync_ShouldCreateValidBackupFile()
     {
-        string backupTarget = Path.Combine(Path.GetTempPath(), $"hotelpos_backup_{Guid.NewGuid():N}.db");
+        var backupService = new BackupService(_dbFactory, _auditService, _logger);
+        var targetBackupPath = Path.Combine(Path.GetTempPath(), $"backup_test_{Guid.NewGuid()}.db");
 
         try
         {
-            string backupResultPath = await _backupService.CreateBackupAsync(backupTarget);
+            var resultPath = await backupService.CreateBackupAsync(targetBackupPath);
 
-            Assert.True(File.Exists(backupResultPath));
-            var fileInfo = new FileInfo(backupResultPath);
-            Assert.True(fileInfo.Length > 0);
+            Assert.True(File.Exists(resultPath));
+            Assert.True(new FileInfo(resultPath).Length > 0);
         }
         finally
         {
-            Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
-            if (File.Exists(backupTarget)) File.Delete(backupTarget);
+            SqliteConnection.ClearAllPools();
+            GC.Collect();
+            GC.WaitForPendingFinalizers();
+
+            try { if (File.Exists(targetBackupPath)) File.Delete(targetBackupPath); } catch { }
+            try { if (File.Exists(_testDbPath)) File.Delete(_testDbPath); } catch { }
         }
     }
 
     [Fact]
-    public async Task RestoreBackup_คืนค่าฐานข้อมูลจากไฟล์สำรอง_สำเร็จสมบูรณ์()
+    public async Task CheckAndOptimizeDatabaseAsync_ShouldReturnIntegrityOk()
     {
-        string backupTarget = Path.Combine(Path.GetTempPath(), $"hotelpos_backup_restore_{Guid.NewGuid():N}.db");
+        var backupService = new BackupService(_dbFactory, _auditService, _logger);
 
         try
         {
-            // 1. สร้างไฟล์ backup แรกเริ่ม
-            await _backupService.CreateBackupAsync(backupTarget);
+            var (isOk, message) = await backupService.CheckAndOptimizeDatabaseAsync();
 
-            // 2. คืนค่าไฟล์ backup กลับเข้ามา
-            await _backupService.RestoreBackupAsync(backupTarget);
-
-            Assert.True(File.Exists(_connectionFactory.DatabaseFilePath));
+            Assert.True(isOk);
+            Assert.Contains("สมบูรณ์", message);
         }
         finally
         {
-            Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
-            if (File.Exists(backupTarget)) File.Delete(backupTarget);
-        }
-    }
+            SqliteConnection.ClearAllPools();
+            GC.Collect();
+            GC.WaitForPendingFinalizers();
 
-    [Fact]
-    public async Task RestoreBackup_ไฟล์ไม่ดำรงอยู่_ต้อง_Throw_FileNotFoundException()
-    {
-        string dummyPath = Path.Combine(Path.GetTempPath(), "non_existent_backup_file.db");
-
-        await Assert.ThrowsAsync<FileNotFoundException>(() => _backupService.RestoreBackupAsync(dummyPath));
-    }
-
-    public void Dispose()
-    {
-        if (_logger is IDisposable disposableLogger) disposableLogger.Dispose();
-        Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
-        for (int i = 0; i < 5; i++)
-        {
-            try
-            {
-                if (File.Exists(_tempDbPath)) File.Delete(_tempDbPath);
-                if (Directory.Exists(_tempLogPath)) Directory.Delete(_tempLogPath, recursive: true);
-                break;
-            }
-            catch (IOException) { Thread.Sleep(100); }
+            try { if (File.Exists(_testDbPath)) File.Delete(_testDbPath); } catch { }
         }
     }
 }

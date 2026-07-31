@@ -107,6 +107,38 @@ public class SettingsServiceTests : IDisposable
         Assert.Equal("0", runningNo);
     }
 
+    [Fact]
+    public async Task SaveAllSettingsAsync_และ_GetAllSettingsAsync_ควรบันทึกและอ่านค่าใหม่ถูกต้องครบถ้วน()
+    {
+        var settings = new Common.Models.SystemSettingsDto
+        {
+            ShopName = "โรงแรม แกรนด์ พลาซ่า",
+            ShopAddress = "88/99 ถ.พหลโยธิน",
+            ShopPhone = "089-999-8888",
+            ShopTaxId = "1234567890123",
+            ElectricRatePerUnit = 9.50m,
+            WaterRatePerUnit = 22.00m,
+            AutoBackupEnabled = true,
+            AutoBackupOnExit = true,
+            AutoBackupMaxKeepFiles = 45,
+            CustomBackupFolderPath = "C:\\CustomBackups"
+        };
+
+        await _settingsService.SaveAllSettingsAsync(settings);
+        var loaded = await _settingsService.GetAllSettingsAsync();
+
+        Assert.Equal("โรงแรม แกรนด์ พลาซ่า", loaded.ShopName);
+        Assert.Equal("88/99 ถ.พหลโยธิน", loaded.ShopAddress);
+        Assert.Equal("089-999-8888", loaded.ShopPhone);
+        Assert.Equal("1234567890123", loaded.ShopTaxId);
+        Assert.Equal(9.50m, loaded.ElectricRatePerUnit);
+        Assert.Equal(22.00m, loaded.WaterRatePerUnit);
+        Assert.True(loaded.AutoBackupEnabled);
+        Assert.True(loaded.AutoBackupOnExit);
+        Assert.Equal(45, loaded.AutoBackupMaxKeepFiles);
+        Assert.Equal("C:\\CustomBackups", loaded.CustomBackupFolderPath);
+    }
+
     public void Dispose()
     {
         if (_logger is IDisposable disposableLogger)

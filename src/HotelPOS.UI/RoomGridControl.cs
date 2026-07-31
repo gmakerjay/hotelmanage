@@ -7,6 +7,7 @@ using System.Windows.Forms;
 using HotelPOS.Common;
 using HotelPOS.Common.Models;
 using HotelPOS.Core.Services;
+using HotelPOS.Printing;
 
 namespace HotelPOS.UI;
 
@@ -50,6 +51,7 @@ public class RoomGridControl : UserControl
     private string? _selectedFilterMode = null; // null = ทั้งหมด
     private System.Windows.Forms.Timer _autoRefreshTimer = null!;
     private Label _lblUtilityRates = null!;
+    private float _cardFontScale = 1.15F;
 
     // ----------------------------------------------------
     // Optimization: Shared ContextMenu & Control Caches
@@ -76,16 +78,38 @@ public class RoomGridControl : UserControl
         InitializeSharedContextMenu();
         InitializeTimer();
 
-        Load += async (s, e) => await RefreshGridAsync();
+        ThemeManager.OnThemeChanged += () =>
+        {
+            UpdateCardFontScale();
+            ApplyFilter();
+        };
+
+        Load += async (s, e) =>
+        {
+            UpdateCardFontScale();
+            await RefreshGridAsync();
+        };
         VisibleChanged += async (s, e) =>
         {
             if (Visible && _isDataLoaded)
             {
+                UpdateCardFontScale();
                 // Instant draw from cache (0ms lag when switching tabs!)
                 ApplyFilter();
                 // Silent background update in case data changed
                 await LoadDataCachesAsync(silent: true);
             }
+        };
+    }
+
+    private void UpdateCardFontScale()
+    {
+        _cardFontScale = ThemeManager.CurrentFontSize switch
+        {
+            "Standard" => 1.00F,
+            "Large" => 1.25F,
+            "ExtraLarge" => 1.35F,
+            _ => 1.15F
         };
     }
 
@@ -110,7 +134,7 @@ public class RoomGridControl : UserControl
     private void InitializeUI()
     {
         Dock = DockStyle.Fill;
-        Font = new Font("Segoe UI", 9.5F, FontStyle.Regular);
+        Font = new Font("Segoe UI", 10.5F, FontStyle.Regular);
         BackColor = Color.FromArgb(241, 245, 249);
 
         // Header Panel - Compact (Height: 82px)
@@ -165,46 +189,48 @@ public class RoomGridControl : UserControl
         var controlsFlow = new FlowLayoutPanel
         {
             Dock = DockStyle.Right,
-            Width = 540,
+            AutoSize = true,
+            AutoSizeMode = AutoSizeMode.GrowAndShrink,
             Height = 36,
             FlowDirection = FlowDirection.LeftToRight,
             WrapContents = false,
-            BackColor = Color.Transparent
+            BackColor = Color.Transparent,
+            Padding = new Padding(0, 0, 6, 0)
         };
 
         var lblSearch = new Label { Text = "ค้นหา:", Font = new Font("Segoe UI", 9.5F, FontStyle.Bold), AutoSize = true, Margin = new Padding(0, 7, 2, 0) };
         _txtSearch = new TextBox
         {
-            Width = 140,
+            Width = 100,
             Font = new Font("Segoe UI", 9.5F),
             PlaceholderText = "เลขห้อง / ชื่อ...",
-            Margin = new Padding(0, 4, 6, 0)
+            Margin = new Padding(0, 4, 4, 0)
         };
         _txtSearch.TextChanged += (s, e) => ApplyFilter();
 
-        var lblFloor = new Label { Text = "ชั้น:", Font = new Font("Segoe UI", 9.5F, FontStyle.Bold), AutoSize = true, Margin = new Padding(2, 7, 2, 0) };
-        _cboFloorFilter = new ComboBox { Width = 75, Font = new Font("Segoe UI", 9.5F), DropDownStyle = ComboBoxStyle.DropDownList, Margin = new Padding(0, 4, 6, 0) };
+        var lblFloor = new Label { Text = "โซน/ชั้น:", Font = new Font("Segoe UI", 9.5F, FontStyle.Bold), AutoSize = true, Margin = new Padding(2, 7, 2, 0) };
+        _cboFloorFilter = new ComboBox { Width = 80, Font = new Font("Segoe UI", 9.5F), DropDownStyle = ComboBoxStyle.DropDownList, Margin = new Padding(0, 4, 4, 0) };
         _cboFloorFilter.SelectedIndexChanged += (s, e) => ApplyFilter();
 
         var lblType = new Label { Text = "ประเภท:", Font = new Font("Segoe UI", 9.5F, FontStyle.Bold), AutoSize = true, Margin = new Padding(2, 7, 2, 0) };
-        _cboTypeFilter = new ComboBox { Width = 95, Font = new Font("Segoe UI", 9.5F), DropDownStyle = ComboBoxStyle.DropDownList, Margin = new Padding(0, 4, 6, 0) };
+        _cboTypeFilter = new ComboBox { Width = 80, Font = new Font("Segoe UI", 9.5F), DropDownStyle = ComboBoxStyle.DropDownList, Margin = new Padding(0, 4, 4, 0) };
         _cboTypeFilter.SelectedIndexChanged += (s, e) => ApplyFilter();
 
         _btnRefresh = new Button
         {
             Text = "รีเฟรช",
-            Size = new Size(68, 28),
+            Size = new Size(58, 28),
             Font = new Font("Segoe UI", 9F, FontStyle.Bold),
             FlatStyle = FlatStyle.Flat,
             Cursor = Cursors.Hand,
-            Margin = new Padding(0, 3, 4, 0)
+            Margin = new Padding(0, 3, 3, 0)
         };
         _btnRefresh.Click += async (s, e) => await RefreshGridAsync();
 
         _btnNewBooking = new Button
         {
             Text = "จองล่วงหน้า",
-            Size = new Size(92, 28),
+            Size = new Size(85, 28),
             BackColor = Color.FromArgb(37, 99, 235),
             ForeColor = Color.White,
             FlatStyle = FlatStyle.Flat,
@@ -236,7 +262,7 @@ public class RoomGridControl : UserControl
         _statusFilterPanel = new FlowLayoutPanel
         {
             Dock = DockStyle.Left,
-            Width = 840,
+            AutoSize = true,
             Height = 34,
             BackColor = Color.Transparent,
             WrapContents = false,
@@ -250,6 +276,7 @@ public class RoomGridControl : UserControl
             ForeColor = Color.FromArgb(234, 88, 12),
             Dock = DockStyle.Right,
             AutoSize = true,
+            Margin = new Padding(0, 6, 6, 0),
             TextAlign = ContentAlignment.MiddleRight
         };
 
@@ -297,12 +324,12 @@ public class RoomGridControl : UserControl
         {
             ("ทั้งหมด", null, Color.FromArgb(30, 41, 59)),
             ("ห้องว่าง", "Available", Color.FromArgb(6, 95, 70)),
-            ("มีผู้เข้าพัก", "Occupied", Color.FromArgb(153, 27, 27)),
+            ("มีผู้เข้าพัก", "Occupied", Color.FromArgb(30, 58, 138)),
             ("รายเดือน", "Monthly", Color.FromArgb(107, 33, 168)),
             ("รายวัน", "Daily", Color.FromArgb(37, 99, 235)),
             ("รายชั่วโมง", "Hourly", Color.FromArgb(146, 64, 14)),
             ("รอทำความสะอาด", "Cleaning", Color.FromArgb(180, 83, 9)),
-            ("จองล่วงหน้า", "Reserved", Color.FromArgb(30, 58, 138)),
+            ("จองล่วงหน้า", "Reserved", Color.FromArgb(91, 33, 182)),
             ("ปิดซ่อม", "Maintenance", Color.FromArgb(71, 85, 105))
         };
 
@@ -402,11 +429,8 @@ public class RoomGridControl : UserControl
             var now = DateTime.Now;
             if (_utilityBillService != null)
             {
-                var curMonth = now.ToString("yyyy-MM");
-                var prevMonth = now.AddMonths(-1).ToString("yyyy-MM");
-                var curBills = await _utilityBillService.GetBillsByMonthAsync(curMonth);
-                var prevBills = await _utilityBillService.GetBillsByMonthAsync(prevMonth);
-                _cachedUnpaidBills = curBills.Concat(prevBills).Where(b => !b.IsPaid).ToList();
+                var unpaid = await _utilityBillService.GetAllUnpaidBillsAsync();
+                _cachedUnpaidBills = unpaid.ToList();
             }
 
             _isDataLoaded = true;
@@ -610,6 +634,7 @@ public class RoomGridControl : UserControl
                 _floorFlowPool[floorName] = floorFlow;
             }
             floorFlow.Width = containerWidth;
+            floorFlow.SuspendLayout();
             floorFlow.Controls.Clear();
 
             foreach (var item in group.OrderBy(x => x.Room.RoomNumber))
@@ -617,6 +642,7 @@ public class RoomGridControl : UserControl
                 var card = UpdateOrCreateRoomTileCard(item.Room, item.Type, item.Booking, item.Customer, now, item.IsUtilityOverdue, item.IsUtilityDueSoon, item.OverdueDays, item.DaysLeft, item.TotalUnpaid);
                 floorFlow.Controls.Add(card);
             }
+            floorFlow.ResumeLayout();
 
             _cardsContainer.Controls.Add(header);
             _cardsContainer.Controls.Add(floorFlow);
@@ -627,7 +653,7 @@ public class RoomGridControl : UserControl
             var lblEmpty = new Label
             {
                 Text = "ไม่พบห้องพักตามเงื่อนไขที่ระบุ",
-                Font = new Font("Segoe UI", 11F, FontStyle.Italic),
+                Font = new Font("Segoe UI", 12F, FontStyle.Italic),
                 ForeColor = Color.Gray,
                 Location = new Point(20, 20),
                 AutoSize = true
@@ -642,7 +668,7 @@ public class RoomGridControl : UserControl
         _lblNearCheckoutCount.Text = $"ใกล้ครบ: {nearCheckoutCount}";
         _lblOverdueCount.Text = $"เลยกำหนด: {overdueCount}";
 
-        _cardsContainer.ResumeLayout();
+        _cardsContainer.ResumeLayout(true);
     }
 
     private class RoomCardElements
@@ -675,8 +701,8 @@ public class RoomGridControl : UserControl
         {
             card = new Panel
             {
-                Size = new Size(210, 142),
-                Margin = new Padding(5),
+                Size = new Size(245, 168),
+                Margin = new Padding(6),
                 BorderStyle = BorderStyle.FixedSingle,
                 Padding = new Padding(0),
                 Cursor = Cursors.Hand
@@ -685,13 +711,13 @@ public class RoomGridControl : UserControl
             var topHeader = new Panel
             {
                 Dock = DockStyle.Top,
-                Height = 28,
-                Padding = new Padding(6, 2, 6, 2)
+                Height = 34,
+                Padding = new Padding(8, 4, 8, 4)
             };
 
             var lblRoomNumHeader = new Label
             {
-                Font = new Font("Segoe UI", 10.5F, FontStyle.Bold),
+                Font = new Font("Segoe UI", 13.5F, FontStyle.Bold),
                 ForeColor = Color.White,
                 Dock = DockStyle.Left,
                 AutoSize = true,
@@ -700,7 +726,7 @@ public class RoomGridControl : UserControl
 
             var lblStatusPill = new Label
             {
-                Font = new Font("Segoe UI", 8.5F, FontStyle.Bold),
+                Font = new Font("Segoe UI", 10F, FontStyle.Bold),
                 ForeColor = Color.White,
                 Dock = DockStyle.Right,
                 AutoSize = true,
@@ -712,34 +738,35 @@ public class RoomGridControl : UserControl
 
             var lblRateBadge = new Label
             {
-                Font = new Font("Segoe UI", 8.5F, FontStyle.Bold),
-                Location = new Point(6, 33),
+                Font = new Font("Segoe UI", 10.5F, FontStyle.Bold),
+                Location = new Point(8, 42),
                 AutoSize = true,
-                Padding = new Padding(4, 1, 4, 1),
+                Padding = new Padding(6, 2, 6, 2),
                 BorderStyle = BorderStyle.FixedSingle
             };
 
             var lblGuest = new Label
             {
-                Font = new Font("Segoe UI", 8.5F, FontStyle.Regular),
-                Location = new Point(6, 62),
-                Size = new Size(196, 18),
+                Font = new Font("Segoe UI", 10.5F, FontStyle.Bold),
+                Location = new Point(8, 74),
+                Size = new Size(228, 22),
                 AutoEllipsis = true
             };
 
             var lblTimeAlert = new Label
             {
-                Location = new Point(6, 82),
-                Size = new Size(196, 18),
+                Font = new Font("Segoe UI", 10F, FontStyle.Bold),
+                Location = new Point(8, 98),
+                Size = new Size(228, 22),
                 AutoEllipsis = true
             };
 
             var btnMeter = new Button
             {
                 Text = "จอง/อ่านมิเตอร์",
-                Location = new Point(6, 105),
-                Size = new Size(196, 26),
-                Font = new Font("Segoe UI", 8.5F, FontStyle.Bold),
+                Location = new Point(8, 126),
+                Size = new Size(228, 32),
+                Font = new Font("Segoe UI", 10F, FontStyle.Bold),
                 BackColor = Color.FromArgb(14, 116, 144),
                 ForeColor = Color.White,
                 FlatStyle = FlatStyle.Flat,
@@ -772,7 +799,6 @@ public class RoomGridControl : UserControl
 
             // WinForms ไม่ bubble MouseClick จาก child ไป parent
             // ต้อง attach click handler ให้ทุก control บนการ์ด (Label, Panel ส่วนหัว ฯลฯ)
-            // เมื่อคลิกการ์ดห้อง จะเปิดหน้าต่าง Pop-up Modal (RoomActionForm) แสดงรายการจัดการทันที
             void AttachClickToAllChildren(Control parent)
             {
                 parent.MouseClick += async (s, e) =>
@@ -792,7 +818,7 @@ public class RoomGridControl : UserControl
             _cardPool[room.Id] = card;
         }
 
-        var elems = (RoomCardElements)card.Tag;
+        var elems = (RoomCardElements)card.Tag!;
         elems.Room = room;
         elems.RoomType = roomType;
 
@@ -816,52 +842,52 @@ public class RoomGridControl : UserControl
         switch (room.Status)
         {
             case RoomStatus.Available:
-                headerColor = Color.FromArgb(16, 185, 129); // Emerald
-                backColor = Color.FromArgb(242, 251, 245);
+                headerColor = Color.FromArgb(16, 185, 129); // Emerald Green
+                backColor = Color.FromArgb(240, 253, 244);
                 textColor = Color.FromArgb(6, 95, 70);
-                statusText = "ว่าง";
+                statusText = "ว่างพร้อมใช้งาน";
                 break;
             case RoomStatus.Occupied:
                 if (isCheckoutOverdue || isUtilityOverdue)
                 {
-                    headerColor = Color.FromArgb(185, 28, 28);
-                    backColor = Color.FromArgb(254, 226, 226);
-                    textColor = Color.DarkRed;
+                    headerColor = Color.FromArgb(220, 38, 38); // Crimson Red (Alert)
+                    backColor = Color.FromArgb(254, 242, 242);
+                    textColor = Color.FromArgb(185, 28, 28);
                     statusText = isUtilityOverdue ? "เลยกำหนดค่าน้ำไฟ!" : "เลยกำหนดเวลาคืนห้อง!";
                 }
                 else if (isNearCheckout || isUtilityDueSoon)
                 {
-                    headerColor = Color.FromArgb(217, 119, 6);
+                    headerColor = Color.FromArgb(217, 119, 6); // Amber Gold (Warning)
                     backColor = Color.FromArgb(254, 243, 199);
-                    textColor = Color.DarkGoldenrod;
+                    textColor = Color.FromArgb(180, 83, 9);
                     statusText = isUtilityDueSoon ? "ใกล้กำหนดจ่ายค่าน้ำไฟ" : "ใกล้ครบเวลาคืนห้อง";
                 }
                 else
                 {
-                    headerColor = Color.FromArgb(225, 29, 72); // Rose Red
-                    backColor = Color.FromArgb(255, 241, 242);
-                    textColor = Color.FromArgb(159, 18, 57);
-                    statusText = "มีผู้เข้าพัก";
+                    headerColor = Color.FromArgb(37, 99, 235); // Royal Blue (Normal Occupied)
+                    backColor = Color.FromArgb(239, 246, 255);
+                    textColor = Color.FromArgb(30, 58, 138);
+                    statusText = "มีผู้เข้าพัก (ปกติ)";
                 }
                 break;
             case RoomStatus.Cleaning:
-                headerColor = Color.FromArgb(217, 119, 6);
-                backColor = Color.FromArgb(255, 253, 230);
-                textColor = Color.SaddleBrown;
+                headerColor = Color.FromArgb(245, 158, 11); // Amber
+                backColor = Color.FromArgb(254, 252, 232);
+                textColor = Color.FromArgb(146, 64, 14);
                 statusText = "รอทำความสะอาด";
                 break;
             case RoomStatus.Reserved:
-                headerColor = Color.FromArgb(37, 99, 235);
-                backColor = Color.FromArgb(239, 246, 255);
-                textColor = Color.FromArgb(30, 58, 138);
-                statusText = "จองล่วงหน้า";
+                headerColor = Color.FromArgb(139, 92, 246); // Purple
+                backColor = Color.FromArgb(245, 243, 255);
+                textColor = Color.FromArgb(91, 33, 182);
+                statusText = "จองแล้ว";
                 break;
             case RoomStatus.Maintenance:
             default:
-                headerColor = Color.FromArgb(100, 116, 139);
-                backColor = Color.FromArgb(245, 245, 245);
-                textColor = Color.DimGray;
-                statusText = "ปิดซ่อม";
+                headerColor = Color.FromArgb(100, 116, 139); // Slate Gray
+                backColor = Color.FromArgb(248, 250, 252);
+                textColor = Color.FromArgb(51, 65, 85);
+                statusText = "ปิดซ่อมบำรุง";
                 break;
         }
 
@@ -942,7 +968,7 @@ public class RoomGridControl : UserControl
             if (isUtilityOverdue)
             {
                 timeAlertText = $"ค้างชำระ: {totalUnpaid:N2} บ. (เลย {overdueDays} วัน)";
-                alertColor = Color.DarkRed;
+                alertColor = Color.FromArgb(185, 28, 28);
             }
             else if (isUtilityDueSoon)
             {
@@ -978,7 +1004,7 @@ public class RoomGridControl : UserControl
 
         elems.LblTimeAlert.Text = timeAlertText;
         elems.LblTimeAlert.ForeColor = alertColor;
-        elems.LblTimeAlert.Font = new Font("Segoe UI", 8.5F, (isCheckoutOverdue || isUtilityOverdue || isNearCheckout || isUtilityDueSoon) ? FontStyle.Bold : FontStyle.Regular);
+        elems.LblTimeAlert.Font = new Font("Segoe UI", 10.5F, (isCheckoutOverdue || isUtilityOverdue || isNearCheckout || isUtilityDueSoon) ? FontStyle.Bold : FontStyle.Regular);
 
         if (room.Status == RoomStatus.Occupied && roomType != null && 
             (roomType.ElectricBillingMode == UtilityBillingMode.Meter || roomType.WaterBillingMode == UtilityBillingMode.Meter))
@@ -1148,7 +1174,116 @@ public class RoomGridControl : UserControl
                     await _roomService.UpdateRoomStatusAsync(room.Id, RoomStatus.Available);
                     await RefreshGridAsync();
                     break;
+                case RoomUserAction.AdminOverrideStatus:
+                    await PromptAdminOverrideRoomStatusAsync(room);
+                    break;
+                case RoomUserAction.PayUtilityNow:
+                    if (_utilityBillService != null)
+                    {
+                        var unpaidBillForRoom = _cachedUnpaidBills.FirstOrDefault(b => b.RoomId == room.Id);
+                        if (unpaidBillForRoom != null)
+                        {
+                            var confirmMsg =
+                                $"=== ทวนรายการรับชำระเงิน | ห้อง {room.RoomNumber} ===\n\n" +
+                                $"• ผู้เช่า: {(customer?.FullName ?? "-")}\n" +
+                                $"• ค่าเช่าห้องพัก: {unpaidBillForRoom.RoomCharge:N2} บาท\n" +
+                                $"• ค่าไฟฟ้า: {unpaidBillForRoom.ElectricAmount:N2} บาท ({(unpaidBillForRoom.ElectricBillingMode == "FLAT" ? "เหมาจ่าย" : $"{unpaidBillForRoom.ElectricUnits:N0} หน่วย")})\n" +
+                                $"• ค่าน้ำประปา: {unpaidBillForRoom.WaterAmount:N2} บาท ({(unpaidBillForRoom.WaterBillingMode == "FLAT" ? $"เหมาจ่าย {unpaidBillForRoom.WaterPersonCount} คน" : $"{unpaidBillForRoom.WaterUnits:N0} หน่วย")})\n" +
+                                $"• ค่าส่วนกลาง/ขยะ: {unpaidBillForRoom.CommonAreaFee + unpaidBillForRoom.GarbageFee:N2} บาท\n" +
+                                $"----------------------------------------\n" +
+                                $"ยอดสุทธิที่ต้องรับชำระ = {unpaidBillForRoom.TotalAmount:N2} บาท\n\n" +
+                                $"กด [Yes] เพื่อยืนยันบันทึกรับชำระเงินทันที";
+
+                            if (MessageBox.Show(confirmMsg, "ยืนยันรับชำระเงิน", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
+                            {
+                                await _utilityBillService.MarkBillAsPaidAsync(unpaidBillForRoom.Id, PaymentMethod.Cash);
+                                unpaidBillForRoom.IsPaid = true;
+
+                                var printConfirm = MessageBox.Show(
+                                    "บันทึกรับชำระเงินสำเร็จเรียบร้อยแล้ว!\n\nต้องการพิมพ์ [ใบเสร็จรับเงิน] ทันทีหรือไม่?",
+                                    "พิมพ์ใบเสร็จรับเงิน", MessageBoxButtons.YesNo, MessageBoxIcon.Information);
+
+                                if (printConfirm == DialogResult.Yes)
+                                {
+                                    var settings = _settingsService != null ? await _settingsService.GetAllSettingsAsync() : new SystemSettingsDto();
+                                    var receiptPrinter = new UtilityInvoicePrinter(unpaidBillForRoom, customer, settings);
+                                    receiptPrinter.ShowPrintPreview();
+                                }
+
+                                await RefreshGridAsync();
+                            }
+                        }
+                    }
+                    break;
             }
+        }
+    }
+
+    private async Task PromptAdminOverrideRoomStatusAsync(Room room)
+    {
+        using var frm = new Form
+        {
+            Width = 380,
+            Height = 240,
+            FormBorderStyle = FormBorderStyle.FixedDialog,
+            Text = $"Admin Override - เปลี่ยนสถานะห้อง {room.RoomNumber}",
+            StartPosition = FormStartPosition.CenterParent,
+            MaximizeBox = false,
+            MinimizeBox = false,
+            BackColor = Color.White
+        };
+
+        var lbl = new Label
+        {
+            Text = $"เลือกสถานะห้องพักใหม่สำหรับห้อง {room.RoomNumber}:",
+            Location = new Point(20, 20),
+            AutoSize = true,
+            Font = new Font("Segoe UI", 10F, FontStyle.Bold)
+        };
+
+        var cmbStatus = new ComboBox
+        {
+            Location = new Point(20, 55),
+            Size = new Size(320, 30),
+            DropDownStyle = ComboBoxStyle.DropDownList,
+            Font = new Font("Segoe UI", 10F)
+        };
+
+        cmbStatus.Items.Add(new { Text = "ว่างพร้อมใช้งาน (Available)", Status = RoomStatus.Available });
+        cmbStatus.Items.Add(new { Text = "มีผู้เข้าพัก (Occupied)", Status = RoomStatus.Occupied });
+        cmbStatus.Items.Add(new { Text = "รอทำความสะอาด (Cleaning)", Status = RoomStatus.Cleaning });
+        cmbStatus.Items.Add(new { Text = "ปิดซ่อมบำรุง (Maintenance)", Status = RoomStatus.Maintenance });
+        cmbStatus.Items.Add(new { Text = "จองแล้ว (Reserved)", Status = RoomStatus.Reserved });
+
+        cmbStatus.DisplayMember = "Text";
+        cmbStatus.ValueMember = "Status";
+        cmbStatus.SelectedIndex = (int)room.Status;
+
+        var btnSave = new Button
+        {
+            Text = "บันทึกเปลี่ยนสถานะ",
+            Location = new Point(150, 120),
+            Size = new Size(190, 40),
+            BackColor = Color.FromArgb(217, 119, 6),
+            ForeColor = Color.White,
+            FlatStyle = FlatStyle.Flat,
+            Font = new Font("Segoe UI", 10F, FontStyle.Bold),
+            DialogResult = DialogResult.OK,
+            Cursor = Cursors.Hand
+        };
+        btnSave.FlatAppearance.BorderSize = 0;
+
+        frm.Controls.Add(lbl);
+        frm.Controls.Add(cmbStatus);
+        frm.Controls.Add(btnSave);
+
+        if (frm.ShowDialog() == DialogResult.OK && cmbStatus.SelectedItem != null)
+        {
+            dynamic selected = cmbStatus.SelectedItem;
+            RoomStatus newStatus = (RoomStatus)selected.Status;
+            await _roomService.UpdateRoomStatusAsync(room.Id, newStatus, "Super Admin Override Status");
+            await RefreshGridAsync();
+            MessageBox.Show($"อัปเดตสถานะห้อง {room.RoomNumber} เป็น [{selected.Text}] เรียบร้อยแล้ว", "สำเร็จ", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
     }
 
@@ -1242,9 +1377,20 @@ public class RoomGridControl : UserControl
                     await _utilityBillService.RecordMeterReadingAsync(room.Id, UtilityType.Water, dlg.WaterPrev, dlg.WaterCurr, currentBillingMonth, dlg.Notes);
                 }
                 var bill = await _utilityBillService.GenerateMonthlyBillAsync(room.Id, currentBillingMonth, dlg.WaterPersons);
+                
+                if (dlg.MarkAsPaidRequested)
+                {
+                    await _utilityBillService.MarkAllUnpaidBillsAsPaidForRoomAsync(room.Id, dlg.SelectedPaymentMethod);
+                    bill.IsPaid = true;
+                    _cachedUnpaidBills.RemoveAll(b => b.RoomId == room.Id);
+                }
+
                 if (dlg.PrintBillRequested)
                 {
-                    var printer = new HotelPOS.Printing.UtilityInvoicePrinter(bill, null, settings);
+                    Customer? customer = null;
+                    if (activeMap.TryGetValue(room.Id, out var custEntry)) customer = custEntry.Customer;
+
+                    var printer = new HotelPOS.Printing.UtilityInvoicePrinter(bill, customer, settings);
                     printer.ShowPrintPreview();
                 }
                 await RefreshGridAsync();

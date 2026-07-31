@@ -87,23 +87,23 @@ public class UtilityBillService : IUtilityBillService
         var electricReading = readings.FirstOrDefault(r => r.UtilityType == UtilityType.Electric);
         var waterReading = readings.FirstOrDefault(r => r.UtilityType == UtilityType.Water);
 
-        // คำนวณค่าไฟตามโหมดของประเภทห้อง
-        string electricBillingMode = roomType?.ElectricBillingMode == UtilityBillingMode.FlatRate ? "FLAT" : "METER";
+        // คำนวณค่าไฟตามโหมดของประเภทห้อง หรือการตั้งค่าระบบ
+        string electricBillingMode = (roomType?.ElectricBillingMode == UtilityBillingMode.FlatRate || settings.ElectricBillingMode == "FLAT") ? "FLAT" : "METER";
         decimal electricAmount = electricBillingMode == "FLAT"
-            ? (roomType?.ElectricFlatRate ?? 0)
+            ? ((roomType?.ElectricFlatRate > 0 && roomType?.ElectricBillingMode == UtilityBillingMode.FlatRate) ? roomType.ElectricFlatRate : settings.ElectricFlatRate)
             : (electricReading?.TotalAmount ?? 0);
 
-        // คำนวณค่าน้ำตามโหมดของประเภทห้อง
+        // คำนวณค่าน้ำตามโหมดของประเภทห้อง หรือการตั้งค่าระบบ
+        string waterBillingMode = (roomType?.WaterBillingMode == UtilityBillingMode.FlatRate || settings.WaterBillingMode == "FLAT") ? "FLAT" : "METER";
         decimal waterAmount;
-        string waterBillingMode = roomType?.WaterBillingMode == UtilityBillingMode.FlatRate ? "FLAT" : "METER";
         if (waterBillingMode == "FLAT")
         {
-            // เหมาจ่ายตามที่ตั้งไว้ใน RoomType
-            waterAmount = roomType?.WaterFlatRate ?? 0;
+            waterAmount = (roomType?.WaterFlatRate > 0 && roomType?.WaterBillingMode == UtilityBillingMode.FlatRate)
+                ? roomType.WaterFlatRate
+                : (settings.WaterFlatRatePerPerson * waterPersonCount);
         }
         else
         {
-            // ตามมิเตอร์
             waterAmount = waterReading?.TotalAmount ?? 0;
         }
 
@@ -175,15 +175,23 @@ public class UtilityBillService : IUtilityBillService
         var electricReading = readings.FirstOrDefault(r => r.UtilityType == UtilityType.Electric);
         var waterReading = readings.FirstOrDefault(r => r.UtilityType == UtilityType.Water);
 
-        string electricBillingMode = roomType?.ElectricBillingMode == UtilityBillingMode.FlatRate ? "FLAT" : "METER";
+        string electricBillingMode = (roomType?.ElectricBillingMode == UtilityBillingMode.FlatRate || settings.ElectricBillingMode == "FLAT") ? "FLAT" : "METER";
         decimal electricAmount = electricBillingMode == "FLAT"
-            ? (roomType?.ElectricFlatRate ?? 0)
+            ? ((roomType?.ElectricFlatRate > 0 && roomType?.ElectricBillingMode == UtilityBillingMode.FlatRate) ? roomType.ElectricFlatRate : settings.ElectricFlatRate)
             : (electricReading?.TotalAmount ?? 0);
 
-        string waterBillingMode = roomType?.WaterBillingMode == UtilityBillingMode.FlatRate ? "FLAT" : "METER";
-        decimal waterAmount = waterBillingMode == "FLAT"
-            ? (roomType?.WaterFlatRate ?? 0)
-            : (waterReading?.TotalAmount ?? 0);
+        string waterBillingMode = (roomType?.WaterBillingMode == UtilityBillingMode.FlatRate || settings.WaterBillingMode == "FLAT") ? "FLAT" : "METER";
+        decimal waterAmount;
+        if (waterBillingMode == "FLAT")
+        {
+            waterAmount = (roomType?.WaterFlatRate > 0 && roomType?.WaterBillingMode == UtilityBillingMode.FlatRate)
+                ? roomType.WaterFlatRate
+                : (settings.WaterFlatRatePerPerson * waterPersonCount);
+        }
+        else
+        {
+            waterAmount = waterReading?.TotalAmount ?? 0;
+        }
 
         decimal commonAreaFee = settings.CommonAreaFee;
         decimal garbageFee = settings.GarbageFee;
@@ -252,5 +260,15 @@ public class UtilityBillService : IUtilityBillService
     public async Task<IEnumerable<MeterReading>> GetMeterHistoryAsync(int roomId, int lastNMonths = 12)
     {
         return await _meterRepo.GetHistoryAsync(roomId, lastNMonths);
+    }
+
+    public async Task<IEnumerable<UtilityBill>> GetAllUnpaidBillsAsync()
+    {
+        return await _billRepo.GetAllUnpaidBillsAsync();
+    }
+
+    public async Task MarkAllUnpaidBillsAsPaidForRoomAsync(int roomId, PaymentMethod paymentMethod)
+    {
+        await _billRepo.MarkAllUnpaidBillsAsPaidForRoomAsync(roomId, paymentMethod);
     }
 }

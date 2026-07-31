@@ -34,11 +34,13 @@ public class SeedMockDataUtility
 
         // 1. Re-create masters (Clean up old data to prevent key conflicts)
         await conn.ExecuteAsync(@"
+            PRAGMA foreign_keys = OFF;
             DELETE FROM backup_history;
             DELETE FROM audit_logs;
             DELETE FROM utility_bills;
             DELETE FROM meter_readings;
             DELETE FROM payments;
+            DELETE FROM invoice_documents;
             DELETE FROM sale_items;
             DELETE FROM sales;
             DELETE FROM folios;
@@ -127,7 +129,7 @@ public class SeedMockDataUtility
             string idCard = $"1100200300{i:D3}";
             string address = i % 2 == 0 ? "กรุงเทพมหานคร" : "นนทบุรี";
             await conn.ExecuteAsync(@"
-                INSERT INTO customers (id, full_name, phone, id_card_or_passport, address, created_at, is_deleted) 
+                INSERT OR REPLACE INTO customers (id, full_name, phone, id_card_or_passport, address, created_at, is_deleted) 
                 VALUES (@Id, @FullName, @Phone, @IdCard, @Address, datetime('now', '-30 days', 'localtime'), 0)",
                 new { Id = i, FullName = fullName, Phone = phone, IdCard = idCard, Address = address });
         }
@@ -409,6 +411,7 @@ public class SeedMockDataUtility
         await conn.ExecuteAsync(@"
             INSERT INTO audit_logs (action, entity_name, entity_id, detail_json, created_at) 
             VALUES ('SEED_MOCK', 'System', '0', 'จำลองข้อมูลระบบแบบครอบคลุม: ผู้เช่ารายเดือนอยู่มาหลายเดือน (4 เดือนย้อนหลัง), มีสถานะใกล้ครบกำหนด และเลยกำหนดชำระ', datetime('now', 'localtime'));
+            PRAGMA foreign_keys = ON;
         ");
     }
 }

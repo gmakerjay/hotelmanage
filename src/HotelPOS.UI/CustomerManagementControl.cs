@@ -45,8 +45,15 @@ public class CustomerManagementControl : UserControl
     private Label _lblStatPosTotal = null!;
     private Label _lblStatBillCount = null!;
 
-    // Rental & Utility Card Controls on Tab 1
-    private GroupBox _grpRentalSummary = null!;
+    // Rental & Utility Accordion Panel Controls on Tab 1
+    private Panel _grpRentalSummary = null!;
+    private Panel _pnlRentalHeader = null!;
+    private Label _lblRentalHeaderTitle = null!;
+    private Label _lblRentalHeaderSummaryBadge = null!;
+    private Button _btnToggleRental = null!;
+    private TableLayoutPanel _pnlRentalContentContainer = null!;
+    private bool _isRentalExpanded = true;
+
     private Label _lblRentalInfo = null!;
     private Label _lblMeterInfo = null!;
     private Label _lblBillStatusBadge = null!;
@@ -187,6 +194,7 @@ public class CustomerManagementControl : UserControl
             SelectionMode = DataGridViewSelectionMode.FullRowSelect,
             MultiSelect = false,
             AllowUserToAddRows = false,
+            RowHeadersVisible = false,
             AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
             ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize,
             RowTemplate = { Height = 36 },
@@ -223,7 +231,46 @@ public class CustomerManagementControl : UserControl
         var tabControlRight = new TabControl
         {
             Dock = DockStyle.Fill,
-            Font = new Font("Segoe UI", 10.5F)
+            Font = new Font("Segoe UI", 10.5F),
+            DrawMode = TabDrawMode.OwnerDrawFixed,
+            SizeMode = TabSizeMode.Fixed,
+            ItemSize = new Size(185, 42),
+            Padding = new Point(12, 6)
+        };
+
+        tabControlRight.DrawItem += (s, e) =>
+        {
+            var g = e.Graphics;
+            g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
+            var tabRect = tabControlRight.GetTabRect(e.Index);
+            bool isSelected = (tabControlRight.SelectedIndex == e.Index);
+
+            Color backColor = isSelected ? Color.FromArgb(30, 41, 59) : Color.FromArgb(241, 245, 249);
+            Color textColor = isSelected ? Color.White : Color.FromArgb(71, 85, 105);
+
+            using var brushBack = new SolidBrush(backColor);
+            g.FillRectangle(brushBack, tabRect);
+
+            if (isSelected)
+            {
+                using var accentBrush = new SolidBrush(Color.FromArgb(59, 130, 246));
+                g.FillRectangle(accentBrush, tabRect.X, tabRect.Y, tabRect.Width, 4);
+            }
+            else
+            {
+                using var borderPen = new Pen(Color.FromArgb(226, 232, 240));
+                g.DrawRectangle(borderPen, tabRect.X, tabRect.Y, tabRect.Width - 1, tabRect.Height - 1);
+            }
+
+            string title = tabControlRight.TabPages[e.Index].Text;
+            using var font = new Font("Segoe UI", isSelected ? 10.5F : 10F, isSelected ? FontStyle.Bold : FontStyle.Regular);
+            using var brushText = new SolidBrush(textColor);
+            var sf = new StringFormat
+            {
+                Alignment = StringAlignment.Center,
+                LineAlignment = StringAlignment.Center
+            };
+            g.DrawString(title, font, brushText, tabRect, sf);
         };
 
         var tabInfo = new TabPage { Text = "ข้อมูลผู้เข้าพัก และค่าน้ำไฟ" };
@@ -283,27 +330,76 @@ public class CustomerManagementControl : UserControl
         pnlStats.Controls.Add(cardPos, 1, 0);
         pnlStats.Controls.Add(cardBill, 2, 0);
 
-        // --- Rental & Utilities Card Panel ---
-        _grpRentalSummary = new GroupBox
+        // --- Rental & Utilities Accordion Panel ---
+        _grpRentalSummary = new Panel
         {
-            Text = "ข้อมูลห้องเช่ารายเดือน และมิเตอร์ค่าน้ำ/ค่าไฟล่าสุด",
             Dock = DockStyle.Top,
             AutoSize = true,
-            Font = new Font("Segoe UI", 11F, FontStyle.Bold),
-            ForeColor = Color.FromArgb(30, 41, 59),
-            Padding = new Padding(12),
+            AutoSizeMode = AutoSizeMode.GrowAndShrink,
             Margin = new Padding(0, 5, 0, 10),
-            BackColor = Color.FromArgb(248, 250, 252)
+            BackColor = Color.White
         };
 
-        var pnlRentalContent = new FlowLayoutPanel
+        _pnlRentalHeader = new Panel
         {
-            Dock = DockStyle.Fill,
-            AutoSize = true,
-            FlowDirection = FlowDirection.TopDown,
-            WrapContents = false,
-            Padding = new Padding(0, 5, 0, 5)
+            Dock = DockStyle.Top,
+            Height = 40,
+            BackColor = Color.FromArgb(30, 41, 59),
+            Cursor = Cursors.Hand,
+            Padding = new Padding(10, 0, 10, 0)
         };
+
+        _lblRentalHeaderTitle = new Label
+        {
+            Text = "🏢 ข้อมูลสัญญาเช่าห้องพัก & มิเตอร์ค่าน้ำ/ค่าไฟล่าสุด",
+            Font = new Font("Segoe UI", 10.5F, FontStyle.Bold),
+            ForeColor = Color.White,
+            AutoSize = true,
+            Location = new Point(10, 9),
+            Cursor = Cursors.Hand
+        };
+
+        _lblRentalHeaderSummaryBadge = new Label
+        {
+            Text = "[ ไม่พบข้อมูลสัญญาเช่า ]",
+            Font = new Font("Segoe UI", 9.5F, FontStyle.Bold),
+            ForeColor = Color.FromArgb(203, 213, 225),
+            AutoSize = true,
+            Location = new Point(360, 10),
+            Cursor = Cursors.Hand
+        };
+
+        _btnToggleRental = new Button
+        {
+            Text = "▲ หุบเข้า",
+            Size = new Size(90, 28),
+            Font = new Font("Segoe UI", 9F, FontStyle.Bold),
+            BackColor = Color.FromArgb(51, 65, 85),
+            ForeColor = Color.White,
+            FlatStyle = FlatStyle.Flat,
+            Cursor = Cursors.Hand,
+            Anchor = AnchorStyles.Top | AnchorStyles.Right
+        };
+        _btnToggleRental.FlatAppearance.BorderSize = 0;
+
+        _pnlRentalHeader.Controls.Add(_lblRentalHeaderTitle);
+        _pnlRentalHeader.Controls.Add(_lblRentalHeaderSummaryBadge);
+        _pnlRentalHeader.Controls.Add(_btnToggleRental);
+        _btnToggleRental.Location = new Point(_pnlRentalHeader.Width - 100, 6);
+
+        _pnlRentalContentContainer = new TableLayoutPanel
+        {
+            Dock = DockStyle.Top,
+            AutoSize = true,
+            ColumnCount = 1,
+            Padding = new Padding(12),
+            Margin = new Padding(0),
+            BackColor = Color.FromArgb(248, 250, 252)
+        };
+        _pnlRentalContentContainer.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        _pnlRentalContentContainer.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        _pnlRentalContentContainer.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        _pnlRentalContentContainer.RowStyles.Add(new RowStyle(SizeType.AutoSize));
 
         _lblRentalInfo = new Label
         {
@@ -311,7 +407,7 @@ public class CustomerManagementControl : UserControl
             Font = new Font("Segoe UI", 10.5F),
             ForeColor = Color.FromArgb(15, 23, 42),
             AutoSize = true,
-            Margin = new Padding(0, 2, 0, 6)
+            Margin = new Padding(0, 4, 0, 8)
         };
 
         _lblMeterInfo = new Label
@@ -320,7 +416,7 @@ public class CustomerManagementControl : UserControl
             Font = new Font("Segoe UI", 10.5F),
             ForeColor = Color.FromArgb(15, 23, 42),
             AutoSize = true,
-            Margin = new Padding(0, 2, 0, 6)
+            Margin = new Padding(0, 0, 0, 8)
         };
 
         _lblBillStatusBadge = new Label
@@ -329,7 +425,7 @@ public class CustomerManagementControl : UserControl
             Font = new Font("Segoe UI", 10.5F, FontStyle.Bold),
             ForeColor = Color.DarkGoldenrod,
             AutoSize = true,
-            Margin = new Padding(0, 2, 0, 6)
+            Margin = new Padding(0, 0, 0, 8)
         };
 
         _lblUnpaidTotalAlert = new Label
@@ -338,11 +434,28 @@ public class CustomerManagementControl : UserControl
             Font = new Font("Segoe UI", 11F, FontStyle.Bold),
             ForeColor = Color.ForestGreen,
             AutoSize = true,
-            Margin = new Padding(0, 2, 0, 4)
+            Margin = new Padding(0, 0, 0, 4)
         };
 
-        pnlRentalContent.Controls.AddRange(new Control[] { _lblRentalInfo, _lblMeterInfo, _lblBillStatusBadge, _lblUnpaidTotalAlert });
-        _grpRentalSummary.Controls.Add(pnlRentalContent);
+        _pnlRentalContentContainer.Controls.Add(_lblRentalInfo, 0, 0);
+        _pnlRentalContentContainer.Controls.Add(_lblMeterInfo, 0, 1);
+        _pnlRentalContentContainer.Controls.Add(_lblBillStatusBadge, 0, 2);
+        _pnlRentalContentContainer.Controls.Add(_lblUnpaidTotalAlert, 0, 3);
+
+        _grpRentalSummary.Controls.Add(_pnlRentalContentContainer);
+        _grpRentalSummary.Controls.Add(_pnlRentalHeader);
+
+        void ToggleRentalPanel()
+        {
+            _isRentalExpanded = !_isRentalExpanded;
+            _pnlRentalContentContainer.Visible = _isRentalExpanded;
+            _btnToggleRental.Text = _isRentalExpanded ? "▲ หุบเข้า" : "▼ กางออก";
+        }
+
+        _pnlRentalHeader.Click += (s, e) => ToggleRentalPanel();
+        _lblRentalHeaderTitle.Click += (s, e) => ToggleRentalPanel();
+        _lblRentalHeaderSummaryBadge.Click += (s, e) => ToggleRentalPanel();
+        _btnToggleRental.Click += (s, e) => ToggleRentalPanel();
 
         // --- Mode Banner ---
         _panelModeBanner = new Panel
@@ -432,49 +545,50 @@ public class CustomerManagementControl : UserControl
             Dock = DockStyle.Top,
             AutoSize = true,
             FlowDirection = FlowDirection.LeftToRight,
-            Padding = new Padding(0, 15, 0, 10)
+            Padding = new Padding(0, 15, 0, 15)
         };
 
         _btnSave = new Button
         {
-            Text = "บันทึกข้อมูล",
-            Size = new Size(130, 40),
+            Text = "💾  บันทึกข้อมูล",
+            Size = new Size(150, 42),
             Font = new Font("Segoe UI", 11F, FontStyle.Bold),
             BackColor = Color.FromArgb(22, 163, 74),
             ForeColor = Color.White,
             FlatStyle = FlatStyle.Flat,
             Cursor = Cursors.Hand,
-            Margin = new Padding(0, 0, 10, 0)
+            Margin = new Padding(0, 0, 12, 0)
         };
         _btnSave.FlatAppearance.BorderSize = 0;
         _btnSave.Click += BtnSave_Click;
 
         _btnClear = new Button
         {
-            Text = "เพิ่มคนใหม่ / ล้างฟอร์ม",
-            Size = new Size(180, 40),
+            Text = "➕  เพิ่มคนใหม่ / ล้างฟอร์ม",
+            Size = new Size(210, 42),
             Font = new Font("Segoe UI", 10.5F, FontStyle.Bold),
-            BackColor = Color.White,
-            ForeColor = Color.FromArgb(37, 99, 235),
+            BackColor = Color.FromArgb(37, 99, 235),
+            ForeColor = Color.White,
             FlatStyle = FlatStyle.Flat,
             Cursor = Cursors.Hand,
-            Margin = new Padding(0, 0, 10, 0)
+            Margin = new Padding(0, 0, 12, 0)
         };
-        _btnClear.FlatAppearance.BorderColor = Color.FromArgb(37, 99, 235);
+        _btnClear.FlatAppearance.BorderSize = 0;
         _btnClear.Click += (s, e) => ClearForm();
 
         _btnDelete = new Button
         {
-            Text = "ลบข้อมูลผู้เข้าพัก",
-            Size = new Size(160, 40),
-            Font = new Font("Segoe UI", 10.5F),
-            ForeColor = Color.DarkRed,
-            BackColor = Color.White,
+            Text = "🗑️  ลบข้อมูลผู้เข้าพัก",
+            Size = new Size(170, 42),
+            Font = new Font("Segoe UI", 10.5F, FontStyle.Bold),
+            ForeColor = Color.White,
+            BackColor = Color.FromArgb(220, 38, 38),
             FlatStyle = FlatStyle.Flat,
             Cursor = Cursors.Hand,
+            Visible = false,
             Margin = new Padding(0, 0, 0, 0)
         };
-        _btnDelete.FlatAppearance.BorderColor = Color.IndianRed;
+        _btnDelete.FlatAppearance.BorderSize = 0;
         _btnDelete.Click += BtnDelete_Click;
 
         pnlButtons.Controls.AddRange(new Control[] { _btnSave, _btnClear, _btnDelete });
@@ -500,17 +614,17 @@ public class CustomerManagementControl : UserControl
         var lblTitle = new Label
         {
             Text = title,
-            Font = new Font("Segoe UI", 8.5F, FontStyle.Bold),
+            Font = new Font("Segoe UI", 9.5F, FontStyle.Bold),
             ForeColor = Color.FromArgb(100, 116, 139),
-            Location = new Point(8, 6),
+            Location = new Point(10, 8),
             AutoSize = true
         };
         valLabel = new Label
         {
             Text = defaultVal,
-            Font = new Font("Segoe UI", 11F, FontStyle.Bold),
+            Font = new Font("Segoe UI", 12.5F, FontStyle.Bold),
             ForeColor = accentColor,
-            Location = new Point(8, 28),
+            Location = new Point(10, 30),
             AutoSize = true
         };
         card.Controls.Add(lblTitle);
@@ -867,6 +981,7 @@ public class CustomerManagementControl : UserControl
             SelectionMode = DataGridViewSelectionMode.FullRowSelect,
             MultiSelect = false,
             AllowUserToAddRows = false,
+            RowHeadersVisible = false,
             AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
             BackgroundColor = Color.White,
             BorderStyle = BorderStyle.None,
@@ -943,9 +1058,19 @@ public class CustomerManagementControl : UserControl
             วันที่ลงทะเบียน = c.CreatedAt.ToString("dd/MM/yyyy")
         }).ToList();
 
+        _dgvCustomers.RowHeadersVisible = false;
+
         if (_dgvCustomers.Columns.Contains("Id"))
         {
-            _dgvCustomers.Columns["Id"].Width = 50;
+            _dgvCustomers.Columns["Id"].AutoSizeMode = DataGridViewAutoSizeColumnMode.None;
+            _dgvCustomers.Columns["Id"].Width = 55;
+            _dgvCustomers.Columns["Id"].HeaderText = "ID";
+            _dgvCustomers.Columns["Id"].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
+        }
+        if (_dgvCustomers.Columns.Contains("ชื่อนามสกุล"))
+        {
+            _dgvCustomers.Columns["ชื่อนามสกุล"].AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
+            _dgvCustomers.Columns["ชื่อนามสกุล"].FillWeight = 180;
         }
     }
 
@@ -995,6 +1120,7 @@ public class CustomerManagementControl : UserControl
             _lblModeText.Text = $"โหมด: แก้ไขผู้เข้าพัก '{cust.FullName}'";
             _lblModeText.ForeColor = Color.DarkGoldenrod;
             _btnCancelEdit.Visible = true;
+            _btnDelete.Visible = true;
 
             await LoadCustomerHistoriesAsync(_selectedCustomerId);
         }
@@ -1101,6 +1227,9 @@ public class CustomerManagementControl : UserControl
             int daysStayed = Math.Max(1, (int)(DateTime.Today - latestStay.CheckIn).TotalDays);
             int monthsStayed = Math.Max(1, (daysStayed / 30));
 
+            _lblRentalHeaderSummaryBadge.Text = $"[ห้อง {latestStay.RoomNumber} | {(unpaidCount > 0 ? $"ค้าง {unpaidSum:N2} บ." : "ชำระครบแล้ว")}]";
+            _lblRentalHeaderSummaryBadge.ForeColor = unpaidCount > 0 ? Color.FromArgb(252, 165, 165) : Color.FromArgb(134, 239, 172);
+
             _lblRentalInfo.Text = $"ห้องพักเช่าปัจจุบัน: ห้อง {latestStay.RoomNumber}   |   สัญญาเช่า: รายเดือน ({latestStay.TotalAmount:N2} บาท/เดือน)\n" +
                                   $"ระยะเวลาเช่าพักอาศัย: อยู่มาแล้ว {monthsStayed} เดือน ({daysStayed} วัน ตั้งแต่ {latestStay.CheckIn:dd/MM/yyyy})";
 
@@ -1139,6 +1268,9 @@ public class CustomerManagementControl : UserControl
 
     private void ResetRentalAndUtilitySummaryCard()
     {
+        _lblRentalHeaderSummaryBadge.Text = "[ ไม่พบข้อมูลสัญญาเช่า ]";
+        _lblRentalHeaderSummaryBadge.ForeColor = Color.FromArgb(203, 213, 225);
+
         _lblRentalInfo.Text = "ผู้เข้าพักรายนี้ไม่มีสัญญาห้องเช่ารายเดือนที่เปิดอยู่ (ไม่พบข้อมูลมิเตอร์ค่าน้ำ/ค่าไฟ)";
         _lblMeterInfo.Text = "มิเตอร์ไฟ: -  |  มิเตอร์น้ำ: -";
         _lblBillStatusBadge.Text = "บิลล่าสุด: -";
@@ -1275,6 +1407,7 @@ public class CustomerManagementControl : UserControl
         _lblModeText.Text = "โหมด: เพิ่มผู้เข้าพักใหม่";
         _lblModeText.ForeColor = Color.ForestGreen;
         _btnCancelEdit.Visible = false;
+        _btnDelete.Visible = false;
         _lblStatStayCount.Text = "0 ครั้ง";
         _lblStatPosTotal.Text = "0.00 บาท";
         _lblStatBillCount.Text = "0 รายการ";

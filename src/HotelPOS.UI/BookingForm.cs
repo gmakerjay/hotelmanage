@@ -180,21 +180,36 @@ public class BookingForm : Form
             var types = await _roomService.GetRoomTypesAsync();
             var customers = await _customerService.GetCustomersAsync();
 
-            _roomsList = rooms.ToList();
+            // แสดงเฉพาะห้องพักที่อยู่ในสถานะว่างพร้อมใช้งาน (Available) หรือห้องที่เลือกมาจากผังห้อง
+            var availableRooms = rooms
+                .Where(r => r.Status == RoomStatus.Available || (_selectedRoom != null && r.Id == _selectedRoom.Id && r.Status == RoomStatus.Available))
+                .OrderBy(r => r.RoomNumber)
+                .ToList();
+
+            _roomsList = availableRooms;
             _roomTypesList = types.ToList();
             _allCustomers = customers.ToList();
 
             _cboRooms.Items.Clear();
             int selectedIndex = 0;
 
-            for (int i = 0; i < _roomsList.Count; i++)
+            if (_roomsList.Count == 0)
             {
-                var r = _roomsList[i];
-                var t = _roomTypesList.FirstOrDefault(x => x.Id == r.RoomTypeId);
-                _cboRooms.Items.Add($"ห้อง {r.RoomNumber} - {t?.Name ?? "ทั่วไป"} (ชั้น {r.Floor ?? "-"})");
-                if (_selectedRoom != null && r.Id == _selectedRoom.Id)
+                _cboRooms.Items.Add("(ไม่มีห้องว่างที่พร้อมสำหรับการจองในขณะนี้)");
+                _btnSave.Enabled = false;
+            }
+            else
+            {
+                _btnSave.Enabled = true;
+                for (int i = 0; i < _roomsList.Count; i++)
                 {
-                    selectedIndex = i;
+                    var r = _roomsList[i];
+                    var t = _roomTypesList.FirstOrDefault(x => x.Id == r.RoomTypeId);
+                    _cboRooms.Items.Add($"ห้อง {r.RoomNumber} - {t?.Name ?? "ทั่วไป"} (ชั้น {r.Floor ?? "-"}) [ว่างพร้อมใช้งาน]");
+                    if (_selectedRoom != null && r.Id == _selectedRoom.Id)
+                    {
+                        selectedIndex = i;
+                    }
                 }
             }
 

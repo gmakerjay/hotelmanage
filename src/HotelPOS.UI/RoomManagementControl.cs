@@ -14,6 +14,7 @@ public class RoomTypeComboItem
 public class RoomManagementControl : UserControl
 {
     private readonly IRoomService _roomService;
+    public event Func<Task>? OnDataChangedAsync;
 
     private TabControl _tabControl = null!;
     private TabPage _tabRoomTypes = null!;
@@ -74,10 +75,55 @@ public class RoomManagementControl : UserControl
         _tabControl = new TabControl
         {
             Dock = DockStyle.Fill,
-            Font = new Font("Segoe UI", 12.5F, FontStyle.Bold),
-            ItemSize = new Size(260, 50),
+            Font = new Font("Segoe UI", 12F, FontStyle.Bold),
+            ItemSize = new Size(240, 48),
             SizeMode = TabSizeMode.Fixed,
-            Padding = new Point(20, 12)
+            Padding = new Point(20, 10),
+            DrawMode = TabDrawMode.OwnerDrawFixed
+        };
+
+        _tabControl.DrawItem += (s, e) =>
+        {
+            var g = e.Graphics;
+            g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+
+            bool isSelected = (_tabControl.SelectedIndex == e.Index);
+            Rectangle rect = _tabControl.GetTabRect(e.Index);
+
+            // Background fill: Black/Dark Slate (15, 23, 42) when active, Light Slate (241, 245, 249) when inactive
+            Color bgColor = isSelected ? Color.FromArgb(15, 23, 42) : Color.FromArgb(241, 245, 249);
+            Color textColor = isSelected ? Color.White : Color.FromArgb(71, 85, 105);
+
+            using (var bgBrush = new SolidBrush(bgColor))
+            {
+                g.FillRectangle(bgBrush, rect);
+            }
+
+            // Top accent bar when active
+            if (isSelected)
+            {
+                using var accentBrush = new SolidBrush(Color.FromArgb(37, 99, 235));
+                g.FillRectangle(accentBrush, rect.X, rect.Y, rect.Width, 4);
+            }
+
+            // Border pen
+            using (var borderPen = new Pen(isSelected ? Color.FromArgb(15, 23, 42) : Color.FromArgb(226, 232, 240), 1))
+            {
+                g.DrawRectangle(borderPen, rect.X, rect.Y, rect.Width - 1, rect.Height - 1);
+            }
+
+            // Centered text rendering
+            string text = _tabControl.TabPages[e.Index].Text;
+            using (var font = new Font("Segoe UI", 11.5F, FontStyle.Bold))
+            using (var textBrush = new SolidBrush(textColor))
+            {
+                var sf = new StringFormat
+                {
+                    Alignment = StringAlignment.Center,
+                    LineAlignment = StringAlignment.Center
+                };
+                g.DrawString(text, font, textBrush, rect, sf);
+            }
         };
 
         _tabRoomTypes = new TabPage
@@ -466,6 +512,11 @@ public class RoomManagementControl : UserControl
             // Populate Rooms Grid with Action Buttons
             _allRoomsList = (await _roomService.GetRoomsAsync()).ToList();
             FilterRooms();
+
+            if (OnDataChangedAsync != null)
+            {
+                await OnDataChangedAsync.Invoke();
+            }
         }
         catch (Exception ex)
         {

@@ -67,6 +67,16 @@ public class SystemSettingsDto
     public decimal GarbageFee { get; set; } = 0m;                  // ค่าขยะรายเดือน (บาท)
 
     public string LobbyTerms { get; set; } = "1. ห้ามประกอบอาหาร หรือส่งเสียงดังรบกวนหลังเวลา 22:00 น.\n2. กำหนดชำระเงินค่าน้ำ-ค่าไฟ ไม่เกินวันที่ 5 ของทุกเดือน\n3. เงินประกันความเสียหายจะได้รับคืนเต็มจำนวนในวันเช็คเอาท์ หากห้องพักอยู่ในสภาพเรียบร้อย";
+
+    // --- ตั้งค่า Auto-Backup ---
+    public bool AutoBackupEnabled { get; set; } = true;
+    public bool AutoBackupOnExit { get; set; } = true;
+    public int AutoBackupMaxKeepFiles { get; set; } = 30;
+    public string? CustomBackupFolderPath { get; set; }
+
+    // --- ตั้งค่าธีมสีและขนาดตัวอักษรของแอปพลิเคชัน ---
+    public string AppTheme { get; set; } = "Slate";       // Slate | Emerald | Dark | Sapphire | Amber
+    public string AppFontSize { get; set; } = "Medium";   // Standard | Medium | Large | ExtraLarge
 }
 
 /// <summary>บันทึกการกระทำของผู้ใช้ในระบบ (Audit Trail) แยกจาก app_logs ที่เป็น log ทางเทคนิค</summary>

@@ -80,7 +80,7 @@ public class MainForm : Form
         _roomService = new RoomService(roomRepo, _logger);
         _customerService = new CustomerService(customerRepo, _logger);
         _bookingService = new BookingService(bookingRepo, roomRepo, customerRepo, folioRepo, _logger, auditService);
-        var backupService = new BackupService(connectionFactory, auditService, _logger);
+        var backupService = new BackupService(connectionFactory, auditService, _logger, _settingsService);
         _backupService = backupService;
         IPOSService posService = new POSService(productRepo, saleRepo, connectionFactory, _logger);
         var exportImportService = new ExportImportService(_customerService, _roomService, auditService, posService);
@@ -104,6 +104,20 @@ public class MainForm : Form
         InitializeViews(auditService, backupService, exportImportService, posService);
         InitializeLayout();
 
+        Load += async (s, e) =>
+        {
+            try
+            {
+                var settings = await _settingsService.GetAllSettingsAsync();
+                ThemeManager.ApplyTheme(settings.AppTheme, settings.AppFontSize);
+                ApplyAppThemeAndFont();
+                await CheckAndPromptFirstTimeActivationAsync();
+            }
+            catch { }
+        };
+
+        ThemeManager.OnThemeChanged += ApplyAppThemeAndFont;
+
         if (_license != null && _license.LicenseType != LicenseType.Trial && !string.IsNullOrEmpty(_license.UsbHardwareId))
         {
             InitializeDongleTimer();
@@ -113,11 +127,66 @@ public class MainForm : Form
             InitializeTrialDongleTimer();
         }
 
-        FormClosing += (s, e) =>
+        FormClosing += async (s, e) =>
         {
             _dongleCheckTimer?.Stop();
             _trialDongleCheckTimer?.Stop();
+
+            try
+            {
+                var settings = await _settingsService.GetAllSettingsAsync();
+                if (settings.AutoBackupEnabled && settings.AutoBackupOnExit)
+                {
+                    await _backupService.AutoPerformRollingBackupAsync(settings.AutoBackupMaxKeepFiles > 0 ? settings.AutoBackupMaxKeepFiles : 30);
+                }
+            }
+            catch { }
         };
+    }
+
+    public void ApplyAppThemeAndFont()
+    {
+        Font = new Font("Segoe UI", ThemeManager.BaseFontSize, FontStyle.Regular);
+        if (_sidebarPanel != null)
+        {
+            _sidebarPanel.BackColor = ThemeManager.SidebarColor;
+        }
+        if (_contentPanel != null)
+        {
+            _contentPanel.BackColor = ThemeManager.BackgroundColor;
+        }
+
+        for (int i = 0; i < _navButtons.Count; i++)
+        {
+            var btn = _navButtons[i];
+            btn.Font = new Font("Segoe UI", _isSidebarCollapsed ? ThemeManager.BaseFontSize - 1f : ThemeManager.BaseFontSize, FontStyle.Bold);
+            if (btn.BackColor != Color.Transparent)
+            {
+                btn.BackColor = ThemeManager.PrimaryColor;
+            }
+        }
+
+        // Apply theme & font size recursively to ALL views across the program
+        Control[] views = new Control[]
+        {
+            _roomGridControl,
+            _bookingListControl,
+            _roomManagementControl,
+            _customerManagementControl,
+            _meterReadingControl,
+            _backupControl,
+            _systemSettingsControl,
+            _posControl,
+            _summaryReportControl
+        };
+
+        foreach (var view in views)
+        {
+            if (view != null)
+            {
+                ThemeManager.ApplyThemeToControlTree(view);
+            }
+        }
     }
 
     private void InitializeViews(IAuditService auditService, IBackupService backupService, IExportImportService exportImportService, IPOSService posService)
@@ -125,9 +194,10 @@ public class MainForm : Form
         _roomGridControl = new RoomGridControl(_roomService, _bookingService, _customerService, _settingsService, _utilityBillService) { Dock = DockStyle.Fill };
         _bookingListControl = new BookingListControl(_bookingService, _roomService, _customerService, _settingsService, _utilityBillService) { Dock = DockStyle.Fill };
         _roomManagementControl = new RoomManagementControl(_roomService) { Dock = DockStyle.Fill };
+        _roomManagementControl.OnDataChangedAsync += async () => await _roomGridControl.RefreshGridAsync();
         _customerManagementControl = new CustomerManagementControl(_customerService, _bookingService, _roomService, _settingsService, _utilityBillService, posService) { Dock = DockStyle.Fill };
         _meterReadingControl = new MeterReadingControl(_utilityBillService, _roomService, _settingsService, _logger, _bookingService, _customerService) { Dock = DockStyle.Fill };
-        _backupControl = new SystemBackupControl(backupService, exportImportService) { Dock = DockStyle.Fill };
+        _backupControl = new SystemBackupControl(backupService, exportImportService, _settingsService) { Dock = DockStyle.Fill };
         _systemSettingsControl = new SystemSettingsControl(_settingsService, auditService) { Dock = DockStyle.Fill };
         _posControl = new POSControl(posService, _settingsService, _logger, auditService) { Dock = DockStyle.Fill };
         _summaryReportControl = new SummaryReportControl(_utilityBillService, _settingsService) { Dock = DockStyle.Fill };
@@ -174,42 +244,93 @@ public class MainForm : Form
         Load += MainForm_Load;
     }
 
+    private bool _isSidebarCollapsed = false;
+    private Button _btnToggleSidebar = null!;
+    private FlowLayoutPanel _navContainer = null!;
+    private Panel _brandPanel = null!;
+    private Panel _footerPanel = null!;
+    private Label _lblBrandTitle = null!;
+    private Label _lblBrandSub = null!;
+    private Label _lblUser = null!;
+    private Button _btnLogout = null!;
+
+    private readonly string[] _fullNavTitles = new[]
+    {
+        "ผังห้องพัก",
+        "รายการจอง",
+        "บริการเสริม & มินิบาร์ (POS)",
+        "การจัดการห้องพัก",
+        "ข้อมูลลูกค้า",
+        "ระบบบิลค่าไฟ/ค่าน้ำ",
+        "รายงานสรุป",
+        "สำรอง/คืนค่าข้อมูล",
+        "ตั้งค่าระบบ"
+    };
+
+    private readonly string[] _shortNavTitles = new[]
+    {
+        "ผัง",
+        "จอง",
+        "POS",
+        "ห้อง",
+        "ลูกค้า",
+        "บิล",
+        "รายงาน",
+        "สำรอง",
+        "ตั้งค่า"
+    };
+
     private void BuildSidebarPanel()
     {
         _sidebarPanel = new Panel
         {
             Dock = DockStyle.Left,
-            Width = 240,
+            Width = _isSidebarCollapsed ? 68 : 240,
             BackColor = Color.FromArgb(20, 20, 30), // Deep Luxury Dark Slate
             Padding = new Padding(0)
         };
 
         // Brand / Logo Section
-        var brandPanel = new Panel
+        _brandPanel = new Panel
         {
             Dock = DockStyle.Top,
             Height = 85,
             BackColor = Color.FromArgb(16, 16, 24),
-            Padding = new Padding(20, 15, 15, 10)
+            Padding = new Padding(15, 15, 10, 10)
         };
 
-        var lblBrandTitle = new Label
+        _lblBrandTitle = new Label
         {
-            Text = "PSoft R&R",
-            Font = new Font("Segoe UI", 15F, FontStyle.Bold),
+            Text = _isSidebarCollapsed ? "PS" : "PSoft R&R",
+            Font = new Font("Segoe UI", 14F, FontStyle.Bold),
             ForeColor = Color.White,
-            Location = new Point(18, 14),
+            Location = new Point(12, 14),
             AutoSize = true
         };
 
-        var lblBrandSub = new Label
+        _lblBrandSub = new Label
         {
             Text = "Rest & Rent Manager",
             Font = new Font("Segoe UI", 8.5F, FontStyle.Regular),
             ForeColor = Color.FromArgb(148, 163, 184),
-            Location = new Point(18, 48),
-            AutoSize = true
+            Location = new Point(12, 48),
+            AutoSize = true,
+            Visible = !_isSidebarCollapsed
         };
+
+        _btnToggleSidebar = new Button
+        {
+            Text = _isSidebarCollapsed ? ">>" : "<<",
+            Font = new Font("Segoe UI", 9.5F, FontStyle.Bold),
+            ForeColor = Color.FromArgb(203, 213, 225),
+            BackColor = Color.FromArgb(30, 41, 59),
+            FlatStyle = FlatStyle.Flat,
+            Size = new Size(36, 32),
+            Location = new Point(185, 14),
+            Cursor = Cursors.Hand
+        };
+        _btnToggleSidebar.FlatAppearance.BorderSize = 0;
+        _btnToggleSidebar.Click += (s, e) => ToggleSidebarState();
 
         var divLine = new Panel
         {
@@ -218,18 +339,19 @@ public class MainForm : Form
             BackColor = Color.FromArgb(42, 42, 60)
         };
 
-        brandPanel.Controls.Add(lblBrandTitle);
-        brandPanel.Controls.Add(lblBrandSub);
-        brandPanel.Controls.Add(divLine);
+        _brandPanel.Controls.Add(_lblBrandTitle);
+        _brandPanel.Controls.Add(_lblBrandSub);
+        _brandPanel.Controls.Add(_btnToggleSidebar);
+        _brandPanel.Controls.Add(divLine);
 
         // Navigation Buttons Container
-        var navContainer = new FlowLayoutPanel
+        _navContainer = new FlowLayoutPanel
         {
             Dock = DockStyle.Fill,
             FlowDirection = FlowDirection.TopDown,
             WrapContents = false,
             AutoScroll = true,
-            Padding = new Padding(10, 15, 10, 10),
+            Padding = new Padding(8, 15, 8, 10),
             BackColor = Color.Transparent
         };
 
@@ -237,25 +359,27 @@ public class MainForm : Form
 
         var navItems = new (string title, Control control, Func<Task>? onActivate)[]
         {
-            ("ผังห้องพัก", _roomGridControl, async () => await _roomGridControl.RefreshGridAsync()),
-            ("รายการจอง", _bookingListControl, async () => await _bookingListControl.LoadBookingsAsync()),
-            ("บริการเสริม & มินิบาร์ (POS)", _posControl, null),
-            ("การจัดการห้องพัก", _roomManagementControl, null),
-            ("ข้อมูลลูกค้า", _customerManagementControl, null),
-            ("ระบบบิลค่าไฟ/ค่าน้ำ", _meterReadingControl, async () => await _meterReadingControl.LoadMeterDataAsync()),
-            ("รายงานสรุป", _summaryReportControl, null),
-            ("สำรอง/คืนค่าข้อมูล", _backupControl, null),
-            ("ตั้งค่าระบบ", _systemSettingsControl, null)
+            (_fullNavTitles[0], _roomGridControl, async () => await _roomGridControl.RefreshGridAsync()),
+            (_fullNavTitles[1], _bookingListControl, async () => await _bookingListControl.LoadBookingsAsync()),
+            (_fullNavTitles[2], _posControl, null),
+            (_fullNavTitles[3], _roomManagementControl, null),
+            (_fullNavTitles[4], _customerManagementControl, null),
+            (_fullNavTitles[5], _meterReadingControl, async () => await _meterReadingControl.LoadMeterDataAsync()),
+            (_fullNavTitles[6], _summaryReportControl, null),
+            (_fullNavTitles[7], _backupControl, null),
+            (_fullNavTitles[8], _systemSettingsControl, null)
         };
 
-        foreach (var item in navItems)
+        for (int i = 0; i < navItems.Length; i++)
         {
+            var item = navItems[i];
+            int index = i;
             var btn = new Button
             {
-                Text = $"   {item.title}",
-                TextAlign = ContentAlignment.MiddleLeft,
-                Size = new Size(220, 46),
-                Font = new Font("Segoe UI", 10.5F, FontStyle.Regular),
+                Text = _isSidebarCollapsed ? _shortNavTitles[index] : $"   {item.title}",
+                TextAlign = _isSidebarCollapsed ? ContentAlignment.MiddleCenter : ContentAlignment.MiddleLeft,
+                Size = _isSidebarCollapsed ? new Size(52, 46) : new Size(220, 46),
+                Font = new Font("Segoe UI", _isSidebarCollapsed ? 9.5F : 10.5F, FontStyle.Bold),
                 ForeColor = Color.FromArgb(203, 213, 225),
                 BackColor = Color.Transparent,
                 FlatStyle = FlatStyle.Flat,
@@ -275,55 +399,101 @@ public class MainForm : Form
             };
 
             _navButtons.Add(btn);
-            navContainer.Controls.Add(btn);
+            _navContainer.Controls.Add(btn);
         }
 
         // Footer / User Section
-        var footerPanel = new Panel
+        _footerPanel = new Panel
         {
             Dock = DockStyle.Bottom,
-            Height = 100,
+            Height = 95,
             BackColor = Color.FromArgb(16, 16, 24),
-            Padding = new Padding(15, 12, 15, 12)
+            Padding = new Padding(8, 10, 8, 10)
         };
 
         var userCard = new Panel
         {
             Dock = DockStyle.Top,
-            Height = 42,
+            Height = 38,
             BackColor = Color.FromArgb(28, 28, 42)
         };
 
-        var lblUser = new Label
+        _lblUser = new Label
         {
-            Text = "ผู้ใช้: admin (ผู้ดูแลระบบ)",
-            Font = new Font("Segoe UI", 9.5F, FontStyle.Bold),
+            Text = _isSidebarCollapsed ? "admin" : "ผู้ใช้: admin (ผู้ดูแลระบบ)",
+            Font = new Font("Segoe UI", 9F, FontStyle.Bold),
             ForeColor = Color.White,
-            Location = new Point(10, 11),
+            Location = new Point(_isSidebarCollapsed ? 4 : 8, 9),
             AutoSize = true
         };
-        userCard.Controls.Add(lblUser);
+        userCard.Controls.Add(_lblUser);
 
-        var btnLogout = new Button
+        _btnLogout = new Button
         {
-            Text = "ออกจากระบบ",
+            Text = _isSidebarCollapsed ? "ออก" : "ออกจากระบบ",
             Dock = DockStyle.Bottom,
             Height = 32,
-            Font = new Font("Segoe UI", 9.5F, FontStyle.Bold),
+            Font = new Font("Segoe UI", 9F, FontStyle.Bold),
             ForeColor = Color.White,
             BackColor = Color.FromArgb(185, 28, 28),
             FlatStyle = FlatStyle.Flat,
             Cursor = Cursors.Hand
         };
-        btnLogout.FlatAppearance.BorderSize = 0;
-        btnLogout.Click += (s, e) => Logout();
+        _btnLogout.FlatAppearance.BorderSize = 0;
+        _btnLogout.Click += (s, e) => Logout();
 
-        footerPanel.Controls.Add(userCard);
-        footerPanel.Controls.Add(btnLogout);
+        _footerPanel.Controls.Add(userCard);
+        _footerPanel.Controls.Add(_btnLogout);
 
-        _sidebarPanel.Controls.Add(navContainer);
-        _sidebarPanel.Controls.Add(brandPanel);
-        _sidebarPanel.Controls.Add(footerPanel);
+        _sidebarPanel.Controls.Add(_navContainer);
+        _sidebarPanel.Controls.Add(_brandPanel);
+        _sidebarPanel.Controls.Add(_footerPanel);
+
+        UpdateTogglePos();
+    }
+
+    private void UpdateTogglePos()
+    {
+        if (_isSidebarCollapsed)
+        {
+            _btnToggleSidebar.Location = new Point(16, 44);
+            _btnToggleSidebar.Size = new Size(36, 30);
+            _lblBrandTitle.Location = new Point(12, 12);
+        }
+        else
+        {
+            _btnToggleSidebar.Location = new Point(185, 14);
+            _btnToggleSidebar.Size = new Size(36, 32);
+            _lblBrandTitle.Location = new Point(12, 14);
+        }
+    }
+
+    private void ToggleSidebarState()
+    {
+        _isSidebarCollapsed = !_isSidebarCollapsed;
+
+        _sidebarPanel.SuspendLayout();
+        _sidebarPanel.Width = _isSidebarCollapsed ? 68 : 240;
+
+        _lblBrandTitle.Text = _isSidebarCollapsed ? "PS" : "PSoft R&R";
+        _lblBrandSub.Visible = !_isSidebarCollapsed;
+        _btnToggleSidebar.Text = _isSidebarCollapsed ? ">>" : "<<";
+
+        _lblUser.Text = _isSidebarCollapsed ? "admin" : "ผู้ใช้: admin (ผู้ดูแลระบบ)";
+        _btnLogout.Text = _isSidebarCollapsed ? "ออก" : "ออกจากระบบ";
+
+        UpdateTogglePos();
+
+        for (int i = 0; i < _navButtons.Count; i++)
+        {
+            var btn = _navButtons[i];
+            btn.Size = _isSidebarCollapsed ? new Size(52, 46) : new Size(220, 46);
+            btn.TextAlign = _isSidebarCollapsed ? ContentAlignment.MiddleCenter : ContentAlignment.MiddleLeft;
+            btn.Text = _isSidebarCollapsed ? _shortNavTitles[i] : $"   {_fullNavTitles[i]}";
+            btn.Font = new Font("Segoe UI", _isSidebarCollapsed ? 9.5F : 10.5F, FontStyle.Bold);
+        }
+
+        _sidebarPanel.ResumeLayout(true);
     }
 
     private void SwitchView(Button selectedBtn, Control targetControl)
@@ -334,13 +504,13 @@ public class MainForm : Form
             {
                 btn.BackColor = Color.FromArgb(37, 99, 235); // Electric Blue
                 btn.ForeColor = Color.White;
-                btn.Font = new Font("Segoe UI", 10.5F, FontStyle.Bold);
+                btn.Font = new Font("Segoe UI", _isSidebarCollapsed ? 9.5F : 10.5F, FontStyle.Bold);
             }
             else
             {
                 btn.BackColor = Color.Transparent;
                 btn.ForeColor = Color.FromArgb(203, 213, 225);
-                btn.Font = new Font("Segoe UI", 10.5F, FontStyle.Regular);
+                btn.Font = new Font("Segoe UI", _isSidebarCollapsed ? 9.5F : 10.5F, FontStyle.Regular);
             }
         }
 
@@ -686,12 +856,12 @@ public class MainForm : Form
     private void InitializeTrialDongleTimer()
     {
         _trialDongleCheckTimer = new System.Windows.Forms.Timer();
-        _trialDongleCheckTimer.Interval = 15000; // Check every 15 seconds
+        _trialDongleCheckTimer.Interval = 3000; // Check every 3 seconds for instant response
         _trialDongleCheckTimer.Tick += TrialDongleCheckTimer_Tick;
         _trialDongleCheckTimer.Start();
     }
 
-    private void TrialDongleCheckTimer_Tick(object? sender, EventArgs e)
+    private async void TrialDongleCheckTimer_Tick(object? sender, EventArgs e)
     {
         if (_trialDongleDetected) return;
 
@@ -705,11 +875,121 @@ public class MainForm : Form
                 _trialDongleDetected = true;
                 _trialDongleCheckTimer?.Stop();
 
-                MessageBox.Show(
-                    "ตรวจพบอุปกรณ์ลิขสิทธิ์ (USB Dongle) แล้ว!\n\nกรุณาปิดและเปิดโปรแกรมใหม่อีกครั้งเพื่อเริ่มใช้งานรุ่นเต็มรูปแบบ โดยข้อมูลทั้งหมดที่ถูกบันทึกไว้จะยังคงอยู่ครบถ้วน",
-                    "ตรวจพบอุปกรณ์ลิขสิทธิ์",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Information);
+                _licenseStatus = LicenseStatus.Active;
+                _license = dongleLicense;
+                _isReadOnlyMode = false;
+
+                InitializeDongleTimer();
+
+                await CheckAndPromptFirstTimeActivationAsync();
+            }
+        }
+    }
+
+    public async Task CheckAndPromptFirstTimeActivationAsync()
+    {
+        try
+        {
+            if (_licenseStatus != LicenseStatus.Active || _license == null || _license.LicenseType == LicenseType.Trial) return;
+
+            var shown = await _settingsService.GetAsync("is_first_activation_prompt_shown");
+            if (shown == "1") return;
+
+            // Mark as shown immediately so it happens ONCE only
+            await _settingsService.SetAsync("is_first_activation_prompt_shown", "1");
+
+            var result = MessageBox.Show(
+                "ยินดีต้อนรับสู่ระบบ PSoft Rest & Rent Manager รุ่นเต็มรูปแบบ (Full Version)!\n\n" +
+                "ท่านต้องการตั้งรหัสผ่าน Admin สำหรับผู้ดูแลระบบใหม่ในตอนนี้เลยหรือไม่?\n" +
+                "(หากเลือกไม่ตั้ง ระบบจะใช้รหัสผ่านเริ่มต้น: psoft123)",
+                "ยินดีต้อนรับสู่ระบบ Full Version",
+                MessageBoxButtons.YesNo,
+                MessageBoxIcon.Question);
+
+            if (result == DialogResult.Yes)
+            {
+                ShowSetAdminPasswordDialog();
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.Error(LogCategory.System, "Error checking first time activation prompt", ex);
+        }
+    }
+
+    private void ShowSetAdminPasswordDialog()
+    {
+        using (var dlg = new Form())
+        {
+            dlg.Text = "ตั้งรหัสผ่าน Admin ผู้ดูแลระบบ";
+            dlg.Size = new Size(420, 240);
+            dlg.StartPosition = FormStartPosition.CenterParent;
+            dlg.FormBorderStyle = FormBorderStyle.FixedDialog;
+            dlg.MaximizeBox = false;
+            dlg.MinimizeBox = false;
+            dlg.Font = new Font("Segoe UI", 10F);
+
+            var lblPrompt = new Label
+            {
+                Text = "กรุณากรอกรหัสผ่าน Admin ใหม่สำหรับเข้าใช้งานระบบ:",
+                Location = new Point(20, 15),
+                Size = new Size(360, 25),
+                Font = new Font("Segoe UI", 10F, FontStyle.Bold)
+            };
+
+            var lblPwd1 = new Label { Text = "รหัสผ่านใหม่:", Location = new Point(20, 48), AutoSize = true };
+            var txtPwd1 = new TextBox { Location = new Point(140, 45), Width = 235, UseSystemPasswordChar = true };
+
+            var lblPwd2 = new Label { Text = "ยืนยันรหัสผ่าน:", Location = new Point(20, 88), AutoSize = true };
+            var txtPwd2 = new TextBox { Location = new Point(140, 85), Width = 235, UseSystemPasswordChar = true };
+
+            var btnOk = new Button
+            {
+                Text = "บันทึกรหัสผ่าน",
+                Location = new Point(150, 135),
+                Size = new Size(115, 36),
+                DialogResult = DialogResult.OK,
+                BackColor = Color.FromArgb(16, 185, 129),
+                ForeColor = Color.White,
+                FlatStyle = FlatStyle.Flat
+            };
+            btnOk.FlatAppearance.BorderSize = 0;
+
+            var btnSkip = new Button
+            {
+                Text = "ข้าม (ใช้ psoft123)",
+                Location = new Point(275, 135),
+                Size = new Size(125, 36),
+                DialogResult = DialogResult.Cancel,
+                BackColor = Color.FromArgb(226, 232, 240),
+                FlatStyle = FlatStyle.Flat
+            };
+            btnSkip.FlatAppearance.BorderSize = 0;
+
+            dlg.Controls.AddRange(new Control[] { lblPrompt, lblPwd1, txtPwd1, lblPwd2, txtPwd2, btnOk, btnSkip });
+            dlg.AcceptButton = btnOk;
+            dlg.CancelButton = btnSkip;
+
+            if (dlg.ShowDialog(this) == DialogResult.OK)
+            {
+                string p1 = txtPwd1.Text.Trim();
+                string p2 = txtPwd2.Text.Trim();
+
+                if (string.IsNullOrEmpty(p1))
+                {
+                    MessageBox.Show("รหัสผ่านไม่สามารถเป็นค่าว่างได้ ระบบจะใช้ psoft123", "แจ้งเตือน", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    return;
+                }
+
+                if (p1 != p2)
+                {
+                    MessageBox.Show("รหัสผ่านไม่ตรงกัน ระบบจะใช้ psoft123 (ท่านสามารถเปลี่ยนรหัสได้ในหน้าตั้งค่าระบบ)", "ข้อผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+
+                _settingsService.SetAsync("admin_password", p1).GetAwaiter().GetResult();
+                _settingsService.SetAsync("is_custom_admin_password_set", "1").GetAwaiter().GetResult();
+                MessageBox.Show("บันทึกรหัสผ่าน Admin เรียบร้อยแล้ว (สามารถแก้ไขได้ภายหลังในเมนูตั้งค่าระบบ)", "สำเร็จ", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
         }
     }

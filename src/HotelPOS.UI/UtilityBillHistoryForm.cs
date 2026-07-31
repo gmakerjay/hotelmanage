@@ -106,13 +106,13 @@ public class UtilityBillHistoryForm : Form
 
         var btnMarkPaid = new Button
         {
-            Text = "บันทึกชำระ",
-            Font = new Font("Segoe UI", 10F, FontStyle.Bold),
+            Text = "สลับสถานะชำระ (Admin)",
+            Font = new Font("Segoe UI", 9.5F, FontStyle.Bold),
             ForeColor = Color.White,
             BackColor = Color.FromArgb(22, 163, 74),
             FlatStyle = FlatStyle.Flat,
-            Size = new Size(120, 36),
-            Location = new Point(945, 12),
+            Size = new Size(160, 36),
+            Location = new Point(905, 12),
             Cursor = Cursors.Hand
         };
         btnMarkPaid.FlatAppearance.BorderSize = 0;
@@ -336,7 +336,7 @@ public class UtilityBillHistoryForm : Form
     {
         if (_dgvBills.CurrentRow == null)
         {
-            MessageBox.Show("กรุณาเลือกรายการที่ต้องการบันทึกชำระ", "ข้อแนะนำ", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            MessageBox.Show("กรุณาเลือกรายการบิลที่ต้องการเปลี่ยนสถานะ", "ข้อแนะนำ", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             return;
         }
 
@@ -344,15 +344,37 @@ public class UtilityBillHistoryForm : Form
         string billCode = _dgvBills.CurrentRow.Cells["BillCode"].Value?.ToString() ?? "";
         string roomNumber = _dgvBills.CurrentRow.Cells["RoomNumber"].Value?.ToString() ?? "";
 
-        var confirm = MessageBox.Show(
-            $"บันทึกชำระใบแจ้งหนี้ {billCode} ห้อง {roomNumber}?",
-            "ยืนยันการชำระ", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+        var bill = _allBills.FirstOrDefault(b => b.Id == billId);
+        if (bill == null) return;
 
-        if (confirm == DialogResult.Yes)
+        if (!bill.IsPaid)
         {
-            await _utilityBillService.MarkBillAsPaidAsync(billId, PaymentMethod.Cash);
-            await LoadBillsAsync();
-            MessageBox.Show("บันทึกการชำระสำเร็จ", "สำเร็จ", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            var confirm = MessageBox.Show(
+                $"ยืนยันบันทึกรับชำระเงินสำหรับบิล {billCode} ห้อง {roomNumber}?\n\nยอดสุทธิ: {bill.TotalAmount:N2} บาท",
+                "บันทึกชำระเงิน", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+
+            if (confirm == DialogResult.Yes)
+            {
+                await _utilityBillService.MarkBillAsPaidAsync(billId, PaymentMethod.Cash);
+                await LoadBillsAsync();
+                MessageBox.Show($"บันทึกชำระเงินห้อง {roomNumber} สำเร็จเรียบร้อย", "สำเร็จ", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+        }
+        else
+        {
+            var confirm = MessageBox.Show(
+                $"บิล {billCode} ห้อง {roomNumber} มีสถานะเป็น [ชำระแล้ว]\n\nต้องการสลับสถานะกลับเป็น [ยังไม่ชำระ / ค้างชำระ] ใช่หรือไม่?",
+                "สลับสถานะเป็นค้างชำระ (Admin Override)", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+
+            if (confirm == DialogResult.Yes)
+            {
+                using var conn = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "PSoftRestRentManager", "restrent.db")}");
+                await conn.OpenAsync();
+                await Dapper.SqlMapper.ExecuteAsync(conn, "UPDATE utility_bills SET is_paid = 0, paid_at = NULL WHERE id = @Id;", new { Id = billId });
+
+                await LoadBillsAsync();
+                MessageBox.Show($"สลับสถานะบิลห้อง {roomNumber} กลับเป็น [ค้างชำระ] เรียบร้อยแล้ว", "สำเร็จ", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
         }
     }
 }

@@ -128,6 +128,11 @@ public class BookingService : IBookingService
         var room = await _roomRepository.GetRoomByIdAsync(roomId);
         if (room == null) throw new KeyNotFoundException($"ไม่พบห้องพัก ID={roomId}");
 
+        if (room.Status != RoomStatus.Available && room.Status != RoomStatus.Reserved)
+        {
+            throw new InvalidOperationException($"ห้องพัก {room.RoomNumber} อยู่ในสถานะ {room.Status} ไม่สามารถทำรายการจองใหม่ได้ (อนุญาตให้จองเฉพาะห้องที่ว่างและพร้อมใช้งานเท่านั้น)");
+        }
+
         if (customer.Id == 0)
         {
             await _customerRepository.SaveCustomerAsync(customer);

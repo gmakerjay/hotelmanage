@@ -18,7 +18,9 @@ public enum RoomUserAction
     CancelReserved,
     CleaningDone,
     MaintenanceStart,
-    MaintenanceDone
+    MaintenanceDone,
+    AdminOverrideStatus,
+    PayUtilityNow
 }
 
 /// <summary>
@@ -51,7 +53,7 @@ public class RoomActionForm : Form
         decimal totalUnpaid)
     {
         Text = $"จัดการห้องพัก {room.RoomNumber} - HotelPOS";
-        Size = new Size(520, 560);
+        Size = new Size(530, 620);
         StartPosition = FormStartPosition.CenterParent;
         FormBorderStyle = FormBorderStyle.FixedDialog;
         MaximizeBox = false;
@@ -94,7 +96,7 @@ public class RoomActionForm : Form
 
         var floorBadge = new Label
         {
-            Text = $"ชั้น {room.Floor ?? "1"}",
+            Text = string.IsNullOrWhiteSpace(room.Floor) ? "" : room.Floor,
             Font = new Font("Segoe UI", 10F, FontStyle.Bold),
             ForeColor = Color.FromArgb(203, 213, 225),
             Location = new Point(typeBadge.Right + 12, 50),
@@ -112,15 +114,15 @@ public class RoomActionForm : Form
                 break;
             case RoomStatus.Occupied:
                 statusText = isUtilityOverdue ? "มีผู้พัก (เลยกำหนดค่าน้ำไฟ!)" : "มีผู้เข้าพัก";
-                statusBg = isUtilityOverdue ? Color.FromArgb(185, 28, 28) : Color.FromArgb(225, 29, 72);
+                statusBg = isUtilityOverdue ? Color.FromArgb(185, 28, 28) : Color.FromArgb(37, 99, 235);
                 break;
             case RoomStatus.Reserved:
                 statusText = "จองล่วงหน้า";
-                statusBg = Color.FromArgb(37, 99, 235);
+                statusBg = Color.FromArgb(139, 92, 246);
                 break;
             case RoomStatus.Cleaning:
                 statusText = "รอทำความสะอาด";
-                statusBg = Color.FromArgb(217, 119, 6);
+                statusBg = Color.FromArgb(245, 158, 11);
                 break;
             case RoomStatus.Maintenance:
             default:
@@ -136,7 +138,7 @@ public class RoomActionForm : Form
             BackColor = statusBg,
             ForeColor = Color.White,
             Location = new Point(290, 24),
-            Size = new Size(195, 36),
+            Size = new Size(205, 36),
             TextAlign = ContentAlignment.MiddleCenter
         };
 
@@ -152,7 +154,7 @@ public class RoomActionForm : Form
             Font = new Font("Segoe UI", 10.5F, FontStyle.Bold),
             ForeColor = Color.FromArgb(15, 23, 42),
             Location = new Point(16, 95),
-            Size = new Size(472, 145),
+            Size = new Size(482, 175),
             BackColor = Color.White
         };
 
@@ -161,7 +163,7 @@ public class RoomActionForm : Form
             Dock = DockStyle.Fill,
             Padding = new Padding(12),
             FlowDirection = FlowDirection.TopDown,
-            AutoScroll = true,
+            AutoScroll = false,
             WrapContents = false
         };
 
@@ -225,27 +227,38 @@ public class RoomActionForm : Form
 
         if (isUtilityOverdue || totalUnpaid > 0)
         {
+            var pnlMeterAlertCard = new Panel
+            {
+                Size = new Size(450, 36),
+                BackColor = Color.FromArgb(254, 242, 242),
+                BorderStyle = BorderStyle.FixedSingle,
+                Margin = new Padding(0, 4, 0, 0),
+                Padding = new Padding(8, 4, 8, 4)
+            };
+
             var lblMeterAlert = new Label
             {
                 Text = $"มียอดค่าน้ำ-ค่าไฟ ค้างชำระ: {totalUnpaid:N2} บาท",
-                Font = new Font("Segoe UI", 9.5F, FontStyle.Bold),
-                ForeColor = Color.DarkRed,
-                AutoSize = true,
-                Margin = new Padding(0, 4, 0, 0)
+                Font = new Font("Segoe UI", 10.5F, FontStyle.Bold),
+                ForeColor = Color.FromArgb(185, 28, 28),
+                Dock = DockStyle.Fill,
+                TextAlign = ContentAlignment.MiddleLeft
             };
-            detailsLayout.Controls.Add(lblMeterAlert);
+
+            pnlMeterAlertCard.Controls.Add(lblMeterAlert);
+            detailsLayout.Controls.Add(pnlMeterAlertCard);
         }
 
         detailsGroup.Controls.Add(detailsLayout);
 
-        // Action Buttons Panel (ปุ่มกดเลือกทำรายการ - ไม่มีอิโมจิ)
+        // Action Buttons Panel (ปุ่มกดเลือกทำรายการหลัก - กะทัดรัด คลีน ไม่มีอิโมจิ)
         var actionGroup = new GroupBox
         {
             Text = "เลือกทำรายการที่ต้องการ",
             Font = new Font("Segoe UI", 10.5F, FontStyle.Bold),
             ForeColor = Color.FromArgb(15, 23, 42),
-            Location = new Point(16, 248),
-            Size = new Size(472, 210),
+            Location = new Point(16, 280),
+            Size = new Size(482, 215),
             BackColor = Color.White
         };
 
@@ -254,10 +267,10 @@ public class RoomActionForm : Form
             Dock = DockStyle.Fill,
             Padding = new Padding(12),
             FlowDirection = FlowDirection.TopDown,
-            WrapContents = false
+            WrapContents = false,
+            AutoScroll = false
         };
 
-        // Add action buttons based on status (ข้อความภาษาไทยล้วน ไม่มีอิโมจิ)
         var btnMeter = CreateActionButton("จดมิเตอร์น้ำ-ไฟ / ออกบิลประจำเดือน", Color.FromArgb(14, 116, 144), Color.White);
         btnMeter.Click += (s, e) => { SelectedAction = RoomUserAction.RecordMeter; DialogResult = DialogResult.OK; };
 
@@ -272,7 +285,7 @@ public class RoomActionForm : Form
             var btnMaint = CreateActionButton("ปิดซ่อมบำรุงห้องพัก", Color.FromArgb(100, 116, 139), Color.White);
             btnMaint.Click += (s, e) => { SelectedAction = RoomUserAction.MaintenanceStart; DialogResult = DialogResult.OK; };
 
-            actionsFlow.Controls.AddRange(new Control[] { btnWalkIn, btnReserve, btnMeter, btnMaint });
+            actionsFlow.Controls.AddRange(new Control[] { btnWalkIn, btnReserve, btnMaint });
         }
         else if (room.Status == RoomStatus.Occupied)
         {
@@ -292,32 +305,31 @@ public class RoomActionForm : Form
             var btnCancelReserve = CreateActionButton("ยกเลิกการจองห้องพักนี้", Color.FromArgb(220, 38, 38), Color.White);
             btnCancelReserve.Click += (s, e) => { SelectedAction = RoomUserAction.CancelReserved; DialogResult = DialogResult.OK; };
 
-            actionsFlow.Controls.AddRange(new Control[] { btnCheckInReserved, btnMeter, btnCancelReserve });
+            actionsFlow.Controls.AddRange(new Control[] { btnCheckInReserved, btnCancelReserve });
         }
         else if (room.Status == RoomStatus.Cleaning)
         {
             var btnCleanDone = CreateActionButton("ทำความสะอาดเสร็จแล้ว (เปลี่ยนเป็นห้องว่าง)", Color.FromArgb(16, 185, 129), Color.White);
             btnCleanDone.Click += (s, e) => { SelectedAction = RoomUserAction.CleaningDone; DialogResult = DialogResult.OK; };
 
-            actionsFlow.Controls.AddRange(new Control[] { btnCleanDone, btnMeter });
+            actionsFlow.Controls.Add(btnCleanDone);
         }
         else if (room.Status == RoomStatus.Maintenance)
         {
             var btnMaintDone = CreateActionButton("ซ่อมเสร็จแล้ว (เปลี่ยนเป็นห้องว่างพร้อมใช้งาน)", Color.FromArgb(16, 185, 129), Color.White);
             btnMaintDone.Click += (s, e) => { SelectedAction = RoomUserAction.MaintenanceDone; DialogResult = DialogResult.OK; };
 
-            actionsFlow.Controls.AddRange(new Control[] { btnMaintDone, btnMeter });
+            actionsFlow.Controls.Add(btnMaintDone);
         }
 
         actionGroup.Controls.Add(actionsFlow);
 
-        // Bottom Footer (ปุ่มปิด)
         var btnClose = new Button
         {
             Text = "ปิดหน้าต่าง",
-            Size = new Size(120, 38),
-            Location = new Point(368, 468),
-            Font = new Font("Segoe UI", 10F, FontStyle.Regular),
+            Size = new Size(130, 40),
+            Location = new Point(368, 515),
+            Font = new Font("Segoe UI", 10.5F, FontStyle.Bold),
             BackColor = Color.White,
             ForeColor = Color.FromArgb(71, 85, 105),
             FlatStyle = FlatStyle.Flat,

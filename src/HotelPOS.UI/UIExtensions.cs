@@ -51,6 +51,7 @@ public static class UIExtensions
     {
         if (dgv == null) return;
         dgv.EnableDoubleBuffering();
+        dgv.RowHeadersVisible = false; // ปิดช่องหน้าสุดซ้ายมือตามคำสั่งผู้ใช้
         dgv.AlternatingRowsDefaultCellStyle.BackColor = Color.FromArgb(243, 246, 251); // ริ้วบรรทัดสลับ
         dgv.DefaultCellStyle.SelectionBackColor = Color.FromArgb(14, 116, 144);
         dgv.DefaultCellStyle.SelectionForeColor = Color.White;

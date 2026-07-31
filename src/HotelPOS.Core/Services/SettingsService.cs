@@ -103,6 +103,16 @@ public class SettingsService : ISettingsService
         dto.GarbageFee = decimal.TryParse(await GetAsync("garbage_fee"), out var gf) ? gf : dto.GarbageFee;
         dto.LobbyTerms = await GetAsync("lobby_terms") ?? dto.LobbyTerms;
 
+        // Auto Backup
+        dto.AutoBackupEnabled = bool.TryParse(await GetAsync("auto_backup_enabled"), out var abe) ? abe : dto.AutoBackupEnabled;
+        dto.AutoBackupOnExit = bool.TryParse(await GetAsync("auto_backup_on_exit"), out var abex) ? abex : dto.AutoBackupOnExit;
+        dto.AutoBackupMaxKeepFiles = int.TryParse(await GetAsync("auto_backup_max_keep_files"), out var abm) ? abm : dto.AutoBackupMaxKeepFiles;
+        dto.CustomBackupFolderPath = await GetAsync("custom_backup_folder_path") ?? dto.CustomBackupFolderPath;
+
+        // App Theme & Font Size
+        dto.AppTheme = await GetAsync("app_theme") ?? dto.AppTheme;
+        dto.AppFontSize = await GetAsync("app_font_size") ?? dto.AppFontSize;
+
         return dto;
     }
 
@@ -147,6 +157,16 @@ public class SettingsService : ISettingsService
             await SetAsync("common_area_fee", settings.CommonAreaFee.ToString());
             await SetAsync("garbage_fee", settings.GarbageFee.ToString());
             await SetAsync("lobby_terms", settings.LobbyTerms);
+
+            // Auto Backup
+            await SetAsync("auto_backup_enabled", settings.AutoBackupEnabled.ToString());
+            await SetAsync("auto_backup_on_exit", settings.AutoBackupOnExit.ToString());
+            await SetAsync("auto_backup_max_keep_files", settings.AutoBackupMaxKeepFiles.ToString());
+            await SetAsync("custom_backup_folder_path", settings.CustomBackupFolderPath);
+
+            // App Theme & Font Size
+            await SetAsync("app_theme", settings.AppTheme);
+            await SetAsync("app_font_size", settings.AppFontSize);
 
             _logger.Info(LogCategory.System, "บันทึกการตั้งค่าระบบเรียบร้อยแล้ว", correlationId);
         }

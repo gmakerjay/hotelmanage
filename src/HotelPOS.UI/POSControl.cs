@@ -734,12 +734,6 @@ public class POSControl : UserControl
                 return;
             }
 
-            if (settings.PaperType == "A4")
-            {
-                MessageBox.Show("การพิมพ์ใบเสร็จ POS หน้าร้านรองรับกระดาษม้วนแบบ Slip 80mm หรือ 58mm เท่านั้น", "ขนาดกระดาษไม่ตรง", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                return;
-            }
-
             // Fetch the sale info
             var sale = await _posService.GetSaleByIdAsync(saleId);
             var items = await _posService.GetSaleItemsBySaleIdAsync(saleId);

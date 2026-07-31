@@ -642,6 +642,99 @@ public class MeterReadingControl : UserControl
             return;
         }
 
+        if (colName == "BtnStatus")
+        {
+            try
+            {
+                var bills = await _utilityBillService.GetBillsByMonthAsync(billingMonth);
+                var bill = bills.FirstOrDefault(b => b.RoomId == roomId);
+
+                if (bill == null)
+                {
+                    // บิลยังไม่ได้ถูกสร้าง -> บันทึกและสร้างให้อัตโนมัติก่อน
+                    await SaveSingleRoomReadingAsync(row, roomId, billingMonth);
+                    int waterPersons = 1;
+                    if (int.TryParse(row.Cells["WaterPersons"].Value?.ToString(), out int p)) waterPersons = p;
+                    bill = await _utilityBillService.GenerateMonthlyBillAsync(roomId, billingMonth, waterPersons);
+                }
+
+                Customer? customer = null;
+                if (_bookingService != null && _customerService != null)
+                {
+                    try
+                    {
+                        var activeBooking = await _bookingService.GetActiveBookingByRoomIdAsync(roomId);
+                        if (activeBooking != null)
+                        {
+                            customer = await _customerService.GetCustomerByIdAsync(activeBooking.CustomerId);
+                        }
+                    }
+                    catch { }
+                }
+
+                if (!bill.IsPaid)
+                {
+                    // ทวนรายการรับชำระเงินอย่างเด่นชัด
+                    var confirmMsg =
+                        $"=== ทวนรายการรับชำระเงิน | ห้อง {roomNumber} (เดือน {billingMonth}) ===\n\n" +
+                        $"• ผู้เช่า: {(customer?.FullName ?? "-")}\n" +
+                        $"• ค่าเช่าห้องพัก: {bill.RoomCharge:N2} บาท\n" +
+                        $"• ค่าไฟฟ้า: {bill.ElectricAmount:N2} บาท ({(bill.ElectricBillingMode == "FLAT" ? "เหมาจ่าย" : $"{bill.ElectricUnits:N0} หน่วย")})\n" +
+                        $"• ค่าน้ำประปา: {bill.WaterAmount:N2} บาท ({(bill.WaterBillingMode == "FLAT" ? $"เหมาจ่าย {bill.WaterPersonCount} คน" : $"{bill.WaterUnits:N0} หน่วย")})\n" +
+                        $"• ค่าส่วนกลาง/ขยะ: {bill.CommonAreaFee + bill.GarbageFee:N2} บาท\n" +
+                        (bill.ExtraCharges > 0 ? $"• ค่าบริการเพิ่มเติม: {bill.ExtraCharges:N2} บาท\n" : "") +
+                        (bill.DiscountAmount > 0 ? $"• ส่วนลดพิเศษ: -{bill.DiscountAmount:N2} บาท\n" : "") +
+                        $"----------------------------------------\n" +
+                        $"👉 ยอดสุทธิที่ต้องรับชำระ = {bill.TotalAmount:N2} บาท\n\n" +
+                        $"กด [Yes] เพื่อยืนยันบันทึกรับชำระเงินทันที";
+
+                    var confirm = MessageBox.Show(confirmMsg, "ยืนยันรับชำระเงิน", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+
+                    if (confirm == DialogResult.Yes)
+                    {
+                        await _utilityBillService.MarkBillAsPaidAsync(bill.Id, PaymentMethod.Cash);
+                        bill.IsPaid = true;
+
+                        // Update Cell UI 100% Real-time
+                        var statusCell = row.Cells["BtnStatus"];
+                        statusCell.Value = "ชำระแล้ว";
+                        statusCell.Style.BackColor = Color.FromArgb(220, 252, 231);
+                        statusCell.Style.ForeColor = Color.FromArgb(22, 101, 52);
+
+                        // ถามพิมพ์ใบเสร็จ (ตอบ [ไม่พิมพ์] สถานะก็เปลี่ยนเป็นชำระแล้วเรียบร้อย)
+                        var printConfirm = MessageBox.Show(
+                            "บันทึกรับชำระเงินสำเร็จเรียบร้อยแล้ว!\n\nต้องการพิมพ์ [ใบเสร็จรับเงิน] ทันทีหรือไม่?",
+                            "พิมพ์ใบเสร็จรับเงิน", MessageBoxButtons.YesNo, MessageBoxIcon.Information);
+
+                        if (printConfirm == DialogResult.Yes)
+                        {
+                            var receiptPrinter = new UtilityInvoicePrinter(bill, customer, _settings);
+                            receiptPrinter.ShowPrintPreview();
+                        }
+                    }
+                }
+                else
+                {
+                    // ชำระแล้ว -> ถามพิมพ์ใบเสร็จรับเงินซ้ำ
+                    var printConfirm = MessageBox.Show(
+                        $"ห้อง {roomNumber} ชำระเงินเรียบร้อยแล้ว\n\nต้องการพิมพ์ [ใบเสร็จรับเงิน] ซ้ำหรือไม่?",
+                        "พิมพ์ใบเสร็จรับเงินซ้ำ", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+
+                    if (printConfirm == DialogResult.Yes)
+                    {
+                        var receiptPrinter = new UtilityInvoicePrinter(bill, customer, _settings);
+                        receiptPrinter.ShowPrintPreview();
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.Error(LogCategory.Utility, $"จัดการการชำระเงินของห้อง {roomNumber} เดือน {billingMonth} ล้มเหลว", ex);
+                Program.ShowDetailedErrorPopup(ex, $"ไม่สามารถดำเนินการชำระเงินสำหรับห้อง {roomNumber} ได้");
+            }
+            return;
+        }
+
         if (colName == "BtnPrint")
         {
             try
@@ -672,8 +765,8 @@ public class MeterReadingControl : UserControl
             }
             catch (Exception ex)
             {
-                _logger.Error(LogCategory.Utility, $"พิมพ์ใบแจ้งหนี้ของห้อง {roomNumber} เดือน {billingMonth} ล้มเหลว", ex);
-                Program.ShowDetailedErrorPopup(ex, $"ไม่สามารถออกใบแจ้งหนี้และพิมพ์บิลสำหรับห้อง {roomNumber} ได้");
+                _logger.Error(LogCategory.Utility, $"พิมพ์บิลของห้อง {roomNumber} เดือน {billingMonth} ล้มเหลว", ex);
+                Program.ShowDetailedErrorPopup(ex, $"ไม่สามารถพิมพ์บิลสำหรับห้อง {roomNumber} ได้");
             }
         }
 
@@ -904,6 +997,18 @@ public class MeterReadingControl : UserControl
                 // 3. Generate Monthly Bill
                 var bill = await _utilityBillService.GenerateMonthlyBillAsync(
                     roomId, billingMonth, dlg.WaterPersons, dlg.ExtraCharges, dlg.DiscountAmount, dlg.Notes);
+
+                // 3.5 Check if Mark As Paid was requested directly from Dialog
+                if (dlg.MarkAsPaidRequested)
+                {
+                    await _utilityBillService.MarkAllUnpaidBillsAsPaidForRoomAsync(roomId, dlg.SelectedPaymentMethod);
+                    bill.IsPaid = true;
+
+                    var statusCell = row.Cells["BtnStatus"];
+                    statusCell.Value = "ชำระแล้ว";
+                    statusCell.Style.BackColor = Color.FromArgb(220, 252, 231);
+                    statusCell.Style.ForeColor = Color.FromArgb(22, 101, 52);
+                }
 
                 // 4. Update UI Grid Row
                 row.Cells["ElecPrev"].Value = dlg.ElecPrev;

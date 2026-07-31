@@ -5,6 +5,7 @@ using System.IO;
 using System.Security.Cryptography;
 using System.Text;
 using System.Windows.Forms;
+using Microsoft.Data.Sqlite;
 using HotelPOS.Common;
 using HotelPOS.Licensing;
 
@@ -65,6 +66,8 @@ public class AdminMainForm : Form
     private Button _btnEditKey = null!;
     private Button _btnTestUnlock = null!;
     private Button _btnViewPayload = null!;
+    private Button _btnResetCustomerPassword = null!;
+    private Button _btnOpenManual = null!;
 
     private ProgressBar _progressBar = null!;
     private Label _lblStatus = null!;
@@ -92,13 +95,29 @@ public class AdminMainForm : Form
         var subFont = new Font("Segoe UI", 9.0F, FontStyle.Regular);
         var inputFont = new Font("Segoe UI", 9.5F, FontStyle.Regular);
 
+        // Header Bar with Manual Button
+        _btnOpenManual = new Button
+        {
+            Text = "📖 คู่มือการใช้งาน Tools",
+            Font = new Font("Segoe UI", 9.0F, FontStyle.Bold),
+            BackColor = Color.FromArgb(71, 85, 105), // Slate
+            ForeColor = Color.White,
+            FlatStyle = FlatStyle.Flat,
+            Location = new Point(410, 12),
+            Width = 156,
+            Height = 32,
+            Cursor = Cursors.Hand
+        };
+        _btnOpenManual.FlatAppearance.BorderSize = 0;
+        _btnOpenManual.Click += (s, e) => new HelpManualForm().ShowDialog(this);
+
         // ==================== [ส่วนที่ 1] เลือกแฟลชไดรฟ์ ====================
         var gbDrive = new GroupBox
         {
             Text = " 1. เลือก USB Flash Drive ที่เสียบอยู่ ",
             Font = labelFont,
             ForeColor = Color.FromArgb(30, 41, 59),
-            Location = new Point(18, 15),
+            Location = new Point(18, 50),
             Size = new Size(548, 115),
             FlatStyle = FlatStyle.Flat
         };
@@ -333,10 +352,25 @@ public class AdminMainForm : Form
         _btnViewPayload.FlatAppearance.BorderSize = 0;
         _btnViewPayload.Click += ViewPayload_Click;
 
+        _btnResetCustomerPassword = new Button
+        {
+            Text = "รีเซ็ตรหัสผ่าน Admin ของลูกค้า (Reset Customer Password)",
+            Font = new Font("Segoe UI", 9.5F, FontStyle.Bold),
+            BackColor = Color.FromArgb(220, 38, 38), // Crimson Red
+            ForeColor = Color.White,
+            FlatStyle = FlatStyle.Flat,
+            Location = new Point(18, 504),
+            Width = 548,
+            Height = 36,
+            Cursor = Cursors.Hand
+        };
+        _btnResetCustomerPassword.FlatAppearance.BorderSize = 0;
+        _btnResetCustomerPassword.Click += ResetCustomerPassword_Click;
+
         // Progress Bar & Status
         _progressBar = new ProgressBar
         {
-            Location = new Point(18, 508),
+            Location = new Point(18, 548),
             Size = new Size(548, 12),
             Style = ProgressBarStyle.Blocks,
             Value = 0
@@ -347,11 +381,14 @@ public class AdminMainForm : Form
             Text = "สถานะ: พร้อมใช้งาน",
             Font = new Font("Segoe UI", 9.0F, FontStyle.Regular),
             ForeColor = Color.FromArgb(51, 65, 85),
-            Location = new Point(18, 526),
+            Location = new Point(18, 566),
             Size = new Size(548, 22)
         };
 
+        Height = 640;
+
         // นำองค์ประกอบทั้งหมดใส่ Form
+        Controls.Add(_btnOpenManual);
         Controls.Add(gbDrive);
         Controls.Add(gbConfig);
         Controls.Add(gbFormat);
@@ -359,8 +396,90 @@ public class AdminMainForm : Form
         Controls.Add(_btnEditKey);
         Controls.Add(_btnTestUnlock);
         Controls.Add(_btnViewPayload);
+        Controls.Add(_btnResetCustomerPassword);
         Controls.Add(_progressBar);
         Controls.Add(_lblStatus);
+    }
+
+    private void ResetCustomerPassword_Click(object? sender, EventArgs e)
+    {
+        using var dlg = new Form();
+        dlg.Text = "เครื่องมือรีเซ็ตรหัสผ่าน Admin สำหรับผู้ดูแลระบบ";
+        dlg.Size = new Size(520, 260);
+        dlg.StartPosition = FormStartPosition.CenterParent;
+        dlg.FormBorderStyle = FormBorderStyle.FixedDialog;
+        dlg.MaximizeBox = false;
+        dlg.MinimizeBox = false;
+        dlg.Font = new Font("Segoe UI", 9.5F);
+
+        string defaultDbPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "HotelPOS", "hotel_pos.db");
+        if (!File.Exists(defaultDbPath))
+        {
+            defaultDbPath = Path.Combine(AppContext.BaseDirectory, "hotel_pos.db");
+        }
+
+        var lblDb = new Label { Text = "ไฟล์ฐานข้อมูลลูกค้า (hotel_pos.db):", Location = new Point(20, 15), AutoSize = true, Font = new Font("Segoe UI", 9.5F, FontStyle.Bold) };
+        var txtDbPath = new TextBox { Text = defaultDbPath, Location = new Point(20, 38), Width = 370, Font = new Font("Consolas", 9F) };
+        var btnBrowse = new Button { Text = "เลือกไฟล์...", Location = new Point(398, 37), Width = 90, Height = 26 };
+        btnBrowse.Click += (s, ev) =>
+        {
+            using var ofd = new OpenFileDialog { Filter = "SQLite Database (*.db)|*.db|All Files (*.*)|*.*", Title = "เลือกไฟล์ hotel_pos.db ของลูกค้า" };
+            if (ofd.ShowDialog() == DialogResult.OK) txtDbPath.Text = ofd.FileName;
+        };
+
+        var lblPwd = new Label { Text = "รหัสผ่าน Admin ใหม่ที่ต้องการตั้ง:", Location = new Point(20, 80), AutoSize = true, Font = new Font("Segoe UI", 9.5F, FontStyle.Bold) };
+        var txtNewPwd = new TextBox { Text = "psoft123", Location = new Point(20, 103), Width = 468, Font = new Font("Segoe UI", 10F) };
+
+        var btnReset = new Button { Text = "ยืนยันรีเซ็ตรหัสผ่าน", Location = new Point(20, 155), Size = new Size(468, 40), BackColor = Color.FromArgb(220, 38, 38), ForeColor = Color.White, FlatStyle = FlatStyle.Flat, Font = new Font("Segoe UI", 10F, FontStyle.Bold), Cursor = Cursors.Hand };
+        btnReset.FlatAppearance.BorderSize = 0;
+
+        btnReset.Click += (s, ev) =>
+        {
+            string dbPath = txtDbPath.Text.Trim();
+            string newPwd = txtNewPwd.Text.Trim();
+
+            if (!File.Exists(dbPath))
+            {
+                MessageBox.Show("ไม่พบไฟล์ฐานข้อมูลตามพาธที่ระบุ กรุณาตรวจสอบอีกครั้ง", "ข้อผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+
+            if (string.IsNullOrEmpty(newPwd))
+            {
+                MessageBox.Show("กรุณากรอกรหัสผ่านที่ต้องการตั้ง", "ข้อผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            try
+            {
+                string connStr = $"Data Source={dbPath}";
+                using var conn = new SqliteConnection(connStr);
+                conn.Open();
+
+                using (var cmd = conn.CreateCommand())
+                {
+                    cmd.CommandText = "INSERT INTO SystemSettings (SettingKey, SettingValue, UpdatedAt) VALUES ('admin_password', @pwd, datetime('now')) ON CONFLICT(SettingKey) DO UPDATE SET SettingValue = @pwd, UpdatedAt = datetime('now');";
+                    cmd.Parameters.AddWithValue("@pwd", newPwd);
+                    cmd.ExecuteNonQuery();
+                }
+
+                using (var cmd = conn.CreateCommand())
+                {
+                    cmd.CommandText = "INSERT INTO SystemSettings (SettingKey, SettingValue, UpdatedAt) VALUES ('is_custom_admin_password_set', '1', datetime('now')) ON CONFLICT(SettingKey) DO UPDATE SET SettingValue = '1', UpdatedAt = datetime('now');";
+                    cmd.ExecuteNonQuery();
+                }
+
+                MessageBox.Show($"รีเซ็ตรหัสผ่าน Admin สำหรับฐานข้อมูลลูกค้าเรียบร้อยแล้ว!\n\nรหัสผ่านใหม่คือ: {newPwd}", "สำเร็จ", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                dlg.DialogResult = DialogResult.OK;
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"เกิดข้อผิดพลาดในการรีเซ็ตรหัสผ่าน: {ex.Message}", "ข้อผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        };
+
+        dlg.Controls.AddRange(new Control[] { lblDb, txtDbPath, btnBrowse, lblPwd, txtNewPwd, btnReset });
+        dlg.ShowDialog(this);
     }
 
     private void SaveWatermark_Click(object? sender, EventArgs e)
@@ -703,5 +822,128 @@ public class AdminMainForm : Form
         _btnEditKey.Enabled = true;
         _btnRefreshDrives.Enabled = true;
         _progressBar.Value = 0;
+    }
+}
+
+public class HelpManualForm : Form
+{
+    public HelpManualForm()
+    {
+        Text = "คู่มือการใช้งานเครื่องมือ PSoft Rest & Rent Manager Generator";
+        Size = new Size(640, 680);
+        StartPosition = FormStartPosition.CenterParent;
+        FormBorderStyle = FormBorderStyle.FixedDialog;
+        MaximizeBox = false;
+        MinimizeBox = false;
+        Font = new Font("Segoe UI", 9.5F);
+        BackColor = Color.FromArgb(248, 250, 252);
+
+        var lblHeader = new Label
+        {
+            Text = "คู่มือการใช้งานเครื่องมือ Admin / Seller Tools",
+            Font = new Font("Segoe UI", 12F, FontStyle.Bold),
+            ForeColor = Color.FromArgb(30, 41, 59),
+            Dock = DockStyle.Top,
+            Height = 45,
+            TextAlign = ContentAlignment.MiddleCenter,
+            BackColor = Color.FromArgb(226, 232, 240)
+        };
+
+        var tabControl = new TabControl
+        {
+            Dock = DockStyle.Fill,
+            Font = new Font("Segoe UI", 9.5F, FontStyle.Bold)
+        };
+
+        AddTab(tabControl, "1. ภาพรวม & ความปลอดภัย",
+            "📌 ภาพรวมและการรักษาความปลอดภัย\r\n\r\n" +
+            "โปรแกรม PSoftRestRentGenerator.exe ใช้สำหรับผู้จัดจำหน่าย (Admin/Seller) ในการสร้าง USB Dongle ลิขสิทธิ์ความปลอดภัยสูง และการรีเซ็ตรหัสผ่านลูกค้า\r\n\r\n" +
+            "⚠️ ข้อควรระวังความปลอดภัยสูงสุด:\r\n" +
+            "1. โปรแกรมนี้ต้องใช้คู่กับไฟล์ private.pem (RSA-2048 Private Key) ในการลงลายเซ็นต์ดิจิทัล\r\n" +
+            "2. ห้ามส่งมอบโปรแกรมนี้ หรือแจกจ่ายโฟลเดอร์ Tools/ไฟล์ private.pem ให้กับลูกค้าเด็ดขาด!\r\n" +
+            "3. ให้เก็บโปรแกรมไว้ในเครื่องของผู้จัดจำหน่ายเท่านั้น");
+
+        AddTab(tabControl, "2. เลือก USB Dongle",
+            "📌 การเลือก USB Flash Drive เป้าหมาย\r\n\r\n" +
+            "1. เสียบ USB Flash Drive ใดก็ได้เข้ากับช่อง USB ของเครื่องคอมพิวเตอร์\r\n" +
+            "2. ในส่วน '1. เลือก USB Flash Drive ที่เสียบอยู่' กดปุ่ม [รีเฟรช] เพื่ออัปเดตรายชื่อ\r\n" +
+            "3. เลือกแฟลชไดรฟ์ที่ต้องการจากรายการ Dropdown\r\n" +
+            "4. โปรแกรมจะตรวจดึงค่า USB Hardware Serial ระดับชิปฮาร์ดแวร์โดยอัตโนมัติ (ป้องกันการคัดลอกไฟล์ข้ามไดรฟ์ 100%)");
+
+        AddTab(tabControl, "3. ปั๊มและแก้ไขคีย์",
+            "📌 การสร้างและอัปเดตคีย์ (Gen Key & Edit Key)\r\n\r\n" +
+            "1. App Serial Watermark: กำหนดรหัสลายน้ำ เช่น APP-2026-CLIENT-A\r\n" +
+            "2. เลือกประเภทสิทธิ์:\r\n" +
+            "   - Lifetime: สิทธิ์ใช้งานถาวร ไม่หมดอายุ\r\n" +
+            "   - Standard: สิทธิ์รายปี / กำหนดวันหมดอายุ\r\n" +
+            "   - Trial: สิทธิ์ทดลองใช้งาน 30 วัน\r\n\r\n" +
+            "3. เลือกปุ่มสั่งการ:\r\n" +
+            "   - ปุ่มสีเขียว [Gen Key]: ทำ Quick Format แล้วสร้างคีย์ใหม่ลง USB\r\n" +
+            "   - ปุ่มสีน้ำเงิน [แก้ไขคีย์]: อัปเดตคีย์เดิมใน USB โดยไม่ลบไฟล์อื่น");
+
+        AddTab(tabControl, "4. รีเซ็ตรหัสผ่านลูกค้า",
+            "📌 การรีเซ็ตรหัสผ่าน Admin สำหรับลูกค้า\r\n\r\n" +
+            "หากลูกค้าลืมรหัสผ่าน Admin หรือลืมรหัสทำ ZetZero:\r\n\r\n" +
+            "1. กดปุ่มสีแดง [รีเซ็ตรหัสผ่าน Admin ของลูกค้า (Reset Customer Password)]\r\n" +
+            "2. กดปุ่ม [เลือกไฟล์...] เลือกไฟล์ฐานข้อมูล hotel_pos.db ของลูกค้า (อยู่ที่ %APPDATA%\\HotelPOS\\hotel_pos.db)\r\n" +
+            "3. ระบุรหัสผ่าน Admin ใหม่ที่ต้องการตั้ง (Default: psoft123)\r\n" +
+            "4. กด [ยืนยันรีเซ็ตรหัสผ่าน] ระบบจะอัปเดตฐานข้อมูลให้ทันที");
+
+        AddTab(tabControl, "5. ตรวจสอบ Validate",
+            "📌 การทดสอบและตรวจสอบคีย์\r\n\r\n" +
+            "1. ปุ่มสีส้ม [ทดสอบปลดล็อก (Validate)]: ทดสอบจำลองอ่านคีย์และจับคู่ USB Hardware Serial ว่า Active สมบูรณ์หรือไม่\r\n" +
+            "2. ปุ่มสีเทา [ดูข้อมูลคีย์ JSON Payload]: เปิดดูโครงสร้าง JSON ภายในคีย์ และดูดิจิทัลซิกเนเจอร์ RSA");
+
+        AddTab(tabControl, "6. คำถามพบบ่อย (FAQ)",
+            "📌 คำถามที่พบบ่อย (FAQ)\r\n\r\n" +
+            "Q: เปิดโปรแกรมแล้วขึ้นเตือน 'ไม่พบไฟล์ Private Key (private.pem)'?\r\n" +
+            "A: ตรวจสอบว่ามีไฟล์ private.pem วางอยู่ข้างไฟล์ PSoftRestRentGenerator.exe แล้วหรือยัง\r\n\r\n" +
+            "Q: ลูกค้าทำ USB Dongle หาย ต้องทำอย่างไร?\r\n" +
+            "A: นำ USB ใบใหม่มาเสียบเครื่องผู้ขาย ➔ กรอก App Serial Watermark เดิม ➔ กด [Gen Key] สร้าง Dongle ใหม่ทดแทนได้ทันที\r\n\r\n" +
+            "Q: ต้องเอาโฟลเดอร์ Tools ไปวางในเครื่องลูกค้าไหม?\r\n" +
+            "A: ไม่จำเป็นและไม่แนะนำครับ ให้ทำจากเครื่องผู้ขาย หรือก๊อบไปรันชั่วคราวแล้วลบออกทันทีเพื่อความปลอดภัย");
+
+        var pnlBottom = new Panel { Dock = DockStyle.Bottom, Height = 50, Padding = new Padding(10) };
+        var btnClose = new Button
+        {
+            Text = "ปิดหน้าต่างคู่มือ",
+            Dock = DockStyle.Right,
+            Width = 140,
+            DialogResult = DialogResult.OK,
+            BackColor = Color.FromArgb(71, 85, 105),
+            ForeColor = Color.White,
+            FlatStyle = FlatStyle.Flat,
+            Font = new Font("Segoe UI", 9.5F, FontStyle.Bold)
+        };
+        btnClose.FlatAppearance.BorderSize = 0;
+        pnlBottom.Controls.Add(btnClose);
+
+        Controls.Add(tabControl);
+        Controls.Add(lblHeader);
+        Controls.Add(pnlBottom);
+    }
+
+    private void AddTab(TabControl tabControl, string title, string content)
+    {
+        var tabPage = new TabPage(title)
+        {
+            BackColor = Color.White,
+            Padding = new Padding(15)
+        };
+
+        var txtBox = new TextBox
+        {
+            Text = content,
+            Multiline = true,
+            ReadOnly = true,
+            ScrollBars = ScrollBars.Vertical,
+            Dock = DockStyle.Fill,
+            Font = new Font("Segoe UI", 10F),
+            BackColor = Color.White,
+            BorderStyle = BorderStyle.None
+        };
+
+        tabPage.Controls.Add(txtBox);
+        tabControl.TabPages.Add(tabPage);
     }
 }

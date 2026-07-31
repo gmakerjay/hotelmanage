@@ -336,4 +336,61 @@ public class UtilityBillRepository : IUtilityBillRepository
             throw;
         }
     }
+
+    public async Task<IEnumerable<UtilityBill>> GetAllUnpaidBillsAsync()
+    {
+        var correlationId = _logger.NewCorrelationId();
+        try
+        {
+            using var conn = _connectionFactory.CreateConnection();
+            const string sql = @"
+                SELECT ub.id AS Id, ub.bill_code AS BillCode, ub.room_id AS RoomId,
+                       ub.billing_month AS BillingMonth, ub.room_charge AS RoomCharge,
+                       ub.electric_prev AS ElectricPrev, ub.electric_curr AS ElectricCurr,
+                       ub.electric_units AS ElectricUnits, ub.electric_rate AS ElectricRate,
+                       ub.electric_amount AS ElectricAmount, ub.electric_billing_mode AS ElectricBillingMode,
+                       ub.water_prev AS WaterPrev, ub.water_curr AS WaterCurr,
+                       ub.water_units AS WaterUnits, ub.water_rate AS WaterRate,
+                       ub.water_amount AS WaterAmount,
+                       ub.water_billing_mode AS WaterBillingMode, ub.water_person_count AS WaterPersonCount,
+                       ub.common_area_fee AS CommonAreaFee, ub.garbage_fee AS GarbageFee,
+                       ub.extra_charges AS ExtraCharges, ub.discount_amount AS DiscountAmount,
+                       ub.total_amount AS TotalAmount, ub.is_paid AS IsPaid, ub.paid_at AS PaidAt,
+                       ub.payment_method AS PaymentMethod, ub.created_by AS CreatedBy,
+                       ub.created_at AS CreatedAt, ub.notes AS Notes,
+                       r.room_number AS RoomNumber
+                FROM utility_bills ub
+                JOIN rooms r ON r.id = ub.room_id
+                WHERE ub.is_paid = 0
+                ORDER BY ub.created_at ASC";
+            return await conn.QueryAsync<UtilityBill>(sql);
+        }
+        catch (Exception ex)
+        {
+            _logger.Error(LogCategory.Utility, "ดึงใบแจ้งหนี้ที่ค้างชำระทั้งหมดล้มเหลว", ex, correlationId);
+            return Enumerable.Empty<UtilityBill>();
+        }
+    }
+
+    public async Task MarkAllUnpaidBillsAsPaidForRoomAsync(int roomId, PaymentMethod paymentMethod)
+    {
+        var correlationId = _logger.NewCorrelationId();
+        try
+        {
+            using var conn = _connectionFactory.CreateConnection();
+            const string sql = @"
+                UPDATE utility_bills SET
+                    is_paid = 1,
+                    paid_at = datetime('now', 'localtime'),
+                    payment_method = @PaymentMethod
+                WHERE room_id = @RoomId AND is_paid = 0";
+            await conn.ExecuteAsync(sql, new { RoomId = roomId, PaymentMethod = (int)paymentMethod });
+            _logger.Info(LogCategory.Utility, $"บันทึกชำระเงินและเคลียร์บิลค้างชำระทั้งหมดของห้อง ID={roomId} สำเร็จ ({paymentMethod})", correlationId);
+        }
+        catch (Exception ex)
+        {
+            _logger.Error(LogCategory.Utility, $"เคลียร์บิลค้างชำระของห้อง {roomId} ไม่สำเร็จ", ex, correlationId);
+            throw;
+        }
+    }
 }

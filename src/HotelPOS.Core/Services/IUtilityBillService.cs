@@ -34,4 +34,10 @@ public interface IUtilityBillService
 
     /// <summary>ดูประวัติมิเตอร์ย้อนหลัง</summary>
     Task<IEnumerable<MeterReading>> GetMeterHistoryAsync(int roomId, int lastNMonths = 12);
+
+    /// <summary>ดึงใบแจ้งหนี้ที่ค้างชำระทั้งหมดในระบบ</summary>
+    Task<IEnumerable<UtilityBill>> GetAllUnpaidBillsAsync();
+
+    /// <summary>บันทึกชำระเงินและเคลียร์บิลค้างชำระทั้งหมดของห้องที่ระบุ</summary>
+    Task MarkAllUnpaidBillsAsPaidForRoomAsync(int roomId, PaymentMethod paymentMethod);
 }
