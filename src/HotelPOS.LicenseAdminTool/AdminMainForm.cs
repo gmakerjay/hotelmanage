@@ -412,13 +412,13 @@ public class AdminMainForm : Form
         dlg.MinimizeBox = false;
         dlg.Font = new Font("Segoe UI", 9.5F);
 
-        string defaultDbPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "HotelPOS", "hotel_pos.db");
+        string defaultDbPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "PSoftRestRentManager", "restrent.db");
         if (!File.Exists(defaultDbPath))
         {
-            defaultDbPath = Path.Combine(AppContext.BaseDirectory, "hotel_pos.db");
+            defaultDbPath = Path.Combine(AppContext.BaseDirectory, "restrent.db");
         }
 
-        var lblDb = new Label { Text = "ไฟล์ฐานข้อมูลลูกค้า (hotel_pos.db):", Location = new Point(20, 15), AutoSize = true, Font = new Font("Segoe UI", 9.5F, FontStyle.Bold) };
+        var lblDb = new Label { Text = "ไฟล์ฐานข้อมูลลูกค้า (restrent.db):", Location = new Point(20, 15), AutoSize = true, Font = new Font("Segoe UI", 9.5F, FontStyle.Bold) };
         var txtDbPath = new TextBox { Text = defaultDbPath, Location = new Point(20, 38), Width = 370, Font = new Font("Consolas", 9F) };
         var btnBrowse = new Button { Text = "เลือกไฟล์...", Location = new Point(398, 37), Width = 90, Height = 26 };
         btnBrowse.Click += (s, ev) =>
@@ -456,16 +456,24 @@ public class AdminMainForm : Form
                 using var conn = new SqliteConnection(connStr);
                 conn.Open();
 
+                // Hash รหัสผ่านด้วย PBKDF2 ก่อนบันทึก (ห้ามเก็บ plaintext)
+                // ใช้รูปแบบเดียวกับ PasswordHelper ใน HotelPOS.UI: "{iterations}:{salt_base64}:{hash_base64}"
+                byte[] salt = System.Security.Cryptography.RandomNumberGenerator.GetBytes(16);
+                byte[] hash = System.Security.Cryptography.Rfc2898DeriveBytes.Pbkdf2(
+                    System.Text.Encoding.UTF8.GetBytes(newPwd), salt, 100000,
+                    System.Security.Cryptography.HashAlgorithmName.SHA256, 32);
+                string hashedPwd = $"100000:{Convert.ToBase64String(salt)}:{Convert.ToBase64String(hash)}";
+
                 using (var cmd = conn.CreateCommand())
                 {
-                    cmd.CommandText = "INSERT INTO SystemSettings (SettingKey, SettingValue, UpdatedAt) VALUES ('admin_password', @pwd, datetime('now')) ON CONFLICT(SettingKey) DO UPDATE SET SettingValue = @pwd, UpdatedAt = datetime('now');";
-                    cmd.Parameters.AddWithValue("@pwd", newPwd);
+                    cmd.CommandText = "INSERT INTO settings (key, value, updated_at) VALUES ('admin_password', @pwd, datetime('now')) ON CONFLICT(key) DO UPDATE SET value = @pwd, updated_at = datetime('now');";
+                    cmd.Parameters.AddWithValue("@pwd", hashedPwd);
                     cmd.ExecuteNonQuery();
                 }
 
                 using (var cmd = conn.CreateCommand())
                 {
-                    cmd.CommandText = "INSERT INTO SystemSettings (SettingKey, SettingValue, UpdatedAt) VALUES ('is_custom_admin_password_set', '1', datetime('now')) ON CONFLICT(SettingKey) DO UPDATE SET SettingValue = '1', UpdatedAt = datetime('now');";
+                    cmd.CommandText = "INSERT INTO settings (key, value, updated_at) VALUES ('is_custom_admin_password_set', '1', datetime('now')) ON CONFLICT(key) DO UPDATE SET value = '1', updated_at = datetime('now');";
                     cmd.ExecuteNonQuery();
                 }
 

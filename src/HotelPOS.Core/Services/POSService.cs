@@ -77,7 +77,7 @@ public class POSService : IPOSService
             // 1. Generate unique sale code if empty
             if (string.IsNullOrWhiteSpace(sale.SaleCode))
             {
-                sale.SaleCode = $"SL-{DateTime.Now:yyyyMMddHHmmss}-{new Random().Next(100, 999)}";
+                sale.SaleCode = $"SL-{DateTime.Now:yyyyMMddHHmmss}-{Guid.NewGuid().ToString("N")[..8]}";
             }
 
             // 2. Validate products and stock quantity
@@ -108,7 +108,7 @@ public class POSService : IPOSService
             }
 
             sale.SubTotal = subTotal;
-            sale.TotalAmount = subTotal - sale.DiscountAmount + sale.TaxAmount;
+            sale.TotalAmount = Math.Max(0, subTotal - sale.DiscountAmount + sale.TaxAmount);
 
             if (payment != null)
             {

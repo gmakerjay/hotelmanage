@@ -73,7 +73,42 @@ public static class LicenseManager
             }
         }
 
-        // 2. กรณีไม่มี USB Dongle เสียบอยู่ -> สลับเข้าโหมดทดลองใช้ 30 วัน (Trial Anti-Reset)
+        // 2. กรณีไม่มี USB Dongle → ตรวจสอบไฟล์ license.dat (Software Key ที่ Activate ผ่าน Key)
+        if (File.Exists(licenseFilePath))
+        {
+            try
+            {
+                string licenseContent = File.ReadAllText(licenseFilePath);
+                var fileLicense = LicenseFile.FromJson(licenseContent);
+
+                if (fileLicense != null)
+                {
+                    // ตรวจสอบลายเซ็นดิจิทัล + HardwareId + วันหมดอายุ
+                    LicenseStatus fileStatus = LicenseValidator.Validate(
+                        fileLicense, currentHardwareId, lastVerifiedAt, licenseDirectory);
+
+                    if (fileStatus == LicenseStatus.Active || fileStatus == LicenseStatus.Expired)
+                    {
+                        int fileDaysRemaining = fileLicense.ExpireDate.HasValue
+                            ? Math.Max(0, (fileLicense.ExpireDate.Value.Date - DateTime.Now.Date).Days)
+                            : 99999;
+
+                        UpdateDbLicenseInfo(dbPath, fileLicense.CustomerName, fileLicense.HardwareId, fileLicense.LicenseType,
+                            fileLicense.IssueDate, fileLicense.ExpireDate, fileLicense.MaxRooms,
+                            JsonSerializer.Serialize(fileLicense.Features), fileStatus);
+
+                        return (fileStatus, fileLicense, fileDaysRemaining);
+                    }
+                    // fileStatus == Invalid/Revoked → ไม่ยอมรับ ตกลงไป Trial
+                }
+            }
+            catch
+            {
+                // ไฟล์เสียหาย / อ่านไม่ได้ → ตกลงไป Trial
+            }
+        }
+
+        // 3. กรณีไม่มี USB Dongle และไม่มี license.dat ที่ valid -> สลับเข้าโหมดทดลองใช้ 30 วัน (Trial Anti-Reset)
         var trialStatus = TrialManager.GetTrialStatus(dbPath, licenseDirectory);
         LicenseStatus trialLicenseStatus = trialStatus.IsActive ? LicenseStatus.Active : LicenseStatus.Expired;
 

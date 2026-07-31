@@ -298,7 +298,8 @@ public class BookingService : IBookingService
                 return days * agreedRate;
 
             case RatePlanType.Monthly:
-                return agreedRate;
+                var months = (int)Math.Max(1, Math.Ceiling((end - start).TotalDays / 30.0));
+                return months * agreedRate;
 
             default:
                 return agreedRate;

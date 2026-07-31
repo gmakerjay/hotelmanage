@@ -368,9 +368,7 @@ public class UtilityBillHistoryForm : Form
 
             if (confirm == DialogResult.Yes)
             {
-                using var conn = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "PSoftRestRentManager", "restrent.db")}");
-                await conn.OpenAsync();
-                await Dapper.SqlMapper.ExecuteAsync(conn, "UPDATE utility_bills SET is_paid = 0, paid_at = NULL WHERE id = @Id;", new { Id = billId });
+                await _utilityBillService.MarkBillAsUnpaidAsync(billId);
 
                 await LoadBillsAsync();
                 MessageBox.Show($"สลับสถานะบิลห้อง {roomNumber} กลับเป็น [ค้างชำระ] เรียบร้อยแล้ว", "สำเร็จ", MessageBoxButtons.OK, MessageBoxIcon.Information);

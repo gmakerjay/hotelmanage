@@ -145,6 +145,54 @@ public class BookingServiceTests : IDisposable
         Assert.Equal(RoomStatus.Cleaning, room!.Status);
     }
 
+    [Fact]
+    public async Task WalkInMonthly_เช็คเอาท์ทันที_ควรคิดค่าเช่าอย่างน้อย_1_เดือน()
+    {
+        var typeId = await _roomService.SaveRoomTypeAsync(new RoomType { Name = "Studio", DailyRate = 5000 });
+        var roomId = await _roomService.SaveRoomAsync(new Room { RoomNumber = "401", Floor = "4", RoomTypeId = typeId });
+
+        var customer = new Customer { FullName = "นายรายเดือน ทดสอบ", Phone = "0811111111" };
+
+        var booking = await _bookingService.WalkInCheckInAsync(
+            roomId,
+            customer,
+            RatePlanType.Monthly,
+            5000,
+            DateTime.Now.AddMonths(1)
+        );
+
+        // เช็คเอาท์ทันที → ต้องคิดอย่างน้อย 1 เดือน = 5,000 บาท
+        var folio = await _bookingService.CheckOutAsync(booking.Id);
+        Assert.True(folio.RoomCharges >= 5000, $"ค่าเช่ารายเดือนต้อง >= 5000 (ได้ {folio.RoomCharges})");
+    }
+
+    [Fact]
+    public void CalculateRoomCharges_Monthly_อยู่75วัน_ต้องคิด3เดือน()
+    {
+        // ทดสอบ private static method ผ่าน Reflection เพื่อตรวจสอบการคำนวณจำนวนเดือน
+        var method = typeof(BookingService).GetMethod("CalculateRoomCharges",
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
+        Assert.NotNull(method);
+
+        var start = new DateTime(2026, 1, 1);
+
+        // Case 1: อยู่ 75 วัน → Ceiling(75/30) = 3 เดือน → 3 * 3500 = 10500
+        var result75 = (decimal)method!.Invoke(null, new object[] { RatePlanType.Monthly, 3500m, start, start.AddDays(75) })!;
+        Assert.Equal(10500m, result75);
+
+        // Case 2: อยู่ 30 วันพอดี → Ceiling(30/30) = 1 เดือน → 1 * 3500 = 3500
+        var result30 = (decimal)method.Invoke(null, new object[] { RatePlanType.Monthly, 3500m, start, start.AddDays(30) })!;
+        Assert.Equal(3500m, result30);
+
+        // Case 3: อยู่ 31 วัน → Ceiling(31/30) = 2 เดือน → 2 * 3500 = 7000
+        var result31 = (decimal)method.Invoke(null, new object[] { RatePlanType.Monthly, 3500m, start, start.AddDays(31) })!;
+        Assert.Equal(7000m, result31);
+
+        // Case 4: อยู่ 1 วัน → Ceiling(1/30) = 1 เดือน → 1 * 3500 = 3500 (ขั้นต่ำ 1 เดือน)
+        var result1 = (decimal)method.Invoke(null, new object[] { RatePlanType.Monthly, 3500m, start, start.AddDays(1) })!;
+        Assert.Equal(3500m, result1);
+    }
+
     public void Dispose()
     {
         if (_logger is IDisposable disposableLogger)

@@ -271,4 +271,9 @@ public class UtilityBillService : IUtilityBillService
     {
         await _billRepo.MarkAllUnpaidBillsAsPaidForRoomAsync(roomId, paymentMethod);
     }
+
+    public async Task MarkBillAsUnpaidAsync(int billId)
+    {
+        await _billRepo.MarkBillAsUnpaidAsync(billId);
+    }
 }

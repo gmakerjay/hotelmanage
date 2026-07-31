@@ -19,6 +19,13 @@ public static class LicenseValidator
         DateTime? lastVerifiedAt = null, 
         string? revocationDirectory = null)
     {
+        if (license == null)
+            return LicenseStatus.Invalid;
+
+        // ตรวจสอบ HardwareId ของเครื่อง สำหรับ Software License (ป้องกันการก๊อปปี้ license.dat ไปเครื่องอื่น)
+        if (!string.IsNullOrEmpty(license.HardwareId) && license.HardwareId != currentHardwareId)
+            return LicenseStatus.Invalid;
+
         string appSerial = AppWatermarkManager.GetCurrentAppSerial();
         return ValidateDongle(license, currentHardwareId, appSerial, lastVerifiedAt, revocationDirectory);
     }

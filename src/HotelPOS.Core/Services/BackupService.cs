@@ -94,6 +94,12 @@ public class BackupService : IBackupService
         GC.Collect();
         GC.WaitForPendingFinalizers();
 
+        // ลบไฟล์ WAL/SHM ของฐานข้อมูลปัจจุบันเพื่อป้องกัน Transaction เก่ารันซ้ำทับข้อมูลที่ Restore
+        var walPath = activeDbPath + "-wal";
+        var shmPath = activeDbPath + "-shm";
+        try { if (File.Exists(walPath)) File.Delete(walPath); } catch { /* ไม่เป็นไร ถ้าลบไม่ได้ */ }
+        try { if (File.Exists(shmPath)) File.Delete(shmPath); } catch { /* ไม่เป็นไร ถ้าลบไม่ได้ */ }
+
         // สำรองไฟล์ปัจจุบันไว้ก่อนเผื่อมีปัญหา
         var tempBackup = activeDbPath + ".tmp_before_restore";
         if (File.Exists(activeDbPath))
@@ -104,6 +110,12 @@ public class BackupService : IBackupService
         try
         {
             File.Copy(sourceFilePath, activeDbPath, overwrite: true);
+
+            // ลบ WAL/SHM ของไฟล์ backup ที่อาจติดมา (ถ้ามี)
+            var srcWal = sourceFilePath + "-wal";
+            var srcShm = sourceFilePath + "-shm";
+            try { if (File.Exists(srcWal)) File.Delete(srcWal); } catch { }
+            try { if (File.Exists(srcShm)) File.Delete(srcShm); } catch { }
             if (File.Exists(tempBackup))
             {
                 File.Delete(tempBackup);

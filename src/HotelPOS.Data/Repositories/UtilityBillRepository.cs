@@ -393,4 +393,21 @@ public class UtilityBillRepository : IUtilityBillRepository
             throw;
         }
     }
+
+    public async Task MarkBillAsUnpaidAsync(int billId)
+    {
+        var correlationId = _logger.NewCorrelationId();
+        try
+        {
+            using var conn = _connectionFactory.CreateConnection();
+            const string sql = @"UPDATE utility_bills SET is_paid = 0, paid_at = NULL WHERE id = @Id";
+            await conn.ExecuteAsync(sql, new { Id = billId });
+            _logger.Info(LogCategory.Utility, $"สลับสถานะบิล ID={billId} กลับเป็นค้างชำระ (Admin Override)", correlationId);
+        }
+        catch (Exception ex)
+        {
+            _logger.Error(LogCategory.Utility, $"สลับสถานะบิล ID={billId} เป็นค้างชำระล้มเหลว", ex, correlationId);
+            throw;
+        }
+    }
 }

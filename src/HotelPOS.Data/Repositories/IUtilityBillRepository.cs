@@ -34,4 +34,7 @@ public interface IUtilityBillRepository
 
     /// <summary>บันทึกชำระเงินและเคลียร์บิลค้างชำระทั้งหมดของห้องที่ระบุ</summary>
     Task MarkAllUnpaidBillsAsPaidForRoomAsync(int roomId, PaymentMethod paymentMethod);
+
+    /// <summary>สลับสถานะบิลกลับเป็นค้างชำระ (Admin Override)</summary>
+    Task MarkBillAsUnpaidAsync(int billId);
 }

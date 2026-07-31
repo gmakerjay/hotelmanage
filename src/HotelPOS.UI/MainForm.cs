@@ -987,7 +987,9 @@ public class MainForm : Form
                     return;
                 }
 
-                _settingsService.SetAsync("admin_password", p1).GetAwaiter().GetResult();
+                // Hash รหัสผ่านด้วย PBKDF2 ก่อนบันทึก (ห้ามเก็บ plaintext)
+                string hashedPwd = PasswordHelper.HashPassword(p1);
+                _settingsService.SetAsync("admin_password", hashedPwd).GetAwaiter().GetResult();
                 _settingsService.SetAsync("is_custom_admin_password_set", "1").GetAwaiter().GetResult();
                 MessageBox.Show("บันทึกรหัสผ่าน Admin เรียบร้อยแล้ว (สามารถแก้ไขได้ภายหลังในเมนูตั้งค่าระบบ)", "สำเร็จ", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }

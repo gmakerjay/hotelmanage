@@ -728,8 +728,12 @@ public class SystemSettingsControl : UserControl
                 var currentPwd = await _settingsService.GetAsync("admin_password") ?? "psoft123";
                 if (string.IsNullOrWhiteSpace(currentPwd)) currentPwd = "psoft123";
 
-                string inputHash = ComputeSha256Hash(inputPwd);
-                bool matches = (inputPwd == "psoft123") || (inputPwd == currentPwd) || (inputHash == currentPwd);
+                // ใช้ PasswordHelper.VerifyPassword เพื่อรองรับ PBKDF2/SHA256/PlainText + auto-upgrade
+                var (matches, upgradedHash) = PasswordHelper.VerifyPassword(inputPwd, currentPwd);
+                if (matches && upgradedHash != null)
+                {
+                    await _settingsService.SetAsync("admin_password", upgradedHash);
+                }
 
                 if (!matches)
                 {
@@ -924,10 +928,15 @@ public class SystemSettingsControl : UserControl
                     if (verifyDlg.ShowDialog(this) == DialogResult.OK)
                     {
                         var typedPwd = txtP.Text.Trim();
-                        string typedHash = ComputeSha256Hash(typedPwd);
-                        if (typedPwd == "psoft123" || typedPwd == currentPwd || typedHash == currentPwd)
+                        // ใช้ PasswordHelper.VerifyPassword เพื่อรองรับ PBKDF2/SHA256/PlainText + auto-upgrade
+                        var (isMatch, upgHash) = PasswordHelper.VerifyPassword(typedPwd, currentPwd);
+                        if (isMatch)
                         {
                             isVerified = true;
+                            if (upgHash != null)
+                            {
+                                await _settingsService.SetAsync("admin_password", upgHash);
+                            }
                         }
                     }
                 }
@@ -938,7 +947,9 @@ public class SystemSettingsControl : UserControl
                     return;
                 }
 
-                await _settingsService.SetAsync("admin_password", pwd);
+                // Hash รหัสผ่านด้วย PBKDF2 ก่อนบันทึก (ห้ามเก็บ plaintext)
+                string hashedPwd = PasswordHelper.HashPassword(pwd);
+                await _settingsService.SetAsync("admin_password", hashedPwd);
                 await _settingsService.SetAsync("is_custom_admin_password_set", "1");
             }
 
